@@ -3,6 +3,8 @@
  *
  * The stopwatch class should function as a "timer" for a variety of unique keys. Any time a caller calls the "tick" method, with a key, the stopwatch will log the time since the last tick for that key.
  */
+import { logger } from './logger';
+
 export class Stopwatch {
 	private _lastTick: { [key: string]: number } = {};
 	constructor() {}
@@ -15,7 +17,7 @@ export class Stopwatch {
 		const now = Date.now();
 		const lastTick = this._lastTick[key];
 		if (lastTick) {
-			console.log(
+			logger.debug(
 				`⏱️ :: ${message ? ` ${message} ` : ''} \n${key} => ${now - lastTick}ms`
 			);
 		}

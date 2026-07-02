@@ -58,6 +58,7 @@ import {
 	SnakeCase,
 } from 'cerializr';
 import { assert } from './utils/assert';
+import { logger } from './utils/logger';
 import { Config } from './Config';
 import {
 	AccountSnapshot,
@@ -2145,7 +2146,7 @@ export class UISerializableSwapRecord extends SerializableSwapRecord {
 			instance.outOraclePrice.precision = outPrecision;
 			instance.fee.precision = inPrecision;
 		} catch (e) {
-			console.error('Error in swap serializer', e);
+			logger.error('Error in swap serializer', e);
 		}
 	}
 }
@@ -2278,7 +2279,7 @@ export function transformDataApiPositionHistoryRecordToUISerializablePositionHis
 
 		return transformedRecord;
 	} catch (e) {
-		console.error(
+		logger.error(
 			'Error in transformDataApiPositionHistoryRecordToUISerializablePositionHistoryRecord',
 			e
 		);

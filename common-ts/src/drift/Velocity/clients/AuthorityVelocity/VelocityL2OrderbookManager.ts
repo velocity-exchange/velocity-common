@@ -10,6 +10,7 @@ import {
 	DLOB_SERVER_WEBSOCKET_UTILS,
 	OrderbookGrouping,
 } from '../../../../utils/dlob-server/DlobServerWebsocketUtils';
+import { logger } from '../../../../utils/logger';
 
 interface VelocityL2OrderbookSubscription {
 	marketId: MarketId;
@@ -53,7 +54,7 @@ export class VelocityL2OrderbookManager {
 	 */
 	public async subscribe(): Promise<void> {
 		if (this.websocketSubscription) {
-			console.error('There is already a subscription to the orderbook');
+			logger.error('There is already a subscription to the orderbook');
 			return;
 		}
 
@@ -96,7 +97,7 @@ export class VelocityL2OrderbookManager {
 					this.handleWebSocketMessage(message);
 				},
 				onError: (error) => {
-					console.error('OrderbookManager WebSocket error:', error);
+					logger.error('OrderbookManager WebSocket error:', error);
 				},
 				messageFilter: (message: DlobMessage) => {
 					return messageFilter(message);
@@ -105,7 +106,7 @@ export class VelocityL2OrderbookManager {
 					return !!message.error;
 				},
 				onClose: () => {
-					console.log('OrderbookManager WebSocket connection closed');
+					logger.debug('OrderbookManager WebSocket connection closed');
 				},
 				enableHeartbeatMonitoring: true,
 			}
@@ -166,7 +167,7 @@ export class VelocityL2OrderbookManager {
 			this._orderbook = deserializedOrderbook;
 			this.updatesSubject$.next(deserializedOrderbook);
 		} catch (error) {
-			console.error('Error processing orderbook websocket message:', error);
+			logger.error('Error processing orderbook websocket message:', error);
 		}
 	}
 

@@ -12,6 +12,7 @@ import { EnvironmentConstants } from '../EnvironmentConstants';
 import { UIEnv } from '../types/UIEnv';
 import { assert } from '../utils/assert';
 import { CandleSubscriberSubscription, MarketDataFeed } from './marketDataFeed';
+import { logger } from '../utils/logger';
 
 /**
  * # CANDLE CLIENT HIGH LEVEL EXPLANATION:
@@ -641,7 +642,7 @@ export class CandleClient {
 		if (subscription) {
 			subscription.eventBus.on(event, listener);
 		} else {
-			console.warn(`No active subscription found for key: ${subscriptionKey}`);
+			logger.warn(`No active subscription found for key: ${subscriptionKey}`);
 		}
 	}
 }

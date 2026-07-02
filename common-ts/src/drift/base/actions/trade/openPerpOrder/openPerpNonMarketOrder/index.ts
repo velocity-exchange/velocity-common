@@ -42,6 +42,7 @@ import {
 	getIsolatedPositionDepositIxIfNeeded,
 	resolveIsolatedPositionDepositsWithOverride,
 } from '../isolatedPositionDeposit';
+import { logger } from '../../../../../../utils/logger';
 
 export interface OpenPerpNonMarketOrderBaseParams
 	extends Omit<NonMarketOrderParamsConfig, 'marketType' | 'baseAssetAmount'> {
@@ -295,7 +296,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 				allIxs.push(placeAndTakeIx);
 				createdPlaceAndTakeIx = true;
 			} catch (e) {
-				console.error(
+				logger.error(
 					'Failed to create placeAndTake order for limit auction order',
 					e
 				);

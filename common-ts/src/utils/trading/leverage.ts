@@ -1,4 +1,5 @@
 import { BN, MARGIN_PRECISION, User } from '@velocity-exchange/sdk';
+import { logger } from '../logger';
 
 const convertLeverageToMarginRatio = (leverage: number): number | undefined => {
 	if (!leverage) return undefined;
@@ -84,7 +85,7 @@ const validateLeverageChange = ({
 
 		return perpPositionWeightedValueDelta.lte(freeCollateral);
 	} catch (error) {
-		console.warn('Error validating leverage change:', error);
+		logger.warn('Error validating leverage change:', error);
 		return true; // Allow change if validation fails
 	}
 };

@@ -6,6 +6,7 @@ import {
 	MAX_PYTH_LAZER_CRANKS,
 	DEFAULT_PRECEDING_IXS_COUNT,
 } from './constants';
+import { logger } from '../../../../../utils/logger';
 
 export const getPythLazerUpdateIxs = async (
 	marketConfigs: OracleMarketConfig[],
@@ -30,7 +31,7 @@ export const getPythLazerUpdateIxs = async (
 	const result = await oracleCrankDataFetcher('pythLazer', feedIds);
 
 	if (!result.success || !result.data) {
-		console.error('Error getting pyth lazer update data');
+		logger.error('Error getting pyth lazer update data');
 		return [];
 	}
 
@@ -43,7 +44,7 @@ export const getPythLazerUpdateIxs = async (
 		);
 		return crankIxs;
 	} catch (e) {
-		console.error('Error getting pyth lazer crank ix from velocityClient:', e);
+		logger.error('Error getting pyth lazer crank ix from velocityClient:', e);
 		return [];
 	}
 };

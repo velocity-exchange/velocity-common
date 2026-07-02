@@ -8,6 +8,7 @@ import {
 	SpotMarketConfig,
 } from '@velocity-exchange/sdk';
 import { UIMarket } from '../types/UIMarket';
+import { logger } from './logger';
 
 /**
  * Calculates the next APR for insurance fund staking
@@ -70,7 +71,7 @@ function calculateVaultNextApr(
 
 		return nextApr;
 	} catch (error) {
-		console.warn('Error calculating next APR:', error);
+		logger.warn('Error calculating next APR:', error);
 		return 0;
 	}
 }

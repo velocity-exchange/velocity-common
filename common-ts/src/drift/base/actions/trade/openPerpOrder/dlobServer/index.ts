@@ -37,6 +37,7 @@ import {
 	deriveMarketOrderParams,
 } from '../../../../../../utils/trading/auction';
 import invariant from 'tiny-invariant';
+import { logger } from '../../../../../../utils/logger';
 
 export interface OptionalAuctionParamsRequestInputs {
 	// Optional parameters that can override defaults or provide additional configuration
@@ -159,8 +160,8 @@ export async function fetchAuctionOrderParams(params: RegularOrderParams) {
 	try {
 		return await fetchAuctionOrderParamsFromDlob(params);
 	} catch (error) {
-		console.error(error);
-		console.log('Falling back to L2 data');
+		logger.error(error);
+		logger.debug('Falling back to L2 data');
 		return await fetchAuctionOrderParamsFromL2(params);
 	}
 }
@@ -411,7 +412,7 @@ export async function fetchTopMakers(params: FetchTopMakersParams): Promise<
 
 		return mappedParams;
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 		return [];
 	}
 }

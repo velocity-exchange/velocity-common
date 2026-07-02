@@ -1,4 +1,5 @@
 import { RpcEndpoint } from 'src/EnvironmentConstants';
+import { logger } from './logger';
 
 export const getResponseTimes = async (rpcOptions: RpcEndpoint[]) => {
 	const responseTimes = await Promise.all(
@@ -51,7 +52,7 @@ export const getResponseTime = async (
 		},
 		body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
 	}).catch((err) => {
-		console.error('Error checking RPC response time ', err);
+		logger.error('Error checking RPC response time ', err);
 		return null;
 	});
 

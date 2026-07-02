@@ -38,6 +38,7 @@ import {
 	PollingDlob,
 } from '../../data/PollingDlob';
 import { EnvironmentConstants } from '../../../../EnvironmentConstants';
+import { logger } from '../../../../utils/logger';
 import { MarkPriceLookup, MarkPriceCache } from '../../stores/MarkPriceCache';
 import {
 	OraclePriceLookup,
@@ -617,7 +618,7 @@ export class AuthorityVelocity {
 			try {
 				this._isGeoBlocked = (await checkGeoBlock()) ?? false;
 			} catch (error) {
-				console.warn('Failed to check geoblock status:', error);
+				logger.warn('Failed to check geoblock status:', error);
 				this._isGeoBlocked = false; // Default to not blocked if check fails
 			}
 		};
