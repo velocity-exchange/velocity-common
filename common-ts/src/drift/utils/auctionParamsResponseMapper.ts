@@ -7,6 +7,7 @@ import {
 	OrderTriggerCondition,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../utils';
+import { logger } from '../../utils/logger';
 
 export interface MappedAuctionParams {
 	orderType: OrderType;
@@ -151,14 +152,14 @@ const convertValue = (value: any, type: FieldType): any => {
 						enumResult = OrderTriggerCondition.TRIGGERED_BELOW;
 						break;
 					default:
-						console.warn(
+						logger.warn(
 							`⚠️  [Converter] Unknown enum value: ${value}, using ENUM_UTILS.toObj as fallback`
 						);
 						enumResult = ENUM_UTILS.toObj(value);
 				}
 				return enumResult;
 			} catch (error) {
-				console.error(
+				logger.error(
 					`❌ [Converter] Enum conversion failed for ${value}:`,
 					error
 				);
@@ -209,7 +210,7 @@ export function mapAuctionParamsResponse(
 			try {
 				(mapped as any)[fieldName] = convertValue(serverValue, config.type);
 			} catch (error) {
-				console.error(`🔴 [Mapper] Field conversion error:`, {
+				logger.error(`🔴 [Mapper] Field conversion error:`, {
 					fieldName,
 					serverValue,
 					expectedType: config.type,

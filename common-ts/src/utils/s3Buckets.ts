@@ -3,6 +3,7 @@ import { ENUM_UTILS } from '.';
 import { Serializer } from '../serializableTypes';
 import { PnlSnapshotOrderOption, SnapshotEpochResolution } from '../types';
 import { ONE_DAY_MS } from '../constants';
+import { logger } from './logger';
 
 export type DownloadFile = {
 	key: string;
@@ -114,7 +115,7 @@ export const getDateRangeFromSelection = (
 			break;
 		case 'custom':
 			if (!customOpts || customOpts.year == undefined) {
-				console.error(
+				logger.error(
 					'Requested custom date range without providing customOpts'
 				);
 				break;
@@ -153,7 +154,7 @@ export const getDateRangeFromSelection = (
 				);
 				to = from;
 			} else {
-				console.error('Requested a custom day range without providing a month');
+				logger.error('Requested a custom day range without providing a month');
 				break;
 			}
 			break;

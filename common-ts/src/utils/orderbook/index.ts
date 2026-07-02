@@ -10,6 +10,7 @@ import {
 } from '@velocity-exchange/sdk';
 import { MarketId } from '../../types';
 import { calculateSpreadBidAskMark } from '../math';
+import { logger } from '../logger';
 import {
 	BidsAndAsks,
 	CategorisedLiquidity,
@@ -610,7 +611,7 @@ export const l2ToDisplayBidsAndAsks = (
 			return bid.price > formatted.bids[index - 1].price;
 		})
 	) {
-		console.log('orderbook - bids_not_in_descending_order', {
+		logger.debug('orderbook - bids_not_in_descending_order', {
 			l2Orderbook,
 			oraclePrice,
 			tickSizeForMarket,
@@ -629,7 +630,7 @@ export const l2ToDisplayBidsAndAsks = (
 			return ask.price < formatted.asks[index - 1].price;
 		})
 	) {
-		console.log('orderbook - asks_not_in_ascending_order', {
+		logger.debug('orderbook - asks_not_in_ascending_order', {
 			l2Orderbook,
 			oraclePrice,
 			tickSizeForMarket,

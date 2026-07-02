@@ -40,6 +40,7 @@ import {
 	VersionedTransaction,
 } from '@solana/web3.js';
 import { createPlaceholderIWallet } from '../../../../utils/accounts/wallet';
+import { logger } from '../../../../utils/logger';
 import {
 	DEFAULT_ACCOUNT_LOADER_COMMITMENT,
 	DEFAULT_ACCOUNT_LOADER_POLLING_FREQUENCY_MS,
@@ -400,7 +401,7 @@ export class CentralServerVelocity {
 				await user.unsubscribe();
 				this._velocityClient.users.clear();
 			} catch (cleanupError) {
-				console.warn('Error during cleanup:', cleanupError);
+				logger.warn('Error during cleanup:', cleanupError);
 				// Don't throw cleanup errors, but log them
 			}
 

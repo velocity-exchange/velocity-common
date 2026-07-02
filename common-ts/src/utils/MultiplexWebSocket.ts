@@ -1,5 +1,6 @@
 import { Subject, Subscription, catchError } from 'rxjs';
 import WebSocket, { MessageEvent } from 'isomorphic-ws';
+import { logger } from './logger';
 
 type WebSocketMessage<T = Record<string, unknown>> = T;
 
@@ -251,7 +252,7 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 		const requestedHeartbeat =
 			newSubscriptionProps.enableHeartbeatMonitoring ?? false;
 		if (existingMWS.heartbeatMonitoringEnabled !== requestedHeartbeat) {
-			console.warn(
+			logger.warn(
 				`WebSocket for ${wsUrl} already exists with heartbeat monitoring ${
 					existingMWS.heartbeatMonitoringEnabled ? 'enabled' : 'disabled'
 				}, ` +
@@ -265,7 +266,7 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 		const requestedTimeout =
 			newSubscriptionProps.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS;
 		if (existingMWS.heartbeatTimeoutMs !== requestedTimeout) {
-			console.warn(
+			logger.warn(
 				`WebSocket for ${wsUrl} already exists with heartbeat timeout ${existingMWS.heartbeatTimeoutMs}ms, ` +
 					`but new subscription requests ${requestedTimeout}ms. Using existing setting.`
 			);
@@ -329,13 +330,13 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 
 			// Restart websocket if it was closed unexpectedly (not by us)
 			if (!event.wasClean && this.subscriptions.size > 0) {
-				console.log('WebSocket closed unexpectedly, restarting...', event);
+				logger.info('WebSocket closed unexpectedly, restarting...', event);
 				this.refreshWebSocket();
 			}
 		};
 
 		webSocket.onerror = (error) => {
-			console.error('MultiplexWebSocket Error', { error, webSocket });
+			logger.error('MultiplexWebSocket Error', { error, webSocket });
 
 			// Forward error to all subscriptions for this websocket URL
 			const subscriptionIds =
@@ -377,7 +378,7 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 		const subjectSubscription = this.subject
 			.pipe(
 				catchError((err) => {
-					console.error('Caught websocket error', err);
+					logger.error('Caught websocket error', err);
 					onError();
 					return [];
 				})
@@ -394,12 +395,12 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 
 						onMessage(message);
 					} catch (err) {
-						console.error('Error parsing websocket message', err);
+						logger.error('Error parsing websocket message', err);
 						onError();
 					}
 				},
 				error: (err) => {
-					console.error('Error subscribing to websocket', err);
+					logger.error('Error subscribing to websocket', err);
 					onError();
 				},
 				complete: () => {
@@ -554,7 +555,7 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 
 		// Set new timeout
 		this.heartbeatTimeout = setTimeout(() => {
-			console.warn(
+			logger.warn(
 				`No heartbeat received within ${this.heartbeatTimeoutMs}ms - connection appears dead`
 			);
 			this.refreshWebSocket();
@@ -588,7 +589,7 @@ export class MultiplexWebSocket<T = Record<string, unknown>>
 				this.reconnectionManager.attemptReconnection(this.wsUrl));
 		} catch (error) {
 			// Max reconnect attempts exceeded — close gracefully and notify all subscribers
-			console.error('WebSocket reconnection failed', error);
+			logger.error('WebSocket reconnection failed', error);
 
 			// Forward error to all subscriptions before closing
 			for (const [, subscription] of this.subscriptions.entries()) {

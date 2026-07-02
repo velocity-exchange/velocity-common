@@ -3,6 +3,7 @@ import { EnvironmentConstants } from '../EnvironmentConstants';
 import { JsonCandle, JsonTrade, MarketSymbol, UIEnv } from '../types';
 import { Observable, Subject } from 'rxjs';
 import { MultiplexWebSocket } from '../utils/MultiplexWebSocket';
+import { logger } from '../utils/logger';
 
 const getBaseDataApiUrl = (env: UIEnv) => {
 	const constantEnv: keyof typeof EnvironmentConstants.dataServerUrl =
@@ -87,11 +88,11 @@ export class DataApiWsClient {
 	};
 
 	private handleError = () => {
-		console.error('candlesv2:: dataApiWsClient error occurred');
+		logger.error('candlesv2:: dataApiWsClient error occurred');
 	};
 
 	private handleClose = () => {
-		console.log('candlesv2:: dataApiWsClient connection closed');
+		logger.info('candlesv2:: dataApiWsClient connection closed');
 	};
 
 	public subscribe = async () => {
@@ -124,7 +125,7 @@ export class DataApiWsClient {
 
 					return false;
 				} catch (error) {
-					console.error('candlesv2:: dataApiWsClient messageFilter error', {
+					logger.error('candlesv2:: dataApiWsClient messageFilter error', {
 						error,
 						message,
 					});

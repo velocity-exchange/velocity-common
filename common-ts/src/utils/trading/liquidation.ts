@@ -1,5 +1,6 @@
 import { BN, BigNum, PRICE_PRECISION_EXP, User } from '@velocity-exchange/sdk';
 import { UIOrderType } from '../../types';
+import { logger } from '../logger';
 
 /**
  * Calculate the liquidation price of a position after a trade. Requires VelocityClient to be subscribed.
@@ -42,7 +43,7 @@ const calculateLiquidationPriceAfterPerpTrade = ({
 	];
 
 	if (!ALLOWED_ORDER_TYPES.includes(orderType)) {
-		console.error(
+		logger.error(
 			'Invalid order type for perp trade liquidation price calculation',
 			orderType
 		);
@@ -50,7 +51,7 @@ const calculateLiquidationPriceAfterPerpTrade = ({
 	}
 
 	if (orderType === 'limit' && !limitPrice) {
-		console.error(
+		logger.error(
 			'Limit order must have a limit price for perp trade liquidation price calculation'
 		);
 		return 0;

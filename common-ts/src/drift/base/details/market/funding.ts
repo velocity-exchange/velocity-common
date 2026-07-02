@@ -7,6 +7,7 @@ import { MarkPriceCache } from '../../../Velocity';
 import { MarketId } from '../../../../types';
 import { getFundingRate } from '../../../utils/funding';
 import { MAINNET_API_URLS, API_ENDPOINTS } from '../../../constants/apiUrls';
+import { logger } from '../../../../utils/logger';
 
 export const getMarketPredictedFunding = (
 	velocityClient: VelocityClient,
@@ -74,7 +75,7 @@ export const getMarketHistoricalFunding = async (
 			};
 		});
 	} catch (error) {
-		console.error('Error fetching funding rates:', error);
+		logger.error('Error fetching funding rates:', error);
 		return [];
 	}
 };

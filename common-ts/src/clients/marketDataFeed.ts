@@ -7,6 +7,7 @@ import { JsonTrade } from 'src/types';
 import { UIEnv } from '../types';
 import assert from 'assert';
 import invariant from 'tiny-invariant';
+import { logger } from '../utils/logger';
 
 /*
 
@@ -234,7 +235,7 @@ class ApiSubscription {
 		this.config = { marketSymbol, resolution, env };
 		this.id = this.generateSubscriptionId();
 		this.onNoMoreSubscribers = () => onNoMoreSubscribers(this.id);
-		console.log(`marketDataFeed::creating_new_api_subscription:${this.id}`);
+		logger.debug(`marketDataFeed::creating_new_api_subscription:${this.id}`);
 
 		const initialSubscriberType = initialSubscriber.config.type;
 
@@ -299,7 +300,7 @@ class ApiSubscription {
 	}
 
 	private unsubscribeFromApi() {
-		console.log(`marketDataFeed::unsubscribing_api_subscription:${this.id}`);
+		logger.debug(`marketDataFeed::unsubscribing_api_subscription:${this.id}`);
 		this.apiClient.unsubscribe();
 	}
 
@@ -473,7 +474,7 @@ class SubscriptionManager {
 
 		if (tradeSubscribers.length === 0) return; // Skip early if there are no trade subscribers to transfer
 
-		console.log(
+		logger.debug(
 			`marketDataFeed::transferring_previous_trade_subscribers_to_new_subscription`
 		);
 
@@ -554,7 +555,7 @@ class SubscriptionManager {
 			return;
 		}
 
-		console.log(
+		logger.debug(
 			`marketDataFeed::transferring_trade_subscribers_on_unsubscribe`
 		);
 
@@ -572,7 +573,7 @@ class SubscriptionManager {
 			this.compatibleCandleSubscriptionLookup.has(candleSubscriptionLookupKey);
 
 		if (hasExistingSuitableSubscription) {
-			console.log(
+			logger.debug(
 				`marketDataFeed::attaching_new_candle_subscriber_to_existing_subscription`
 			);
 			const existingSubscription = this.compatibleCandleSubscriptionLookup.get(
@@ -587,7 +588,7 @@ class SubscriptionManager {
 				subscriber
 			);
 		} else {
-			console.log(`marketDataFeed::creating_new_candle_subscription`);
+			logger.debug(`marketDataFeed::creating_new_candle_subscription`);
 			const newSubscription = new ApiSubscription(
 				subscriber.config.resolution,
 				subscriber,
@@ -612,7 +613,7 @@ class SubscriptionManager {
 			this.compatibleTradeSubscriptionLookup.has(tradeSubscriptionLookupKey);
 
 		if (hasExistingSuitableSubscription) {
-			console.log(
+			logger.debug(
 				`marketDataFeed::attaching_new_trade_subscriber_to_existing_subscription`
 			);
 			const existingSubscription = this.compatibleTradeSubscriptionLookup.get(
@@ -627,7 +628,7 @@ class SubscriptionManager {
 				subscriber
 			);
 		} else {
-			console.log(`marketDataFeed::creating_new_trade_subscription`);
+			logger.debug(`marketDataFeed::creating_new_trade_subscription`);
 			const newSubscription = new ApiSubscription(
 				DEFAULT_CANDLE_RESOLUTION_FOR_TRADE_SUBSCRIPTIONS,
 				subscriber,

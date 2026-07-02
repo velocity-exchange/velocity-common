@@ -10,6 +10,7 @@ import {
 import { UIMarket } from '../types/UIMarket';
 import { MarketId } from '../types/MarketId';
 import { ENUM_UTILS } from '.';
+import { logger } from './logger';
 
 /**
  * Calculates the price impact of an order, based on an L2
@@ -79,7 +80,7 @@ export const calculatePriceImpactFromL2 = (
 		}
 	} catch (e) {
 		// SDK function may throw error if no liquidity, use fallback values
-		console.warn('Error calculating price impact from L2:', e);
+		logger.warn('Error calculating price impact from L2:', e);
 
 		// Use best bid/ask as fallback
 		const bestBid = l2Data.bids?.[0];

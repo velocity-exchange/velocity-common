@@ -2,6 +2,8 @@
  * Utility class which makes sure that all results with a slot are only accepted if the slot is higher than the previous result
  * Enhanced to handle tab return scenarios and prevent "speed run" through queued messages
  */
+import { logger } from './logger';
+
 export class ResultSlotIncrementer {
 	private resultIncrements = new Map<string | symbol, number>();
 	private tabReturnTimestamp: number | null = null;
@@ -42,7 +44,7 @@ export class ResultSlotIncrementer {
 	 */
 	handleResult(key: string | symbol, slot: number, messageTimestamp?: number) {
 		if (slot === undefined) {
-			console.warn('Caught undefined slot in ResultSlotIncrementer');
+			logger.warn('Caught undefined slot in ResultSlotIncrementer');
 			return true;
 		}
 

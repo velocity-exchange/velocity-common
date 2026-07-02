@@ -11,7 +11,7 @@ import {
 } from '@velocity-exchange/sdk';
 
 import { Observable, Subscriber } from 'rxjs';
-import { allEnvDlog } from '../utils/logger';
+import { logger } from '../utils/logger';
 export type SwiftServerOrderProcessResponse = {
 	error?: string;
 	message: string;
@@ -133,7 +133,7 @@ export class SwiftClient {
 							status: response.status,
 						});
 					} catch (err) {
-						allEnvDlog('swiftClient', 'Error reading response body', err);
+						logger.debug('swiftClient', 'Error reading response body', err);
 
 						res({
 							success: false,
@@ -170,10 +170,10 @@ export class SwiftClient {
 		const response = await this.post('/orders', requestPayload);
 
 		if (response.status !== 200) {
-			console.error(
+			logger.error(
 				`Non-200 status code received for sent Swift order: ${response.status}`
 			);
-			allEnvDlog('swiftClient', 'full non-200 response body', response.body);
+			logger.debug('swiftClient', 'full non-200 response body', response.body);
 			return {
 				message:
 					response.body?.error ||
@@ -247,7 +247,7 @@ export class SwiftClient {
 						signedMsgOrderUuid
 					);
 					if (lastOrderId !== undefined) {
-						allEnvDlog(
+						logger.debug(
 							'swiftClient',
 							`confirmed in ${confirmType} RPC fetch orderID\n`,
 							lastOrderId
@@ -255,7 +255,7 @@ export class SwiftClient {
 						finalizeResolve(lastOrderId);
 					}
 				} catch (err) {
-					allEnvDlog('swiftClient', `${confirmType} RPC fetch error`, err);
+					logger.debug('swiftClient', `${confirmType} RPC fetch error`, err);
 				}
 			};
 
@@ -283,7 +283,7 @@ export class SwiftClient {
 						signedMsgOrderUuid
 					);
 					if (order) {
-						allEnvDlog(
+						logger.debug(
 							'swiftClient',
 							'confirmed in onAccountChange orderID\n',
 							order.orderId
@@ -330,7 +330,7 @@ export class SwiftClient {
 			'signedMsgUserOrders',
 			ordersAccount.data
 		) as SignedMsgUserOrdersAccount;
-		allEnvDlog(
+		logger.debug(
 			'swiftClient findOrder',
 			'decodedAccount\n',
 			decodedAccount,
@@ -339,7 +339,7 @@ export class SwiftClient {
 		const order = decodedAccount.signedMsgOrderData.find(
 			(order) => order.uuid.toString() === signedMsgOrderUuid.toString()
 		);
-		allEnvDlog('swiftClient findOrder', 'order\n', order);
+		logger.debug('swiftClient findOrder', 'order\n', order);
 		return order;
 	}
 
@@ -365,7 +365,7 @@ export class SwiftClient {
 			);
 
 			if (confirmResponse.status === 200) {
-				console.log('Confirmed hash: ', hash);
+				logger.debug('Confirmed hash: ', hash);
 				return {
 					success: true,
 					status: 200,
@@ -384,7 +384,7 @@ export class SwiftClient {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 
-		console.error('Failed to confirm hash: ', hash);
+		logger.error('Failed to confirm hash: ', hash);
 		return {
 			success: false,
 			status: 408,
@@ -479,7 +479,7 @@ export class SwiftClient {
 			takerPubkey,
 			signingAuthority
 		);
-		allEnvDlog('swiftClient', 'sendResponse\n', sendResponse);
+		logger.debug('swiftClient', 'sendResponse\n', sendResponse);
 
 		if (!sendResponse.success) {
 			subscriber.next({
@@ -507,7 +507,7 @@ export class SwiftClient {
 			signedMsgOrderUuid,
 			confirmDuration
 		).catch((err) => {
-			allEnvDlog('swiftClient', 'confirmSwiftOrderWS error', err);
+			logger.debug('swiftClient', 'confirmSwiftOrderWS error', err);
 			subscriber.next({
 				type: 'expired',
 				hash,

@@ -19,6 +19,7 @@ import {
 } from 'rxjs/operators';
 import { ResultSlotIncrementer } from '../utils/ResultSlotIncrementer';
 import { MultiplexWebSocket } from '../utils/MultiplexWebSocket';
+import { logger } from '../utils/logger';
 import { RawL2Output } from '../utils/orderbook/types';
 
 export type OrderbookChannelTypes = Extract<
@@ -83,7 +84,7 @@ export class DlobWebsocketClient {
 			),
 			filter((result): result is ProcessedMarketData => result !== null),
 			catchError((error) => {
-				console.error('Caught error in getMarketDataStream', error);
+				logger.error('Caught error in getMarketDataStream', error);
 				return EMPTY;
 			}),
 			takeUntil(this.destroy$),
@@ -286,7 +287,7 @@ export class DlobWebsocketClient {
 					})(message);
 				},
 				onError: (error?: any) => {
-					console.error('Caught error in createSubscription', error);
+					logger.error('Caught error in createSubscription', error);
 					this.config.onFallback?.(marketId);
 				},
 				errorMessageFilter: (message?: any) => {
@@ -299,7 +300,7 @@ export class DlobWebsocketClient {
 
 			this.subscriptions.set(subscriptionKey, { unsubscribe });
 		} catch (error) {
-			console.error('Failed to create subscription:', error);
+			logger.error('Failed to create subscription:', error);
 			this.config.onFallback?.(marketId);
 		}
 	}

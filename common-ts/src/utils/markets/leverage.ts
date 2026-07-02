@@ -5,6 +5,7 @@ import {
 	SpotMarketAccount,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../enum';
+import { logger } from '../logger';
 import { DEFAULT_MAX_MARKET_LEVERAGE } from '../../constants/markets';
 
 const getMaxLeverageForMarketAccount = (
@@ -44,7 +45,7 @@ const getMaxLeverageForMarketAccount = (
 			};
 		}
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 		return {
 			maxLeverage: 0,
 		};

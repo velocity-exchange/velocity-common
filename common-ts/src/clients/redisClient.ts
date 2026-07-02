@@ -1,5 +1,6 @@
 import { sleep } from '..';
 import { chunks } from '../utils/core/arrays';
+import { logger } from '../utils/logger';
 import Redis, { Cluster, RedisOptions } from 'ioredis';
 
 const BULK_WRITE_CHUNK_SIZE = 500;
@@ -25,7 +26,7 @@ function isWrite() {
 
 		descriptor.value = function (...args: unknown[]) {
 			if (process.env.DISABLE_CACHE_WRITE) {
-				console.log(`DISABLE_CACHE_WRITE=true :: Skipping ${methodName}`);
+				logger.debug(`DISABLE_CACHE_WRITE=true :: Skipping ${methodName}`);
 				return;
 			}
 
@@ -50,18 +51,18 @@ const getTlsConfiguration = () => {
 		process.env.RUNNING_LOCAL === 'true' &&
 		process.env.LOCAL_CACHE === 'true'
 	) {
-		console.log('Redis: Running LOCAL with LOCAL cache');
+		logger.debug('Redis: Running LOCAL with LOCAL cache');
 		return undefined;
 	}
 	if (process.env.RUNNING_LOCAL === 'true') {
-		console.log('Redis: Running LOCAL with REMOTE cache');
+		logger.debug('Redis: Running LOCAL with REMOTE cache');
 		return {
 			checkServerIdentity: (): undefined => {
 				return undefined;
 			},
 		};
 	}
-	console.log('Redis: Making a tls connection');
+	logger.debug('Redis: Making a tls connection');
 	return {};
 };
 
@@ -70,11 +71,11 @@ const getNatMap = () => {
 		process.env.RUNNING_LOCAL === 'true' &&
 		process.env.LOCAL_CACHE === 'false'
 	) {
-		console.log('Redis: Getting NATMAP for remote connection');
+		logger.debug('Redis: Getting NATMAP for remote connection');
 		const natMap = process.env?.NAT_MAP
 			? JSON.parse(process.env.NAT_MAP)
 			: false;
-		console.log(`NATMAP: ${process.env.NAT_MAP}`);
+		logger.debug(`NATMAP: ${process.env.NAT_MAP}`);
 		if (!natMap) {
 			throw new Error(
 				'NATMAP not found. When running the openElasticacheTunnel script copy the output into your terminal'
@@ -94,7 +95,7 @@ export const getRedisClusterClient = (
 	opts?: RedisOptions
 ): Cluster => {
 	if (host && port) {
-		console.log(`Connecting to configured cluster redis:: ${host}:${port}`);
+		logger.debug(`Connecting to configured cluster redis:: ${host}:${port}`);
 
 		const redisClient = new Redis.Cluster(
 			[
@@ -108,7 +109,7 @@ export const getRedisClusterClient = (
 				natMap: getNatMap(),
 				clusterRetryStrategy: (times) => {
 					const delay = Math.min(times * 1000, 10000);
-					console.log(
+					logger.info(
 						`Reconnecting to Redis in ${delay}ms... (retries: ${times})`
 					);
 					return delay;
@@ -118,7 +119,7 @@ export const getRedisClusterClient = (
 					reconnectOnError: (err) => {
 						const targetError = 'ECONNREFUSED';
 						if (err.message.includes(targetError)) {
-							console.log(
+							logger.info(
 								`Redis error: ${targetError}. Attempting to reconnect...`
 							);
 							return true;
@@ -133,15 +134,15 @@ export const getRedisClusterClient = (
 		);
 
 		redisClient.on('connect', () => {
-			console.log('Connected to Redis.');
+			logger.info('Connected to Redis.');
 		});
 
 		redisClient.on('error', (err) => {
-			console.error('Redis error:', err);
+			logger.error('Redis error:', err);
 		});
 
 		redisClient.on('reconnecting', () => {
-			console.log('Reconnecting to Redis...');
+			logger.info('Reconnecting to Redis...');
 		});
 
 		return redisClient;
@@ -157,7 +158,7 @@ export const getRedisClient = (
 	opts?: RedisOptions
 ): Redis => {
 	if (host && port) {
-		console.log(`Connecting to configured redis:: ${host}:${port}`);
+		logger.debug(`Connecting to configured redis:: ${host}:${port}`);
 
 		const redisClient = new Redis({
 			host,
@@ -165,7 +166,7 @@ export const getRedisClient = (
 			keyPrefix: prefix,
 			retryStrategy: (times) => {
 				const delay = Math.min(times * 1000, 10000);
-				console.log(
+				logger.debug(
 					`Reconnecting to Redis in ${delay}ms... (retries: ${times})`
 				);
 				return delay;
@@ -173,7 +174,7 @@ export const getRedisClient = (
 			reconnectOnError: (err) => {
 				const targetError = 'ECONNREFUSED';
 				if (err.message.includes(targetError)) {
-					console.log(
+					logger.info(
 						`Redis error: ${targetError}. Attempting to reconnect...`
 					);
 					return true;
@@ -186,15 +187,15 @@ export const getRedisClient = (
 		});
 
 		redisClient.on('connect', () => {
-			console.log('Connected to Redis.');
+			logger.info('Connected to Redis.');
 		});
 
 		redisClient.on('error', (err) => {
-			console.error('Redis error:', err);
+			logger.error('Redis error:', err);
 		});
 
 		redisClient.on('reconnecting', () => {
-			console.log('Reconnecting to Redis...');
+			logger.info('Reconnecting to Redis...');
 		});
 
 		return redisClient;
@@ -273,13 +274,13 @@ export class RedisClient {
 		}
 
 		this.client.on('error', (error) =>
-			console.log(`'Redis Client Error :: ', ${error?.message}`)
+			logger.error(`'Redis Client Error :: ', ${error?.message}`)
 		);
 
 		try {
 			await this.client.connect();
 		} catch (e) {
-			console.error(e);
+			logger.error(e);
 		}
 
 		return true;
