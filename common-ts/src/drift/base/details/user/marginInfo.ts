@@ -9,7 +9,7 @@ import {
 	VelocityClient,
 	calculateClaimablePnl,
 } from '@velocity-exchange/sdk';
-import { USDC_SPOT_MARKET_INDEX } from '../../../../constants';
+import { USDT_SPOT_MARKET_INDEX } from '../../../../constants';
 import { MarketId, MarketKey } from '../../../../types';
 
 export type AccountMarginInfo = {
@@ -60,8 +60,8 @@ export const getAccountMarginInfo = (
 	if (userMarginRatio.eq(new BN(Number.MAX_SAFE_INTEGER)))
 		userMarginRatio = ZERO;
 
-	const usdcSpotMarketAccount = velocityClient.getSpotMarketAccountOrThrow(
-		USDC_SPOT_MARKET_INDEX
+	const usdtSpotMarketAccount = velocityClient.getSpotMarketAccountOrThrow(
+		USDT_SPOT_MARKET_INDEX
 	);
 	const totalClaimablePnl = user
 		.getActivePerpPositions()
@@ -74,7 +74,7 @@ export const getAccountMarginInfo = (
 			);
 			const positionClaimablePnl = calculateClaimablePnl(
 				perpMarket,
-				usdcSpotMarketAccount,
+				usdtSpotMarketAccount,
 				position,
 				{
 					price: oraclePrice,

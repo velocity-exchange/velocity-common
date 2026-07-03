@@ -28,5 +28,5 @@ export enum PollingCategory {
  */
 export const HIGH_ACTIVITY_MARKET_ACCOUNTS = [
 	new PublicKey('8UJgxaiQx5nTrdDgph5FiahMmzduuLTLf5WmsPegYA6W'), // sol perp
-	new PublicKey('6gMq3mRCKf8aP3ttTyYhuijVZ2LGi14oDsBbkgubfLB3'), // usdc
+	new PublicKey('6gMq3mRCKf8aP3ttTyYhuijVZ2LGi14oDsBbkgubfLB3'), // usdt
 ];

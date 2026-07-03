@@ -16,7 +16,7 @@ import {
 	calculateUnsettledFundingPnl,
 } from '@velocity-exchange/sdk';
 import { calculatePotentialProfit } from '../../../../utils/trading/pnl';
-import { USDC_SPOT_MARKET_INDEX } from '../../../../constants';
+import { USDT_SPOT_MARKET_INDEX } from '../../../../constants';
 
 /**
  * Comprehensive position information derived from a PerpPosition at a specific reference price.
@@ -212,11 +212,11 @@ export const getPositionInfo = (
 		}),
 		QUOTE_PRECISION_EXP
 	);
-	const usdcSpotMarketAccount = velocityClient.getSpotMarketAccountOrThrow(
-		USDC_SPOT_MARKET_INDEX
+	const usdtSpotMarketAccount = velocityClient.getSpotMarketAccountOrThrow(
+		USDT_SPOT_MARKET_INDEX
 	);
 	const totalClaimablePnlBigNum = BigNum.from(
-		calculateClaimablePnl(perpMarket, usdcSpotMarketAccount, perpPosition, {
+		calculateClaimablePnl(perpMarket, usdtSpotMarketAccount, perpPosition, {
 			price: oraclePrice,
 		}),
 		QUOTE_PRECISION_EXP

@@ -153,7 +153,7 @@ export interface ComputeIsolatedPositionDepositParams {
 
 /**
  * Computes the isolated position deposit required for opening an isolated perp position.
- * Returns a BN in QUOTE_PRECISION (USDC).
+ * Returns a BN in QUOTE_PRECISION (USDT).
  */
 export function computeIsolatedPositionDepositForTrade({
 	velocityClient,

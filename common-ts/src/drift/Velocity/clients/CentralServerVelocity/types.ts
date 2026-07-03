@@ -101,7 +101,7 @@ export interface CentralServerGetDepositAndOpenIsolatedPerpPositionTxnParams
 		CentralServerGetOpenPerpMarketOrderTxnParams<false>,
 		'isolatedPositionDepositsOverride' | 'useSwift' | 'marginMode'
 	> {
-	/** Amount to deposit from wallet directly into isolated (QUOTE_PRECISION, e.g. USDC). */
+	/** Amount to deposit from wallet directly into isolated (QUOTE_PRECISION, e.g. USDT). */
 	depositAmount: BN;
 }
 

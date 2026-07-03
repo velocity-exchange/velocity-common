@@ -66,7 +66,7 @@ describe('CentralServerVelocity velocityClientContextWrapper', function () {
 			solanaRpcEndpoint: defaultDevnetRpc,
 			velocityEnv: 'devnet' as VelocityEnv,
 			supportedPerpMarkets: [0, 1, 2], // SOL, BTC, ETH
-			supportedSpotMarkets: [0, 1], // USDC, SOL
+			supportedSpotMarkets: [0, 1], // USDT, SOL
 		};
 
 		centralServerVelocity = new CentralServerVelocity(config);

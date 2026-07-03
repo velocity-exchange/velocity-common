@@ -114,7 +114,7 @@ export class VelocityOperations {
 	 * ```typescript
 	 * const result = await tradingOps.createUserAndDeposit({
 	 *   depositAmount: new BigNum(100),
-	 *   depositSpotMarketIndex: 0, // USDC
+	 *   depositSpotMarketIndex: 0, // USDT
 	 *   name: "Trading Account",
 	 *   maxLeverage: 5,
 	 *   subAccountId: 0
@@ -277,7 +277,7 @@ export class VelocityOperations {
 	 * const txSig = await tradingOps.deposit({
 	 *   subAccountId: 0,
 	 *   amount: new BigNum(50),
-	 *   spotMarketIndex: 0, // USDC
+	 *   spotMarketIndex: 0, // USDT
 	 *   isMaxBorrowRepayment: false
 	 * });
 	 * ```
@@ -331,7 +331,7 @@ export class VelocityOperations {
 	 * const txSig = await tradingOps.withdraw({
 	 *   subAccountId: 0,
 	 *   amount: new BigNum(25),
-	 *   spotMarketIndex: 0, // USDC
+	 *   spotMarketIndex: 0, // USDT
 	 *   allowBorrow: false,
 	 *   isMax: false
 	 * });
@@ -670,7 +670,7 @@ export class VelocityOperations {
 	 * @example
 	 * ```typescript
 	 * const txSig = await tradingOps.executeSwap({
-	 *   fromMarketIndex: 0, // USDC
+	 *   fromMarketIndex: 0, // USDT
 	 *   toMarketIndex: 1,   // SOL
 	 *   amount: new BigNum(100),
 	 *   subAccountId: 0,

@@ -139,13 +139,13 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 					expectedSubAccountId
 				);
 
-				const usdcSpotPosition = user
+				const usdtSpotPosition = user
 					.getUserAccount()
 					.spotPositions.find(
 						(position) => position.marketIndex === spotMarketIndex
 					);
-				expect(usdcSpotPosition).to.exist;
-				expect(usdcSpotPosition?.scaledBalance.gtn(0)).to.be.true;
+				expect(usdtSpotPosition).to.exist;
+				expect(usdtSpotPosition?.scaledBalance.gtn(0)).to.be.true;
 
 				await user.unsubscribe();
 			} catch (error: any) {
@@ -206,7 +206,7 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 					testWallet
 				);
 
-				// Ensure account has no balances: withdraw max USDC first
+				// Ensure account has no balances: withdraw max USDT first
 				const withdrawMaxTxn = await centralServerVelocity.getWithdrawTxn(
 					userAccountPublicKey,
 					ZERO,

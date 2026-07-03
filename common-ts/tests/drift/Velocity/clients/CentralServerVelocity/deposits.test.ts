@@ -115,8 +115,8 @@ describe('CentralServerVelocity - Deposit Transactions', function () {
 	}
 
 	describe('getDepositTxn', () => {
-		it('should create and execute deposit transaction for USDC', async () => {
-			const amount = new BN(1_000_000); // 1 USDC
+		it('should create and execute deposit transaction for USDT', async () => {
+			const amount = new BN(1_000_000); // 1 USDT
 			const spotMarketIndex = 0;
 			try {
 				await verifyDepositExecution(amount, spotMarketIndex, {

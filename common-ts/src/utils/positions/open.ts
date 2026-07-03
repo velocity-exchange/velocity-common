@@ -44,7 +44,7 @@ const getOpenPositionData = (
 				position.marketIndex
 			);
 
-			const usdcSpotMarket = velocityClient.getSpotMarketAccountOrThrow(
+			const usdtSpotMarket = velocityClient.getSpotMarketAccountOrThrow(
 				QUOTE_SPOT_MARKET_INDEX
 			);
 
@@ -147,7 +147,7 @@ const getOpenPositionData = (
 				pnlVsOracle,
 				unsettledPnl: calculateClaimablePnl(
 					perpMarket,
-					usdcSpotMarket,
+					usdtSpotMarket,
 					position,
 					oraclePriceData
 				),

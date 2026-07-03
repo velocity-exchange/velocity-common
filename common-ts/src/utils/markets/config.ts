@@ -9,7 +9,7 @@ import {
 import { ENUM_UTILS } from '../enum';
 
 const getBaseAssetSymbol = (marketName: string, removePrefix = false) => {
-	let baseAssetSymbol = marketName.replace('-PERP', '').replace('/USDC', '');
+	let baseAssetSymbol = marketName.replace('-PERP', '').replace('/USDT', '');
 
 	if (removePrefix) {
 		baseAssetSymbol = baseAssetSymbol.replace('1K', '').replace('1M', '');

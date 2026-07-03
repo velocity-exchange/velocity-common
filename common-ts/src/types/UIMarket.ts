@@ -17,7 +17,7 @@ import {
 	MAIN_POOL_ID,
 	SACRED_POOL_ID,
 } from '../constants/pools';
-import { USDC_SPOT_MARKET_INDEX } from '../constants/markets';
+import { USDT_SPOT_MARKET_INDEX } from '../constants/markets';
 import { ENUM_UTILS } from '../utils/enum';
 import { Config } from '../Config';
 import { Opaque } from './utility';
@@ -168,8 +168,8 @@ export class UIMarket {
 		return this.marketId.key;
 	}
 
-	get isUsdcMarket() {
-		return this.isSpot && this.marketIndex === USDC_SPOT_MARKET_INDEX;
+	get isUsdtMarket() {
+		return this.isSpot && this.marketIndex === USDT_SPOT_MARKET_INDEX;
 	}
 
 	get isStableCoinMarket() {

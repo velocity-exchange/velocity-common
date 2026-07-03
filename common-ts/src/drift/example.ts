@@ -58,7 +58,7 @@ async function initializeCentralServerVelocity(): Promise<void> {
 		solanaRpcEndpoint: process.env.ENDPOINT as string,
 		velocityEnv: 'mainnet-beta', // Change to 'devnet' for devnet testing
 		supportedPerpMarkets: [0, 1, 2], // SOL, BTC, ETH
-		supportedSpotMarkets: [0, 1], // USDC, SOL
+		supportedSpotMarkets: [0, 1], // USDT, SOL
 		additionalVelocityClientConfig: {
 			// Optional: Add additional VelocityClient configuration
 			txVersion: 0,
@@ -114,8 +114,8 @@ async function depositWithdrawExample() {
 	console.log('🚀 Starting Deposit/Withdraw Example...\n');
 
 	// Configuration for this example
-	const amount = new BN(1000000); // 1 USDC (6 decimals)
-	const spotMarketIndex = 0; // USDC market index
+	const amount = new BN(1000000); // 1 USDT (6 decimals)
+	const spotMarketIndex = 0; // USDT market index
 
 	// Example 1: Create a deposit transaction
 	console.log('--- 📥 Creating Deposit Transaction ---');

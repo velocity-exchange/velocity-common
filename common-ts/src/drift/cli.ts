@@ -232,7 +232,7 @@ async function initializeCentralServerVelocity(): Promise<void> {
 		solanaRpcEndpoint: rpcEndpoint,
 		velocityEnv,
 		supportedPerpMarkets: [0, 1, 2], // SOL, BTC, ETH
-		supportedSpotMarkets: [0, 1], // USDC, SOL
+		supportedSpotMarkets: [0, 1], // USDT, SOL
 		additionalVelocityClientConfig: {
 			txVersion: 0,
 			txParams: {
@@ -361,7 +361,7 @@ async function depositCommand(args: CliArgs): Promise<void> {
 	}
 
 	const userAccountPubkey = new PublicKey(userAccount);
-	const amountBN = parseAmount(amount, QUOTE_PRECISION); // Most deposits are USDC (quote precision)
+	const amountBN = parseAmount(amount, QUOTE_PRECISION); // Most deposits are USDT (quote precision)
 
 	console.log('--- 📥 Deposit Transaction ---');
 	console.log(`👤 User Account: ${userAccount}`);
@@ -1112,11 +1112,11 @@ function showUsage(): void {
 	console.log('');
 	console.log('Notes:');
 	console.log(
-		'  - Amounts are in human-readable format (e.g., 1.5 USDC, 0.1 SOL)'
+		'  - Amounts are in human-readable format (e.g., 1.5 USDT, 0.1 SOL)'
 	);
 	console.log('  - Direction can be: long, short, buy, sell');
 	console.log(
-		'  - Asset type: base (for native tokens like SOL) or quote (for USDC amounts)'
+		'  - Asset type: base (for native tokens like SOL) or quote (for USDT amounts)'
 	);
 	console.log('  - Swap modes:');
 	console.log(

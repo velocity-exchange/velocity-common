@@ -47,7 +47,7 @@ export const getDevWallet = () => {
 };
 
 /**
- * Generates a new test wallet for the devnet environment, and attempts to request an airdrop of 0.1 SOL + 1000 USDC.
+ * Generates a new test wallet for the devnet environment, and attempts to request an airdrop of 0.1 SOL + 1000 USDT.
  * If the airdrop fails, it will use the dev wallet as a fallback wallet.
  */
 export const getTestWallet = async () => {
@@ -75,12 +75,12 @@ export const getTestWallet = async () => {
 					connection,
 					DEVNET_TEST_WALLET,
 					new PublicKey('V4v1mQiAdLz4qwckEb45WqHYceYizoib39cDBHSWfaB'),
-					DevnetSpotMarkets[0].mint // Devnet USDC
+					DevnetSpotMarkets[0].mint // Devnet USDT
 				);
 
 				await faucet.createAssociatedTokenAccountAndMintTo(
 					DEVNET_TEST_WALLET.publicKey,
-					new BN(QUOTE_PRECISION.muln(1_000)) // 1000 USDC
+					new BN(QUOTE_PRECISION.muln(1_000)) // 1000 USDT
 				);
 			} catch (e) {
 				DEVNET_TEST_WALLET = getDevWallet().devWallet;

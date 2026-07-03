@@ -123,7 +123,7 @@ const findMarketBySymbol = (
 		throw new Error(`TVFeed::No symbol provided`);
 	}
 
-	const sanitisedSymbol = symbol.toLowerCase().replace('/usdc', ''); // Lowercase and replace /usdc (for spot markets) to santise symbol for lookup
+	const sanitisedSymbol = symbol.toLowerCase().replace('/usdt', ''); // Lowercase and replace /usdt (for spot markets) to santise symbol for lookup
 
 	const isPerp = sanitisedSymbol.toLowerCase().includes('perp');
 
