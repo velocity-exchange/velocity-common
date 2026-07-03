@@ -36,11 +36,6 @@ export const EnvironmentConstants = {
 			},
 		] as RpcEndpoint[],
 	},
-	historyServerUrl: {
-		dev: 'https://master.api.drift.trade',
-		staging: 'https://staging.api.drift.trade',
-		mainnet: 'https://mainnet-beta.api.drift.trade',
-	},
 	dataServerUrl: {
 		dev: 'https://data.master.velocity.exchange',
 		staging: 'https://data.staging.velocity.exchange',
