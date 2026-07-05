@@ -7,7 +7,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/velocity-exchange/drift-common/tree/master/common-ts"
+		"url": "https://github.com/velocity-exchange/velocity-common/tree/master/common-ts"
 	},
 	"homepage": "https://www.drift.trade/",
 	"keywords": [

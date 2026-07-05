@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"description": "Common building blocks for connecting to the Velocity Exchange program from React",
 	"main": "lib/index.js",
-	"repository": "https://github.com/velocity-exchange/drift-common",
+	"repository": "https://github.com/velocity-exchange/velocity-common",
 	"author": "Velocity Exchange",
 	"license": "MIT",
 	"scripts": {

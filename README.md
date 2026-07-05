@@ -1,4 +1,4 @@
-# drift-common
+# velocity-common
 
 Shared TypeScript code used across Drift/Velocity Exchange frontends, bots, and services. The repo is a multi-package workspace; each top-level directory is an independently published (or consumed-by-path) package.
 
@@ -16,7 +16,7 @@ Shared TypeScript code used across Drift/Velocity Exchange frontends, bots, and 
 ## Repo layout
 
 ```
-drift-common/
+velocity-common/
 ├── common-ts/          # @velocity-exchange/common — core TS library
 ├── react/              # @velocity-exchange/react — React hooks/providers/stores
 ├── icons/              # @velocity-exchange/icons — Figma-generated React icons

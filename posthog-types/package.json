@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/velocity-exchange/drift-common/tree/master/posthog-types"
+    "url": "https://github.com/velocity-exchange/velocity-common/tree/master/posthog-types"
   },
   "author": "Velocity Exchange",
   "scripts": {

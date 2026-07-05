@@ -13,7 +13,7 @@
 	"homepage": "https://www.drift.trade/",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/velocity-exchange/drift-common/tree/master/icons"
+		"url": "https://github.com/velocity-exchange/velocity-common/tree/master/icons"
 	},
 	"sideEffects": false,
 	"scripts": {
