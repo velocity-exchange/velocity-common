@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.6](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.1.5...common-ts-v0.1.6) (2026-07-05)
+
+
+### Code Refactoring
+
+* **common-ts:** remove historyServerUrl from EnvironmentConstants ([189ea46](https://github.com/velocity-exchange/velocity-common/commit/189ea4675b72a337d8d2f2dd96e0d9841878be9d))
+* **common-ts:** rename USDC to USDT ([d476fcb](https://github.com/velocity-exchange/velocity-common/commit/d476fcb3092593c846e89ee211f3f1c20057b527))
+* **common-ts:** replace console logging with logger utility for improved log management ([#381](https://github.com/velocity-exchange/velocity-common/issues/381)) ([7709504](https://github.com/velocity-exchange/velocity-common/commit/7709504c16159b7a9106af7e3404c0f10021117a))
+* **common-ts:** update bun.lock ([fd7d199](https://github.com/velocity-exchange/velocity-common/commit/fd7d19915e944266018e7104b819cf04e5215578))
+
 ## [0.1.5](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.1.4...common-ts-v0.1.5) (2026-06-30)
 
 
