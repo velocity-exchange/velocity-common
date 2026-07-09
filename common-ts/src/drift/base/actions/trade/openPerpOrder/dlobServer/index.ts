@@ -52,6 +52,10 @@ export interface OptionalAuctionParamsRequestInputs {
 	isOracleOrder?: boolean;
 	additionalEndPriceBuffer?: BN;
 	forceUpToSlippage?: boolean;
+	/**
+	 * Auction params API version, forwarded to the dlob-server's /auctionParams endpoint as `version`
+	 */
+	version?: number;
 }
 
 interface RegularOrderParams {
@@ -189,6 +193,7 @@ export async function fetchAuctionOrderParamsFromDlob({
 	velocityClient,
 	reduceOnly,
 	optionalAuctionParamsInputs = {},
+	onAuctionParamsFetched,
 }: RegularOrderParams): Promise<OptionalOrderParams> {
 	const baseAmount =
 		assetType === 'base'
@@ -228,6 +233,12 @@ export async function fetchAuctionOrderParamsFromDlob({
 	const serverResponse: ServerAuctionParamsResponse = await response.json();
 	const serverAuctionParams = serverResponse?.data?.params;
 	invariant(serverAuctionParams, 'Server auction params are required');
+
+	onAuctionParamsFetched?.(
+		new URLSearchParams(urlParamsObject),
+		serverResponse
+	);
+
 	const mappedParams: MappedAuctionParams =
 		mapAuctionParamsResponse(serverAuctionParams);
 
