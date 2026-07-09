@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.1.6...common-ts-v0.2.0) (2026-07-09)
+
+
+### Features
+
+* **common-ts:** add version parameter to auction params and callback for fetched auction params ([ae6a737](https://github.com/velocity-exchange/velocity-common/commit/ae6a73734d493015ea6f2b1acafd0f752cb065c1))
+
 ## [0.1.6](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.1.5...common-ts-v0.1.6) (2026-07-05)
 
 
