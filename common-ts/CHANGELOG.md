@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.2.0...common-ts-v0.2.1) (2026-07-11)
+
+
+### Code Refactoring
+
+* **common-ts:** update auction params response ([4c29a65](https://github.com/velocity-exchange/velocity-common/commit/4c29a65fda6f0dab7194d4e9eaed6f24293ee531))
+
 ## [0.2.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.1.6...common-ts-v0.2.0) (2026-07-09)
 
 
