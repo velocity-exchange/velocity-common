@@ -14,8 +14,12 @@ import {
 import { ENUM_UTILS } from '../../../../../../utils';
 import {
 	mapAuctionParamsResponse,
+	mapAuctionParamsResponseMeta,
 	ServerAuctionParamsResponse,
 	MappedAuctionParams,
+	MappedPriceImpact,
+	AuctionOrderParamsMeta,
+	FetchAuctionOrderParamsResult,
 	AuctionParamsFetchedCallback,
 } from '../../../../../utils/auctionParamsResponseMapper';
 import { encodeQueryParams } from '../../../../../../utils/core/fetch';
@@ -71,6 +75,11 @@ interface RegularOrderParams {
 	optionalAuctionParamsInputs?: OptionalAuctionParamsRequestInputs;
 	dynamicSlippageConfig?: DynamicSlippageConfig;
 	onAuctionParamsFetched?: AuctionParamsFetchedCallback;
+	/**
+	 * Skips the /auctionParams endpoint tier and derives params from L2 data directly.
+	 * Wired from the UI's FORCE_ORDER_PARAMS_FALLBACK feature flag.
+	 */
+	forceFallback?: boolean;
 }
 
 export interface BulkL2FetchingQueryParams {
@@ -160,7 +169,13 @@ export function fetchBulkMarketsDlobL2Data(
 	});
 }
 
-export async function fetchAuctionOrderParams(params: RegularOrderParams) {
+export async function fetchAuctionOrderParams(
+	params: RegularOrderParams
+): Promise<FetchAuctionOrderParamsResult> {
+	if (params.forceFallback) {
+		return await fetchAuctionOrderParamsFromL2(params);
+	}
+
 	try {
 		return await fetchAuctionOrderParamsFromDlob(params);
 	} catch (error) {
@@ -194,7 +209,7 @@ export async function fetchAuctionOrderParamsFromDlob({
 	reduceOnly,
 	optionalAuctionParamsInputs = {},
 	onAuctionParamsFetched,
-}: RegularOrderParams): Promise<OptionalOrderParams> {
+}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
 	const baseAmount =
 		assetType === 'base'
 			? amount
@@ -234,16 +249,11 @@ export async function fetchAuctionOrderParamsFromDlob({
 	const serverAuctionParams = serverResponse?.data?.params;
 	invariant(serverAuctionParams, 'Server auction params are required');
 
-	onAuctionParamsFetched?.(
-		new URLSearchParams(urlParamsObject),
-		serverResponse
-	);
-
 	const mappedParams: MappedAuctionParams =
 		mapAuctionParamsResponse(serverAuctionParams);
 
 	// Convert MappedAuctionParams to OptionalOrderParams
-	return {
+	const orderParams: OptionalOrderParams = {
 		orderType: mappedParams.orderType,
 		marketType: mappedParams.marketType,
 		userOrderId: mappedParams.userOrderId,
@@ -262,6 +272,21 @@ export async function fetchAuctionOrderParamsFromDlob({
 		auctionEndPrice: mappedParams.auctionEndPrice || null,
 		// no price, because market orders don't need a price
 	};
+
+	const meta: AuctionOrderParamsMeta = {
+		source: 'endpoint',
+		...mapAuctionParamsResponseMeta(serverResponse.data),
+	};
+
+	const result: FetchAuctionOrderParamsResult = { orderParams, meta };
+
+	onAuctionParamsFetched?.(
+		new URLSearchParams(urlParamsObject),
+		serverResponse,
+		result
+	);
+
+	return result;
 }
 
 const DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS = 100;
@@ -280,7 +305,7 @@ export async function fetchAuctionOrderParamsFromL2({
 	optionalAuctionParamsInputs = {},
 	velocityClient,
 	dynamicSlippageConfig,
-}: RegularOrderParams): Promise<OptionalOrderParams> {
+}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
 	const marketId = new MarketId(marketIndex, marketType);
 	const baseAmount =
 		assetType === 'base'
@@ -368,7 +393,25 @@ export async function fetchAuctionOrderParamsFromL2({
 		throw new Error('Failed to derive auction params from L2');
 	}
 
-	return auctionOrderParams;
+	const priceImpact: MappedPriceImpact = {
+		entryPrice: priceImpactData.entryPrice,
+		markPrice: markPriceBn,
+		oraclePrice: oraclePriceBn,
+		bestPrice: priceImpactData.bestPrice,
+		worstPrice: priceImpactData.worstPrice,
+		priceImpact: priceImpactData.priceImpact,
+		baseAvailable: priceImpactData.baseAvailable,
+		exceedsLiquidity: priceImpactData.exceedsLiquidity,
+	};
+
+	return {
+		orderParams: auctionOrderParams,
+		meta: {
+			source: 'l2',
+			slippage: derivedSlippage,
+			priceImpact,
+		},
+	};
 }
 
 type FetchTopMakersParams = {

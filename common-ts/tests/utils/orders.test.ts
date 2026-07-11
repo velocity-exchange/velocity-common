@@ -417,6 +417,68 @@ describe('COMMON_UI_UTILS OrderParams Tests', () => {
 			expect(result.constrainedBySlippage).to.equal(false);
 		});
 	});
+	describe('deriveMarketOrderParams max leverage sizing', () => {
+		it('uses maxLeverageOrderSize as baseAssetAmount when maxLeverageSelected is true', () => {
+			const maxLeverageOrderSize = new BN(1000).mul(BASE_PRECISION);
+
+			const result = deriveMarketOrderParams({
+				marketType: MarketType.PERP,
+				marketIndex: 0,
+				direction: PositionDirection.LONG,
+				maxLeverageSelected: true,
+				maxLeverageOrderSize,
+				baseAmount: new BN(1).mul(BASE_PRECISION),
+				reduceOnly: false,
+				allowInfSlippage: false,
+				bestPrice: new BN(99).mul(PRICE_PRECISION),
+				entryPrice: new BN(100).mul(PRICE_PRECISION),
+				oraclePrice: new BN(100).mul(PRICE_PRECISION),
+				worstPrice: new BN(101).mul(PRICE_PRECISION),
+				markPrice: new BN(100).mul(PRICE_PRECISION),
+				auctionDuration: 20,
+				auctionStartPriceOffset: 0,
+				auctionEndPriceOffset: 0,
+				auctionStartPriceOffsetFrom: 'entry',
+				auctionEndPriceOffsetFrom: 'worst',
+				slippageTolerance: 0.5,
+				isOracleOrder: false,
+			});
+
+			expect(result.baseAssetAmount.toString()).to.equal(
+				maxLeverageOrderSize.toString()
+			);
+		});
+
+		it('uses the requested baseAmount when maxLeverageSelected is false', () => {
+			const baseAmount = new BN(1).mul(BASE_PRECISION);
+
+			const result = deriveMarketOrderParams({
+				marketType: MarketType.PERP,
+				marketIndex: 0,
+				direction: PositionDirection.LONG,
+				maxLeverageSelected: false,
+				maxLeverageOrderSize: new BN(1000).mul(BASE_PRECISION),
+				baseAmount,
+				reduceOnly: false,
+				allowInfSlippage: false,
+				bestPrice: new BN(99).mul(PRICE_PRECISION),
+				entryPrice: new BN(100).mul(PRICE_PRECISION),
+				oraclePrice: new BN(100).mul(PRICE_PRECISION),
+				worstPrice: new BN(101).mul(PRICE_PRECISION),
+				markPrice: new BN(100).mul(PRICE_PRECISION),
+				auctionDuration: 20,
+				auctionStartPriceOffset: 0,
+				auctionEndPriceOffset: 0,
+				auctionStartPriceOffsetFrom: 'entry',
+				auctionEndPriceOffsetFrom: 'worst',
+				slippageTolerance: 0.5,
+				isOracleOrder: false,
+			});
+
+			expect(result.baseAssetAmount.toString()).to.equal(baseAmount.toString());
+		});
+	});
+
 	describe('getMarketOrderLimitPrice', () => {
 		it('should use the correct price for a LONG with 5% max slippage', () => {
 			const result = getMarketOrderLimitPrice({

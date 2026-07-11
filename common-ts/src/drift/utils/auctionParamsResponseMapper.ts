@@ -1,7 +1,10 @@
 import {
 	BN,
+	BigNum,
+	PRICE_PRECISION_EXP,
 	OrderType,
 	MarketType,
+	OptionalOrderParams,
 	PositionDirection,
 	PostOnlyParams,
 	OrderTriggerCondition,
@@ -58,14 +61,85 @@ interface ServerAuctionParams {
 export interface ServerAuctionParamsResponse {
 	data: {
 		params: ServerAuctionParams;
-		// Additional fields like entryPrice, bestPrice, etc. are ignored for now
+		entryPrice?: string;
+		bestPrice?: string;
+		worstPrice?: string;
+		oraclePrice?: string;
+		markPrice?: string;
+		// Fraction of price, e.g. 0.15 for 15% - the endpoint's native unit
+		priceImpact?: number;
+		// Fraction of price as a string, e.g. "0.15" for 15% - the endpoint's native unit
+		slippageTolerance?: string;
+		generatedAt?: number;
 	};
+}
+
+/**
+ * Price-impact data mapped to client-side BN types, in the same shape regardless
+ * of which auction-params tier (endpoint or L2) produced it.
+ */
+export interface MappedPriceImpact {
+	entryPrice: BN;
+	markPrice: BN;
+	oraclePrice: BN;
+	bestPrice: BN;
+	worstPrice: BN;
+	priceImpact: BN;
+	baseAvailable?: BN;
+	exceedsLiquidity?: boolean;
+}
+
+export interface AuctionOrderParamsMeta {
+	source: 'endpoint' | 'l2';
+	// Percentage, e.g. 0.5 for 0.5% - normalized to the same unit across tiers
+	slippage?: number;
+	priceImpact?: MappedPriceImpact;
+}
+
+export interface FetchAuctionOrderParamsResult {
+	orderParams: OptionalOrderParams;
+	meta: AuctionOrderParamsMeta;
 }
 
 export type AuctionParamsFetchedCallback = (
 	urlSearchParams: URLSearchParams,
-	response: ServerAuctionParamsResponse
+	response: ServerAuctionParamsResponse,
+	mapped: FetchAuctionOrderParamsResult
 ) => void;
+
+/**
+ * Maps the endpoint tier's raw priceImpact/slippageTolerance fields to the
+ * normalized `AuctionOrderParamsMeta` shape shared with the L2 tier.
+ *
+ * The endpoint returns `slippageTolerance` as a fraction (e.g. "0.15" for 15%)
+ * and `priceImpact` as a plain human-readable number - both are converted here
+ * so callers never have to know which tier answered.
+ */
+export function mapAuctionParamsResponseMeta(
+	data: ServerAuctionParamsResponse['data']
+): Pick<AuctionOrderParamsMeta, 'slippage' | 'priceImpact'> {
+	const slippage =
+		data.slippageTolerance !== undefined
+			? parseFloat(data.slippageTolerance) * 100
+			: undefined;
+
+	const priceImpact: MappedPriceImpact | undefined =
+		data.entryPrice !== undefined && data.priceImpact !== undefined
+			? {
+					entryPrice: new BN(data.entryPrice),
+					markPrice: new BN(data.markPrice ?? 0),
+					oraclePrice: new BN(data.oraclePrice ?? 0),
+					bestPrice: new BN(data.bestPrice ?? 0),
+					worstPrice: new BN(data.worstPrice ?? 0),
+					priceImpact: BigNum.fromPrint(
+						data.priceImpact.toString(),
+						PRICE_PRECISION_EXP
+					).val,
+			  }
+			: undefined;
+
+	return { slippage, priceImpact };
+}
 
 const FIELD_MAPPING: Record<keyof ServerAuctionParams, FieldConfig> = {
 	// Enums (string -> enum object)

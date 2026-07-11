@@ -155,7 +155,7 @@ async function prepSwiftMarketOrderData(params: OpenPerpMarketOrderBaseParams) {
 		throw new Error('Amount must be greater than zero');
 	}
 
-	const fetchedOrderParams = await fetchAuctionOrderParams({
+	const { orderParams: fetchedOrderParams } = await fetchAuctionOrderParams({
 		velocityClient,
 		user,
 		assetType,
@@ -337,7 +337,7 @@ export const createPlaceAndTakePerpMarketOrderIx = async ({
 		? 'ask'
 		: 'bid';
 
-	const [fetchedOrderParams, topMakersResult, resolvedTakerEscrow] =
+	const [fetchedResult, topMakersResult, resolvedTakerEscrow] =
 		await Promise.all([
 			fetchAuctionOrderParams({
 				velocityClient,
@@ -378,6 +378,8 @@ export const createPlaceAndTakePerpMarketOrderIx = async ({
 					: undefined;
 			})(),
 		]);
+
+	const fetchedOrderParams = fetchedResult.orderParams;
 
 	fetchedOrderParams.userOrderId = userOrderId;
 
@@ -553,7 +555,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 			}
 		}
 	} else {
-		const fetchedOrderParams = await fetchAuctionOrderParams({
+		const { orderParams: fetchedOrderParams } = await fetchAuctionOrderParams({
 			velocityClient,
 			user,
 			assetType,

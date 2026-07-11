@@ -48,7 +48,7 @@ export const getLimitAuctionOrderParams = async ({
 	};
 	onAuctionParamsFetched?: AuctionParamsFetchedCallback;
 }): Promise<OptionalOrderParams> => {
-	const orderParams = await fetchAuctionOrderParams({
+	const { orderParams } = await fetchAuctionOrderParams({
 		velocityClient,
 		user,
 		assetType: 'base',
