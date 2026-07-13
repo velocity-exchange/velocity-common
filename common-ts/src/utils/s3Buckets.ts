@@ -32,7 +32,6 @@ export type DownloadRecordType =
 	| 'deposits'
 	| 'liquidations'
 	| 'settle-pnl-records'
-	| 'lp-records'
 	| 'if-stake-records'
 	| 'swap-records'
 	| 'rewards';
