@@ -3,17 +3,20 @@ import {
 	MarketType,
 	OrderType,
 	PositionDirection,
+	PRICE_PRECISION,
 	User,
 	VelocityClient,
 } from '@velocity-exchange/sdk';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import {
+	deriveAuctionParamsFromVamm,
 	fetchAuctionOrderParams,
 	fetchAuctionOrderParamsFromDlob,
 	fetchAuctionOrderParamsFromL2,
 } from '../../src/drift/base/actions/trade/openPerpOrder/dlobServer';
 import { ENUM_UTILS } from '../../src';
+import { mockPerpMarket } from './fixtures/mockPerpMarket';
 
 const DLOB_SERVER_HTTP_URL = 'https://test-dlob.example.com';
 
@@ -288,6 +291,34 @@ describe('fetchAuctionOrderParams', () => {
 					.getCalls()
 					.some((call) => (call.args[0] as string).includes('/auctionParams'))
 			).to.be.false;
+		});
+	});
+
+	// Minimal VelocityClient stub exposing only what the vAMM tier reads.
+	const makeVammClientStub = () => {
+		const oracle = { price: new BN(100).mul(PRICE_PRECISION), slot: new BN(1) };
+		const mmOracle = {
+			price: new BN(100).mul(PRICE_PRECISION),
+			slot: new BN(1),
+		};
+		return {
+			getPerpMarketAccount: (_i: number) => mockPerpMarket,
+			getMMOracleDataForPerpMarket: (_i: number) => mmOracle,
+			getOracleDataForPerpMarket: (_i: number) => oracle,
+		} as any;
+	};
+
+	describe('vAMM fallback tier', () => {
+		it('derives auction params from the vAMM with no network, source=vamm', async () => {
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.meta.source).to.equal('vamm');
+			expect(result.orderParams.auctionStartPrice).to.not.be.null;
+			expect(result.orderParams.auctionEndPrice).to.not.be.null;
 		});
 	});
 });

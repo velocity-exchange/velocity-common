@@ -11,8 +11,12 @@ import {
 	DefaultOrderParams,
 	BASE_PRECISION,
 	L2OrderBook,
+	MMOraclePriceData,
+	getVammL2Generator,
+	createL2Levels,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../../../../../utils';
+import { calculateSpreadBidAskMark } from '../../../../../../utils/math';
 import {
 	mapAuctionParamsResponse,
 	mapAuctionParamsResponseMeta,
@@ -458,6 +462,67 @@ export function deriveFromL2Inputs({
 		orderParams: auctionOrderParams,
 		meta: { source, slippage: derivedSlippage, priceImpact },
 	};
+}
+
+const VAMM_L2_NUM_ORDERS = DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS; // 100
+
+/**
+ * Network-free last-resort tier: derives auction params from the in-memory perp AMM
+ * + oracle when the DLOB server is unreachable. Used by FE-4472 fallback.
+ */
+export async function deriveAuctionParamsFromVamm({
+	velocityClient,
+	marketIndex,
+	marketType,
+	direction,
+	assetType,
+	amount,
+	reduceOnly,
+	optionalAuctionParamsInputs = {},
+	dynamicSlippageConfig,
+}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
+	const marketId = new MarketId(marketIndex, marketType);
+	const baseAmount =
+		assetType === 'base'
+			? amount
+			: calcBaseFromQuote(velocityClient, marketIndex, amount);
+
+	const marketAccount = velocityClient.getPerpMarketAccount(marketIndex);
+	invariant(marketAccount, 'Perp market account not loaded on client');
+	const mmOracle: MMOraclePriceData =
+		velocityClient.getMMOracleDataForPerpMarket(marketIndex);
+	const oraclePrice =
+		velocityClient.getOracleDataForPerpMarket(marketIndex).price;
+
+	const vammGen = getVammL2Generator({
+		marketAccount,
+		mmOraclePriceData: mmOracle,
+		numOrders: VAMM_L2_NUM_ORDERS,
+	});
+	const l2Data: L2OrderBook = {
+		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),
+		asks: createL2Levels(vammGen.getL2Asks(), VAMM_L2_NUM_ORDERS),
+	};
+	const markPrice = calculateSpreadBidAskMark(l2Data, oraclePrice)?.markPrice;
+
+	logger.warn(
+		'DLOB server unreachable — deriving auction params from on-chain vAMM'
+	);
+
+	return deriveFromL2Inputs({
+		l2Data,
+		oraclePrice,
+		markPrice,
+		marketId,
+		marketType,
+		marketIndex,
+		direction,
+		baseAmount,
+		reduceOnly,
+		optionalAuctionParamsInputs,
+		dynamicSlippageConfig,
+		source: 'vamm',
+	});
 }
 
 type FetchTopMakersParams = {
