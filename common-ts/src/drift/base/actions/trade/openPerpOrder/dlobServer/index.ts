@@ -10,6 +10,7 @@ import {
 	decodeUser,
 	DefaultOrderParams,
 	BASE_PRECISION,
+	L2OrderBook,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../../../../../utils';
 import {
@@ -323,22 +324,71 @@ export async function fetchAuctionOrderParamsFromL2({
 	const markPriceBn = l2DataResponse[0].markPrice;
 	const l2Data = convertToL2OrderBook(l2DataResponse);
 
+	return deriveFromL2Inputs({
+		l2Data,
+		oraclePrice: oraclePriceBn,
+		markPrice: markPriceBn,
+		marketId,
+		marketType,
+		marketIndex,
+		direction,
+		baseAmount,
+		reduceOnly,
+		optionalAuctionParamsInputs,
+		dynamicSlippageConfig,
+		source: 'l2',
+	});
+}
+
+/**
+ * Derives auction order params from L2 data, oracle price, and mark price. Shared by
+ * the network L2 tier (`fetchAuctionOrderParamsFromL2`) and the network-free vAMM
+ * fallback tier so both code paths cannot drift from each other.
+ */
+export function deriveFromL2Inputs({
+	l2Data,
+	oraclePrice,
+	markPrice,
+	marketId,
+	marketType,
+	marketIndex,
+	direction,
+	baseAmount,
+	reduceOnly,
+	optionalAuctionParamsInputs,
+	dynamicSlippageConfig,
+	source,
+}: {
+	l2Data: L2OrderBook;
+	oraclePrice: BN;
+	markPrice: BN;
+	marketId: MarketId;
+	marketType: MarketType;
+	marketIndex: number;
+	direction: PositionDirection;
+	baseAmount: BN;
+	reduceOnly?: boolean;
+	optionalAuctionParamsInputs: OptionalAuctionParamsRequestInputs;
+	dynamicSlippageConfig?: DynamicSlippageConfig;
+	source: AuctionOrderParamsMeta['source'];
+}): FetchAuctionOrderParamsResult {
 	const priceImpactData = calculatePriceImpactFromL2(
 		marketId,
 		direction,
 		baseAmount,
 		l2Data,
-		oraclePriceBn
+		oraclePrice
 	);
 
 	const startPrices = getPriceObject({
-		oraclePrice: oraclePriceBn,
+		oraclePrice,
 		bestOffer: priceImpactData.bestPrice,
 		entryPrice: priceImpactData.entryPrice,
 		worstPrice: priceImpactData.worstPrice,
-		markPrice: markPriceBn,
-		direction: direction,
+		markPrice,
+		direction,
 	});
+
 	const slippageToleranceInput = optionalAuctionParamsInputs.slippageTolerance;
 	const derivedSlippage =
 		slippageToleranceInput === 'dynamic'
@@ -350,7 +400,7 @@ export async function fetchAuctionOrderParamsFromL2({
 							optionalAuctionParamsInputs.auctionStartPriceOffsetFrom as keyof typeof startPrices
 						],
 					worstPrice: priceImpactData.worstPrice,
-					oraclePrice: oraclePriceBn,
+					oraclePrice,
 					dynamicSlippageConfig,
 			  })
 			: typeof slippageToleranceInput === 'number'
@@ -358,21 +408,21 @@ export async function fetchAuctionOrderParamsFromL2({
 			: 0.005;
 
 	const auctionOrderParams = deriveMarketOrderParams({
-		marketType: marketType,
-		marketIndex: marketIndex,
-		direction: direction,
+		marketType,
+		marketIndex,
+		direction,
 		maxLeverageSelected:
 			optionalAuctionParamsInputs.maxLeverageSelected ?? false,
 		maxLeverageOrderSize:
 			optionalAuctionParamsInputs.maxLeverageOrderSize ?? new BN(0),
-		baseAmount: baseAmount,
+		baseAmount,
 		reduceOnly: reduceOnly ?? false,
 		allowInfSlippage: false,
-		oraclePrice: oraclePriceBn,
+		oraclePrice,
 		bestPrice: priceImpactData.bestPrice,
 		entryPrice: priceImpactData.entryPrice,
 		worstPrice: priceImpactData.worstPrice,
-		markPrice: markPriceBn,
+		markPrice,
 		auctionDuration: optionalAuctionParamsInputs.auctionDuration ?? 0,
 		auctionStartPriceOffset:
 			optionalAuctionParamsInputs.auctionStartPriceOffset ?? 0,
@@ -390,13 +440,13 @@ export async function fetchAuctionOrderParamsFromL2({
 	});
 
 	if (!auctionOrderParams) {
-		throw new Error('Failed to derive auction params from L2');
+		throw new Error(`Failed to derive auction params from ${source}`);
 	}
 
 	const priceImpact: MappedPriceImpact = {
 		entryPrice: priceImpactData.entryPrice,
-		markPrice: markPriceBn,
-		oraclePrice: oraclePriceBn,
+		markPrice,
+		oraclePrice,
 		bestPrice: priceImpactData.bestPrice,
 		worstPrice: priceImpactData.worstPrice,
 		priceImpact: priceImpactData.priceImpact,
@@ -406,11 +456,7 @@ export async function fetchAuctionOrderParamsFromL2({
 
 	return {
 		orderParams: auctionOrderParams,
-		meta: {
-			source: 'l2',
-			slippage: derivedSlippage,
-			priceImpact,
-		},
+		meta: { source, slippage: derivedSlippage, priceImpact },
 	};
 }
 

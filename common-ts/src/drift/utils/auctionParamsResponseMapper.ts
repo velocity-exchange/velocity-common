@@ -90,7 +90,7 @@ export interface MappedPriceImpact {
 }
 
 export interface AuctionOrderParamsMeta {
-	source: 'endpoint' | 'l2';
+	source: 'endpoint' | 'l2' | 'vamm';
 	// Percentage, e.g. 0.5 for 0.5% - normalized to the same unit across tiers
 	slippage?: number;
 	priceImpact?: MappedPriceImpact;
