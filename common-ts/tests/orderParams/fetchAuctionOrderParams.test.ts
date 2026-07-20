@@ -339,4 +339,28 @@ describe('fetchAuctionOrderParams', () => {
 			).to.be.true;
 		});
 	});
+
+	describe('3-tier fallthrough to vAMM', () => {
+		it('falls through both network tiers to source=vamm and never throws', async () => {
+			stubFetch(() => jsonResponse({}, false, 500)); // both /auctionParams and /batchL2 fail
+			const result = await fetchAuctionOrderParams({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+			expect(result.meta.source).to.equal('vamm');
+		});
+
+		it('honours forceFallback and still reaches vAMM when the L2 fetch fails', async () => {
+			stubFetch(() => jsonResponse({}, false, 500));
+			const result = await fetchAuctionOrderParams({
+				...baseParams,
+				direction: PositionDirection.SHORT,
+				velocityClient: makeVammClientStub(),
+				forceFallback: true,
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+			expect(result.meta.source).to.equal('vamm');
+		});
+	});
 });

@@ -178,7 +178,12 @@ export async function fetchAuctionOrderParams(
 	params: RegularOrderParams
 ): Promise<FetchAuctionOrderParamsResult> {
 	if (params.forceFallback) {
-		return await fetchAuctionOrderParamsFromL2(params);
+		try {
+			return await fetchAuctionOrderParamsFromL2(params);
+		} catch (error) {
+			logger.error(error);
+			return await deriveAuctionParamsFromVamm(params);
+		}
 	}
 
 	try {
@@ -186,7 +191,13 @@ export async function fetchAuctionOrderParams(
 	} catch (error) {
 		logger.error(error);
 		logger.debug('Falling back to L2 data');
-		return await fetchAuctionOrderParamsFromL2(params);
+		try {
+			return await fetchAuctionOrderParamsFromL2(params);
+		} catch (l2Error) {
+			logger.error(l2Error);
+			logger.debug('Falling back to on-chain vAMM data');
+			return await deriveAuctionParamsFromVamm(params);
+		}
 	}
 }
 
