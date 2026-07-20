@@ -317,8 +317,26 @@ describe('fetchAuctionOrderParams', () => {
 			});
 
 			expect(result.meta.source).to.equal('vamm');
-			expect(result.orderParams.auctionStartPrice).to.not.be.null;
-			expect(result.orderParams.auctionEndPrice).to.not.be.null;
+
+			// Concrete values derived from the vAMM's own L2 generator (100-PRICE_PRECISION
+			// oracle/mm-oracle price, 0.005 slippage tolerance) — not just non-null checks,
+			// so a degenerate (e.g. zero-price) book would fail this test.
+			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
+				'100000000'
+			);
+			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
+				'100005000'
+			);
+
+			// The derived book must be meaningful: positive best/worst prices, and for a
+			// LONG order the auction must walk the price up (or stay flat), never down.
+			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
+			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
+			expect(
+				result.orderParams.auctionEndPrice?.gte(
+					result.orderParams.auctionStartPrice as BN
+				)
+			).to.be.true;
 		});
 	});
 });

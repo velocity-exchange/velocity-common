@@ -503,6 +503,8 @@ export async function deriveAuctionParamsFromVamm({
 		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),
 		asks: createL2Levels(vammGen.getL2Asks(), VAMM_L2_NUM_ORDERS),
 	};
+	// markPrice may be undefined if the derived vAMM book is one-sided (no bid or no
+	// ask level); this is handled defensively by getPriceObject downstream.
 	const markPrice = calculateSpreadBidAskMark(l2Data, oraclePrice)?.markPrice;
 
 	logger.warn(
