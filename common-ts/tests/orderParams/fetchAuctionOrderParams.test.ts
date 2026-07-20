@@ -338,6 +338,59 @@ describe('fetchAuctionOrderParams', () => {
 				)
 			).to.be.true;
 		});
+
+		it('derives auction params from the vAMM for a SHORT order, walking the price down', async () => {
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				direction: PositionDirection.SHORT,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.meta.source).to.equal('vamm');
+
+			// Concrete values derived from the vAMM's own L2 generator (100-PRICE_PRECISION
+			// oracle/mm-oracle price, 0.005 slippage tolerance) for a SHORT order.
+			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
+				'100000000'
+			);
+			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
+				'99995000'
+			);
+
+			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
+			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
+			// For a SHORT order the auction must walk the price down (or stay flat),
+			// never up — the opposite invariant of the LONG case above.
+			expect(
+				result.orderParams.auctionEndPrice?.lte(
+					result.orderParams.auctionStartPrice as BN
+				)
+			).to.be.true;
+		});
+
+		it('derives auction params from the vAMM for a quote-denominated amount', async () => {
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				assetType: 'quote',
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.meta.source).to.equal('vamm');
+
+			// baseParams.amount ($1000 notional, in BN) is converted via calcBaseFromQuote
+			// against the stub's $100 oracle price before hitting the vAMM L2 generator.
+			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
+				'100000000'
+			);
+			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
+				'100005000'
+			);
+
+			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
+			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
+		});
 	});
 
 	describe('3-tier fallthrough to vAMM', () => {
