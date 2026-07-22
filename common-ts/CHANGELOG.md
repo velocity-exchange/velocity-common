@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.2.1...common-ts-v0.3.0) (2026-07-22)
+
+
+### Features
+
+* **common-ts:** DLOB-independent vAMM fallback for perp auction params ([#385](https://github.com/velocity-exchange/velocity-common/issues/385)) ([fe8a661](https://github.com/velocity-exchange/velocity-common/commit/fe8a661d7758e1f7ba5e8538cda8ca51fc7a4f5f))
+
+
+### Code Refactoring
+
+* **common-ts:** remove lp-records from DownloadRecordType ([0dafed5](https://github.com/velocity-exchange/velocity-common/commit/0dafed565439ba580d34a59cedce26f4dbb3ffc0))
+
 ## [0.2.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.2.0...common-ts-v0.2.1) (2026-07-11)
 
 
