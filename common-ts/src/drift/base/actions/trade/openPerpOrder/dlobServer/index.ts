@@ -14,6 +14,8 @@ import {
 	MMOraclePriceData,
 	getVammL2Generator,
 	createL2Levels,
+	DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
+	MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../../../../../utils';
 import { calculateSpreadBidAskMark } from '../../../../../../utils/math';
@@ -102,6 +104,25 @@ export interface BulkL2FetchingParams {
 }
 
 const BACKGROUND_L2_POLLING_KEY = Symbol('BACKGROUND_L2_POLLING_KEY');
+const DLOB_REQUEST_TIMEOUT_MS = 3_000;
+
+const fetchDlobWithTimeout = async <T>(
+	url: string,
+	handleResponse: (response: Response) => Promise<T>
+): Promise<T> => {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(
+		() => controller.abort(),
+		DLOB_REQUEST_TIMEOUT_MS
+	);
+
+	try {
+		const response = await fetch(url, { signal: controller.signal });
+		return await handleResponse(response);
+	} finally {
+		clearTimeout(timeoutId);
+	}
+};
 
 /**
  * Fetches the L2 data for the given markets and their depth
@@ -160,14 +181,16 @@ export function fetchBulkMarketsDlobL2Data(
 
 	return new Promise<L2WithOracleAndMarketData[]>((resolve, reject) => {
 		PollingSequenceGuard.fetch(BACKGROUND_L2_POLLING_KEY, () => {
-			return fetch(`${endpoint}?${queryParams}`);
+			return fetchDlobWithTimeout(
+				`${endpoint}?${queryParams}`,
+				async (response) => {
+					const responseData = await response.json();
+					const resultsArray = responseData.l2s as RawL2Output[];
+					return resultsArray.map(deserializeL2Response);
+				}
+			);
 		})
-			.then(async (response) => {
-				const responseData = await response.json();
-				const resultsArray = responseData.l2s as RawL2Output[];
-				const deserializedL2 = resultsArray.map(deserializeL2Response);
-				resolve(deserializedL2);
-			})
+			.then(resolve)
 			.catch((error) => {
 				reject(error);
 			});
@@ -182,6 +205,9 @@ export async function fetchAuctionOrderParams(
 			return await fetchAuctionOrderParamsFromL2(params);
 		} catch (error) {
 			logger.error(error);
+			if (!ENUM_UTILS.match(params.marketType, MarketType.PERP)) {
+				throw error;
+			}
 			return await deriveAuctionParamsFromVamm(params);
 		}
 	}
@@ -195,6 +221,9 @@ export async function fetchAuctionOrderParams(
 			return await fetchAuctionOrderParamsFromL2(params);
 		} catch (l2Error) {
 			logger.error(l2Error);
+			if (!ENUM_UTILS.match(params.marketType, MarketType.PERP)) {
+				throw l2Error;
+			}
 			logger.debug('Falling back to on-chain vAMM data');
 			return await deriveAuctionParamsFromVamm(params);
 		}
@@ -253,15 +282,18 @@ export async function fetchAuctionOrderParamsFromDlob({
 
 	// Get order params from server
 	const requestUrl = `${dlobServerHttpUrl}/auctionParams?${urlParams.toString()}`;
-	const response = await fetch(requestUrl);
+	const serverResponse = await fetchDlobWithTimeout(
+		requestUrl,
+		async (response): Promise<ServerAuctionParamsResponse> => {
+			if (!response.ok) {
+				throw new Error(
+					`Server responded with ${response.status}: ${response.statusText}`
+				);
+			}
 
-	if (!response.ok) {
-		throw new Error(
-			`Server responded with ${response.status}: ${response.statusText}`
-		);
-	}
-
-	const serverResponse: ServerAuctionParamsResponse = await response.json();
+			return await response.json();
+		}
+	);
 	const serverAuctionParams = serverResponse?.data?.params;
 	invariant(serverAuctionParams, 'Server auction params are required');
 
@@ -492,6 +524,11 @@ export async function deriveAuctionParamsFromVamm({
 	optionalAuctionParamsInputs = {},
 	dynamicSlippageConfig,
 }: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
+	invariant(
+		ENUM_UTILS.match(marketType, MarketType.PERP),
+		'vAMM auction params only support perp markets'
+	);
+
 	const marketId = new MarketId(marketIndex, marketType);
 	const baseAmount =
 		assetType === 'base'
@@ -509,6 +546,10 @@ export async function deriveAuctionParamsFromVamm({
 		marketAccount,
 		mmOraclePriceData: mmOracle,
 		numOrders: VAMM_L2_NUM_ORDERS,
+		topOfBookQuoteAmounts:
+			marketIndex < 3
+				? MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS
+				: DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
 	});
 	const l2Data: L2OrderBook = {
 		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),

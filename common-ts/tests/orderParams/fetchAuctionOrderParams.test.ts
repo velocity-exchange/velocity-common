@@ -81,12 +81,26 @@ const jsonResponse = (body: unknown, ok = true, status = 200) => ({
 	json: async () => JSON.parse(JSON.stringify(body)),
 });
 
-const stubFetch = (handler: (url: string) => any) => {
+const stubFetch = (handler: (url: string, init?: RequestInit) => any) => {
 	return sinon
 		.stub(global, 'fetch')
-		.callsFake(((url: string) =>
-			Promise.resolve(handler(url))) as typeof fetch);
+		.callsFake(((url: string, init?: RequestInit) =>
+			Promise.resolve(handler(url, init))) as typeof fetch);
 };
+
+const pendingUntilAborted = (_url: string, init?: RequestInit) =>
+	new Promise((_resolve, reject) => {
+		init?.signal?.addEventListener(
+			'abort',
+			() => reject(new Error('request aborted')),
+			{ once: true }
+		);
+	});
+
+const responseWithPendingBody = (url: string, init?: RequestInit) => ({
+	...jsonResponse({}),
+	json: () => pendingUntilAborted(url, init),
+});
 
 const baseParams = {
 	velocityClient: {} as VelocityClient,
@@ -98,6 +112,21 @@ const baseParams = {
 	amount: new BN(1_000_000_000),
 	dlobServerHttpUrl: DLOB_SERVER_HTTP_URL,
 	reduceOnly: false,
+};
+
+const expectRejection = async (
+	promise: Promise<unknown>,
+	expectedMessage: string
+) => {
+	let caught: unknown;
+	try {
+		await promise;
+	} catch (error) {
+		caught = error;
+	}
+
+	expect(caught).to.be.instanceOf(Error);
+	expect((caught as Error).message).to.equal(expectedMessage);
 };
 
 describe('fetchAuctionOrderParams', () => {
@@ -294,6 +323,107 @@ describe('fetchAuctionOrderParams', () => {
 		});
 	});
 
+	describe('network timeouts', () => {
+		it('times out the endpoint tier after 3 seconds and continues to L2', async () => {
+			const clock = sinon.useFakeTimers({ now: Date.now() });
+			stubFetch((url, init) =>
+				url.includes('/auctionParams')
+					? pendingUntilAborted(url, init)
+					: jsonResponse({ l2s: [RAW_L2_RESPONSE] })
+			);
+
+			const resultPromise = fetchAuctionOrderParams({ ...baseParams });
+			const timedOut = Symbol('test timed out');
+			const result = await Promise.race([
+				resultPromise,
+				clock.tickAsync(3_000).then(() => timedOut),
+			]);
+
+			expect(result).to.not.equal(timedOut);
+			if (typeof result === 'symbol') return;
+			expect(result.meta.source).to.equal('l2');
+		});
+
+		it('keeps the endpoint timeout active while reading the response body', async () => {
+			const clock = sinon.useFakeTimers({ now: Date.now() });
+			stubFetch((url, init) =>
+				url.includes('/auctionParams')
+					? responseWithPendingBody(url, init)
+					: jsonResponse({ l2s: [RAW_L2_RESPONSE] })
+			);
+
+			const resultPromise = fetchAuctionOrderParams({ ...baseParams });
+			const timedOut = Symbol('test timed out');
+			const result = await Promise.race([
+				resultPromise,
+				clock.tickAsync(3_000).then(() => timedOut),
+			]);
+
+			expect(result).to.not.equal(timedOut);
+			if (typeof result === 'symbol') return;
+			expect(result.meta.source).to.equal('l2');
+		});
+
+		it('times out both network tiers independently and reaches vAMM after 6 seconds', async () => {
+			const clock = sinon.useFakeTimers({ now: Date.now() });
+			stubFetch(pendingUntilAborted);
+
+			const resultPromise = fetchAuctionOrderParams({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+			});
+			const timedOut = Symbol('test timed out');
+			const result = await Promise.race([
+				resultPromise,
+				clock.tickAsync(6_000).then(() => timedOut),
+			]);
+
+			expect(result).to.not.equal(timedOut);
+			if (typeof result === 'symbol') return;
+			expect(result.meta.source).to.equal('vamm');
+		});
+
+		it('keeps the L2 timeout active while reading the response body', async () => {
+			const clock = sinon.useFakeTimers({ now: Date.now() });
+			stubFetch(responseWithPendingBody);
+
+			const resultPromise = fetchAuctionOrderParams({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				forceFallback: true,
+			});
+			const timedOut = Symbol('test timed out');
+			const result = await Promise.race([
+				resultPromise,
+				clock.tickAsync(3_000).then(() => timedOut),
+			]);
+
+			expect(result).to.not.equal(timedOut);
+			if (typeof result === 'symbol') return;
+			expect(result.meta.source).to.equal('vamm');
+		});
+
+		it('times out forceFallback L2 and reaches vAMM after 3 seconds', async () => {
+			const clock = sinon.useFakeTimers({ now: Date.now() });
+			stubFetch(pendingUntilAborted);
+
+			const resultPromise = fetchAuctionOrderParams({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				forceFallback: true,
+			});
+			const timedOut = Symbol('test timed out');
+			const result = await Promise.race([
+				resultPromise,
+				clock.tickAsync(3_000).then(() => timedOut),
+			]);
+
+			expect(result).to.not.equal(timedOut);
+			if (typeof result === 'symbol') return;
+			expect(result.meta.source).to.equal('vamm');
+		});
+	});
+
 	// Minimal VelocityClient stub exposing only what the vAMM tier reads.
 	const makeVammClientStub = () => {
 		const oracle = { price: new BN(100).mul(PRICE_PRECISION), slot: new BN(1) };
@@ -309,6 +439,17 @@ describe('fetchAuctionOrderParams', () => {
 	};
 
 	describe('vAMM fallback tier', () => {
+		it('rejects direct spot-market vAMM derivation', async () => {
+			await expectRejection(
+				deriveAuctionParamsFromVamm({
+					...baseParams,
+					marketType: MarketType.SPOT,
+					velocityClient: makeVammClientStub(),
+				}),
+				'Invariant failed: vAMM auction params only support perp markets'
+			);
+		});
+
 		it('derives auction params from the vAMM with no network, source=vamm', async () => {
 			const result = await deriveAuctionParamsFromVamm({
 				...baseParams,
@@ -328,10 +469,12 @@ describe('fetchAuctionOrderParams', () => {
 				'100005000'
 			);
 
-			// The derived book must be meaningful: positive best/worst prices, and for a
-			// LONG order the auction must walk the price up (or stay flat), never down.
-			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
-			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
+			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
+				'100005000'
+			);
+			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
+				'100005000'
+			);
 			expect(
 				result.orderParams.auctionEndPrice?.gte(
 					result.orderParams.auctionStartPrice as BN
@@ -358,8 +501,12 @@ describe('fetchAuctionOrderParams', () => {
 				'99995000'
 			);
 
-			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
-			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
+			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
+				'99995000'
+			);
+			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
+				'99995000'
+			);
 			// For a SHORT order the auction must walk the price down (or stay flat),
 			// never up — the opposite invariant of the LONG case above.
 			expect(
@@ -378,6 +525,9 @@ describe('fetchAuctionOrderParams', () => {
 			});
 
 			expect(result.meta.source).to.equal('vamm');
+			expect(result.orderParams.baseAssetAmount.toString()).to.equal(
+				'10000000000'
+			);
 
 			// baseParams.amount ($1000 notional, in BN) is converted via calcBaseFromQuote
 			// against the stub's $100 oracle price before hitting the vAMM L2 generator.
@@ -391,9 +541,65 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
 			expect(result.meta.priceImpact?.worstPrice.gt(new BN(0))).to.be.true;
 		});
+
+		it('uses the canonical non-major top-of-book quote buckets', async () => {
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				marketIndex: 3,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
+				'100000500'
+			);
+			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
+				'100000500'
+			);
+		});
+
+		it('uses the canonical non-major top-of-book quote buckets for SHORT orders', async () => {
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				marketIndex: 3,
+				direction: PositionDirection.SHORT,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
+				'100000000'
+			);
+			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
+				'99999500'
+			);
+			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
+				'99999500'
+			);
+			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
+				'99999500'
+			);
+		});
 	});
 
 	describe('3-tier fallthrough to vAMM', () => {
+		it('preserves the L2 failure for spot requests instead of using a perp vAMM', async () => {
+			stubFetch((url) => {
+				throw new Error(
+					url.includes('/auctionParams') ? 'endpoint down' : 'l2 down'
+				);
+			});
+
+			await expectRejection(
+				fetchAuctionOrderParams({
+					...baseParams,
+					marketType: MarketType.SPOT,
+					velocityClient: makeVammClientStub(),
+				}),
+				'l2 down'
+			);
+		});
+
 		it('falls through both network tiers to source=vamm and never throws', async () => {
 			stubFetch(() => jsonResponse({}, false, 500)); // both /auctionParams and /batchL2 fail
 			const result = await fetchAuctionOrderParams({
