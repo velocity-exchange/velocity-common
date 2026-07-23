@@ -47,6 +47,7 @@ import {
 	getPriceObject,
 	deriveMarketOrderParams,
 } from '../../../../../../utils/trading/auction';
+import { DEFAULT_MARKET_AUCTION_DURATION } from '../../../../constants/auction';
 import invariant from 'tiny-invariant';
 import { logger } from '../../../../../../utils/logger';
 
@@ -470,7 +471,12 @@ export function deriveFromL2Inputs({
 		entryPrice: priceImpactData.entryPrice,
 		worstPrice: priceImpactData.worstPrice,
 		markPrice,
-		auctionDuration: optionalAuctionParamsInputs.auctionDuration ?? 0,
+		// Fall back to the default market auction duration when the caller omits it
+		// (the UI relies on the DLOB server to supply it). A null/0 duration on a
+		// signed-message order is rejected by the swift server as InvalidOrderAuction.
+		auctionDuration:
+			optionalAuctionParamsInputs.auctionDuration ??
+			DEFAULT_MARKET_AUCTION_DURATION,
 		auctionStartPriceOffset:
 			optionalAuctionParamsInputs.auctionStartPriceOffset ?? 0,
 		auctionEndPriceOffset:
