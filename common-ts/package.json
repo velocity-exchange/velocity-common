@@ -1,6 +1,6 @@
 {
 	"name": "@velocity-exchange/common",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"description": "Common functions for Velocity",
 	"main": "./lib/index.js",
 	"types": "./lib/index.d.ts",
