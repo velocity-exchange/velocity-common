@@ -1,5 +1,5 @@
 {
 	"common-ts": "0.3.0",
-	"posthog-types": "0.1.0",
+	"posthog-types": "0.0.3",
 	"icons": "1.0.2"
 }
