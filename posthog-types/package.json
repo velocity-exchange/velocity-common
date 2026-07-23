@@ -1,6 +1,6 @@
 {
   "name": "@velocity-exchange/posthog-types",
-  "version": "0.1.0",
+  "version": "0.0.3",
   "description": "Shared PostHog event type definitions for Velocity Exchange",
   "types": "./lib/index.d.ts",
   "license": "MIT",

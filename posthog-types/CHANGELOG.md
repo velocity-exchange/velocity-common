@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/velocity-exchange/velocity-common/compare/posthog-types-v0.1.0...posthog-types-v0.0.3) (2026-07-23)
+
+
+### Miscellaneous
+
+* release common-ts 0.0.3 ([b6ab786](https://github.com/velocity-exchange/velocity-common/commit/b6ab7861f9614c6d7ae6a31e9ea4b6434186b0b1))
+
 ## [0.1.0](https://github.com/velocity-exchange/velocity-common/compare/posthog-types-v0.0.4...posthog-types-v0.1.0) (2026-05-15)
 
 
