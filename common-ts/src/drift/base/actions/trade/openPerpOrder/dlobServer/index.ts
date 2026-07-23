@@ -516,6 +516,14 @@ export function deriveFromL2Inputs({
 const VAMM_L2_NUM_ORDERS = DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS; // 100
 
 /**
+ * Extra auction-end / oracle-offset buffer (in basis points of the oracle price)
+ * applied ONLY on the network-free vAMM fallback. The vAMM book carries no resting
+ * limit-order liquidity, so its derived worst/entry prices are coarser than the DLOB
+ * server's; this widens the auction end so degraded-liquidity orders still cross.
+ */
+const VAMM_FALLBACK_END_PRICE_BUFFER_BPS = 10; // 0.1%
+
+/**
  * Network-free last-resort tier: derives auction params from the in-memory perp AMM
  * + oracle when the DLOB server is unreachable. Used by FE-4472 fallback.
  */
@@ -569,6 +577,20 @@ export async function deriveAuctionParamsFromVamm({
 		'DLOB server unreachable — deriving auction params from on-chain vAMM'
 	);
 
+	// Add a 0.1%-of-oracle buffer to the auction end / oracle price offset to
+	// compensate for the vAMM book's coarser (no resting-order) liquidity. Added on
+	// top of any caller-supplied buffer; direction is handled downstream (added for
+	// longs, subtracted for shorts) in getMarketAuctionParams.
+	const fallbackEndPriceBuffer = oraclePrice
+		.muln(VAMM_FALLBACK_END_PRICE_BUFFER_BPS)
+		.divn(10_000);
+	const bufferedInputs: OptionalAuctionParamsRequestInputs = {
+		...optionalAuctionParamsInputs,
+		additionalEndPriceBuffer: (
+			optionalAuctionParamsInputs.additionalEndPriceBuffer ?? new BN(0)
+		).add(fallbackEndPriceBuffer),
+	};
+
 	return deriveFromL2Inputs({
 		l2Data,
 		oraclePrice,
@@ -579,7 +601,7 @@ export async function deriveAuctionParamsFromVamm({
 		direction,
 		baseAmount,
 		reduceOnly,
-		optionalAuctionParamsInputs,
+		optionalAuctionParamsInputs: bufferedInputs,
 		dynamicSlippageConfig,
 		source: 'vamm',
 	});

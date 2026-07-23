@@ -466,8 +466,11 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
+			// auction end = slippage-capped end (100005000) + the 0.1%-of-oracle vAMM
+			// fallback buffer (100000) = 100105000. priceImpact best/worst are the raw
+			// L2-walk prices and are NOT buffered.
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'100005000'
+				'100105000'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
@@ -499,6 +502,32 @@ describe('fetchAuctionOrderParams', () => {
 			);
 		});
 
+		it('applies a 0.1% oracle-price buffer to the auction end in the vAMM fallback', async () => {
+			// The vAMM book has no resting-order liquidity, so its pricing is coarser
+			// than the DLOB server's. Widen the auction end (and thus the oracle price
+			// offset) by 0.1% of the oracle price so degraded-liquidity orders still cross.
+			const oracle = new BN(100).mul(PRICE_PRECISION); // matches makeVammClientStub
+			const minBuffer = oracle.divn(1000); // 0.1%
+
+			const long = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+			expect(
+				(long.orderParams.auctionEndPrice as BN).sub(oracle).gte(minBuffer)
+			).to.be.true;
+
+			const short = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				direction: PositionDirection.SHORT,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+			expect(oracle.sub(short.orderParams.auctionEndPrice as BN).gte(minBuffer))
+				.to.be.true;
+		});
+
 		it('derives auction params from the vAMM for a SHORT order, walking the price down', async () => {
 			const result = await deriveAuctionParamsFromVamm({
 				...baseParams,
@@ -514,8 +543,10 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
+			// SHORT: slippage-capped end (99995000) minus the 0.1%-of-oracle vAMM
+			// fallback buffer (100000) = 99895000. priceImpact is unbuffered.
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'99995000'
+				'99895000'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
@@ -551,8 +582,9 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
+			// includes the 0.1%-of-oracle vAMM fallback buffer (+100000 on the long end)
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'100005000'
+				'100105000'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
@@ -587,8 +619,9 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
+			// SHORT end = 99999500 minus the 0.1%-of-oracle vAMM fallback buffer (100000)
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'99999500'
+				'99899500'
 			);
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
 				'99999500'
