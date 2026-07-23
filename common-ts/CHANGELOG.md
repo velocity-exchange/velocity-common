@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.3.0...common-ts-v0.3.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **common-ts:** resolve default auction duration in fallback tiers ([a2d247a](https://github.com/velocity-exchange/velocity-common/commit/a2d247a318575fc218e616ad546457a6c8401edb))
+
 ## [0.3.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.2.1...common-ts-v0.3.0) (2026-07-22)
 
 
