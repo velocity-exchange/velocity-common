@@ -17,6 +17,7 @@ import {
 } from '../../src/drift/base/actions/trade/openPerpOrder/dlobServer';
 import { ENUM_UTILS } from '../../src';
 import { mockPerpMarket } from './fixtures/mockPerpMarket';
+import { DEFAULT_MARKET_AUCTION_DURATION } from '../../src/drift/base/constants/auction';
 
 const DLOB_SERVER_HTTP_URL = 'https://test-dlob.example.com';
 
@@ -480,6 +481,22 @@ describe('fetchAuctionOrderParams', () => {
 					result.orderParams.auctionStartPrice as BN
 				)
 			).to.be.true;
+		});
+
+		it('defaults auctionDuration to DEFAULT_MARKET_AUCTION_DURATION when the caller omits it', async () => {
+			// The UI sends auctionDuration=undefined, relying on the DLOB server to
+			// fill it in. The network-free fallback must resolve a non-null duration
+			// itself, otherwise the swift server rejects the signed order with
+			// InvalidOrderAuction (a null/0 duration + populated auction prices).
+			const result = await deriveAuctionParamsFromVamm({
+				...baseParams,
+				velocityClient: makeVammClientStub(),
+				optionalAuctionParamsInputs: { slippageTolerance: 0.005 },
+			});
+
+			expect(result.orderParams.auctionDuration).to.equal(
+				DEFAULT_MARKET_AUCTION_DURATION
+			);
 		});
 
 		it('derives auction params from the vAMM for a SHORT order, walking the price down', async () => {
