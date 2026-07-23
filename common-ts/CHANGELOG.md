@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.3.1...common-ts-v0.4.0) (2026-07-23)
+
+
+### Features
+
+* **common-ts:** widen vAMM fallback auction end by 0.1% of oracle ([#387](https://github.com/velocity-exchange/velocity-common/issues/387)) ([79d7507](https://github.com/velocity-exchange/velocity-common/commit/79d7507e59b2dc411d8063893a03b27e32f916f1))
+
 ## [0.3.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.3.0...common-ts-v0.3.1) (2026-07-23)
 
 
