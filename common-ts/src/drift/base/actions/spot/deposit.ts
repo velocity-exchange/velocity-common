@@ -102,14 +102,8 @@ export const createDepositTxn = async ({
 	initSwiftAccount: _initSwiftAccount,
 	externalWallet,
 }: CreateDepositTxnParams): Promise<Transaction | VersionedTransaction> => {
-	let finalDepositAmount = amount;
-
-	if (isMaxBorrowRepayment) {
-		// we over-estimate to ensure that there is no borrow dust left
-		// since isMaxBorrowRepayment = reduceOnly, it is safe to over-estimate
-		finalDepositAmount = finalDepositAmount.scale(2, 1);
-	}
-
+	// createDepositIxs owns the isMaxBorrowRepayment over-estimation; scaling here too
+	// would double it
 	// we choose to not use createDepositIxs here because it doesn't have the initSwiftAccount logic
 	// const depositTxn = await velocityClient.createDepositTxn(
 	// 	finalDepositAmount.val,
@@ -123,7 +117,7 @@ export const createDepositTxn = async ({
 	const depositIxs = await createDepositIxs({
 		velocityClient,
 		user,
-		amount: finalDepositAmount,
+		amount,
 		spotMarketConfig,
 		isMaxBorrowRepayment,
 		externalWallet,
