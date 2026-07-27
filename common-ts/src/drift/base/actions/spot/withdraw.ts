@@ -1,9 +1,12 @@
 import {
 	BigNum,
 	VelocityClient,
+	SpotBalanceType,
 	SpotMarketConfig,
 	TxParams,
 	User,
+	getTokenAmount,
+	isVariant,
 } from '@velocity-exchange/sdk';
 import {
 	Transaction,
@@ -30,33 +33,46 @@ export const createWithdrawIx = async ({
 	isMax,
 }: CreateWithdrawIxParams): Promise<TransactionInstruction[]> => {
 	const reduceOnly = !isBorrow;
+	const spotMarketAccount = velocityClient.getSpotMarketAccountOrThrow(
+		spotMarketConfig.marketIndex
+	);
 
 	let finalWithdrawAmount = amount;
 
 	if (isMax && reduceOnly) {
-		// we over-estimate to ensure that there is no borrow dust left
-		// since reduceOnly is true, it is safe to over-estimate
-		finalWithdrawAmount = finalWithdrawAmount.scale(2, 1);
-		const scaledBalance = user
+		const spotPosition = user
 			.getUserAccountOrThrow()
 			.spotPositions.find(
 				(position) => position.marketIndex === spotMarketConfig.marketIndex
-			)?.scaledBalance;
-		if (scaledBalance && scaledBalance.abs().gtn(0)) {
-			// we use scaledBalance in case amount argument is zero
-			finalWithdrawAmount = BigNum.max(
-				finalWithdrawAmount,
-				BigNum.from(scaledBalance, spotMarketConfig.precisionExp).scale(2, 1)
 			);
+
+		// scaledBalance is interest-free and in SPOT_MARKET_BALANCE_PRECISION
+		const depositTokenAmount =
+			spotPosition && isVariant(spotPosition.balanceType, 'deposit')
+				? BigNum.from(
+						getTokenAmount(
+							spotPosition.scaledBalance,
+							spotMarketAccount,
+							SpotBalanceType.DEPOSIT
+						),
+						spotMarketConfig.precisionExp
+				  )
+				: undefined;
+
+		// Only over-estimate when the max closes out the whole deposit, to absorb interest
+		// accrued before execution. A margin-bound max must be sent as-is, since the on-chain
+		// reduceOnly clamp is non-strict while the margin check gating the withdraw is strict.
+		if (
+			depositTokenAmount?.gtZero() &&
+			(amount.eqZero() || amount.gte(depositTokenAmount)) // a margin-bound max is expected to be less than the deposit amount, so should skip this over-estimation
+		) {
+			finalWithdrawAmount = BigNum.max(amount, depositTokenAmount).scale(2, 1);
 		}
 	}
 
 	const authority = user.getUserAccountOrThrow().authority;
 	const associatedDepositTokenAddress =
-		await getTokenAddressForDepositAndWithdraw(
-			velocityClient.getSpotMarketAccountOrThrow(spotMarketConfig.marketIndex),
-			authority
-		);
+		await getTokenAddressForDepositAndWithdraw(spotMarketAccount, authority);
 
 	const withdrawIxs = await velocityClient.getWithdrawalIxs(
 		finalWithdrawAmount.val,
