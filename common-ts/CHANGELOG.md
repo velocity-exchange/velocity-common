@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.0...common-ts-v0.4.1) (2026-07-27)
+
+
+### Code Refactoring
+
+* **common-ts:** scale max amount only on non-margin-bound withdraws ([#389](https://github.com/velocity-exchange/velocity-common/issues/389)) ([393570d](https://github.com/velocity-exchange/velocity-common/commit/393570dd4251b30574f61d44a18a9f4e78270485))
+
 ## [0.4.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.3.1...common-ts-v0.4.0) (2026-07-23)
 
 
