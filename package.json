@@ -4,24 +4,22 @@
 	"devDependencies": {
 		"@commitlint/cli": "19.6.1",
 		"@commitlint/config-conventional": "19.6.0",
-		"@typescript-eslint/eslint-plugin": "6.9.1",
-		"@typescript-eslint/parser": "6.9.1",
 		"husky": "8.0.3",
+		"oxfmt": "0.60.0",
+		"oxlint": "1.75.0",
 		"typescript": "5.1.6"
 	},
 	"scripts": {
-		"lint": "eslint './**/*.{ts,tsx}'",
-		"lint:fix": "yarn lint --fix",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint . --fix",
 		"prepare": "husky install",
-		"prettify": "prettier --check './**/*.{ts,tsx}'",
-		"prettify:write": "prettier --write './**/*.{ts,tsx}'",
+		"format": "oxfmt --check './**/*.{ts,tsx}'",
+		"format:write": "oxfmt --write './**/*.{ts,tsx}'",
 		"typecheck": "tsc --project common-ts --noEmit"
 	},
 	"dependencies": {
 		"@types/big.js": "6.2.2",
-		"eslint": "8.44.0",
-		"posthog-js": "1.72.1",
-		"prettier": "2.8.8"
+		"posthog-js": "1.72.1"
 	},
 	"version": "0.0.1"
 }

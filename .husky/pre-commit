@@ -2,7 +2,7 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 bun lint
-bun prettify
+bun run format
 bun typecheck
 cd common-ts && bun run test
 bun run build

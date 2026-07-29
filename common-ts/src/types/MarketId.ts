@@ -12,7 +12,10 @@ export class MarketId {
 	private _isPerp: boolean;
 	private _marketTypeStr: string;
 
-	constructor(readonly marketIndex: number, readonly marketType: MarketType) {
+	constructor(
+		readonly marketIndex: number,
+		readonly marketType: MarketType
+	) {
 		this._key = MarketId.key(marketIndex, marketType);
 		this._isSpot = ENUM_UTILS.match(marketType, MarketType.SPOT);
 		this._isPerp = ENUM_UTILS.match(marketType, MarketType.PERP);

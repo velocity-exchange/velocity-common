@@ -130,10 +130,10 @@ const findMarketBySymbol = (
 	const matchingMarketConfig = isPerp
 		? perpMarketConfigs.find((mkt) =>
 				mkt.symbol.toLowerCase().includes(sanitisedSymbol.toLowerCase())
-		  )
+			)
 		: spotMarketConfigs.find((mkt) =>
 				mkt.symbol.toLowerCase().includes(sanitisedSymbol.toLowerCase())
-		  );
+			);
 
 	if (!matchingMarketConfig) {
 		throw new Error(`TVFeed::No market found for symbol ${symbol}`);

@@ -10,7 +10,7 @@ export const usePriorityFeesPollingRate = () => {
 
 	const pollingFrequencyMs = isPriorityFeeStoreReady
 		? basePollingRateMs *
-		  Math.max(pollingMultiplier, priorityFeePollingMultiplier)
+			Math.max(pollingMultiplier, priorityFeePollingMultiplier)
 		: 1000; // poll more frequently until priority fee store is ready
 
 	return pollingFrequencyMs;

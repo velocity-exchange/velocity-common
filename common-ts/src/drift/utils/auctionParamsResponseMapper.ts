@@ -135,7 +135,7 @@ export function mapAuctionParamsResponseMeta(
 						data.priceImpact.toString(),
 						PRICE_PRECISION_EXP
 					).val,
-			  }
+				}
 			: undefined;
 
 	return { slippage, priceImpact };

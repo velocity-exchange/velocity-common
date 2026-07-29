@@ -296,7 +296,7 @@ const handleOnDeserializedPrecision = <T>(
  * @param className The name of the class being deserialized (for error messages)
  */
 function validateEventTypeOnDeserialize<
-	InstanceType extends { eventType?: string }
+	InstanceType extends { eventType?: string },
 >(
 	instance: InstanceType,
 	expectedEventType: InstanceType extends { eventType: infer EventType }
@@ -323,7 +323,7 @@ function validateEventTypeOnDeserialize<
  * @param className The name of the class being serialized (for error messages)
  */
 function validateEventTypeOnSerialize<
-	InstanceType extends { eventType?: string }
+	InstanceType extends { eventType?: string },
 >(
 	json: JsonObject,
 	expectedEventType: InstanceType extends { eventType: infer E } ? E : never,
@@ -467,9 +467,7 @@ export class UISerializableOrderRecord extends SerializableOrderRecord {
 	}
 }
 
-export class SerializableOrderActionRecord
-	implements WrappedEvent<'OrderActionRecord'>
-{
+export class SerializableOrderActionRecord implements WrappedEvent<'OrderActionRecord'> {
 	@autoserializeAs(String) eventType!: 'OrderActionRecord';
 	@autoserializeAs(String) txSig!: string;
 	@autoserializeAs(Number) slot!: number;
@@ -1144,9 +1142,7 @@ export class UISerializableFundingRateRecord extends SerializableFundingRateReco
 
 export type FundingPaymentRecordEvent = Event<FundingPaymentRecord>;
 
-export class SerializableFundingPaymentRecord
-	implements FundingPaymentRecordEvent
-{
+export class SerializableFundingPaymentRecord implements FundingPaymentRecordEvent {
 	@autoserializeAs(Number) id!: number;
 	@autoserializeAs(String) txSig!: string;
 	@autoserializeAs(Number) txSigIndex!: number;
@@ -1259,9 +1255,7 @@ export class UISerializableLiquidateSpotRecord extends SerializableLiquidateSpot
 	}
 }
 
-export class SerializableLiquidateBorrowForPerpPnlRecord
-	implements LiquidateBorrowForPerpPnlRecord
-{
+export class SerializableLiquidateBorrowForPerpPnlRecord implements LiquidateBorrowForPerpPnlRecord {
 	@autoserializeUsing(BNSerializeAndDeserializeFns) marketOraclePrice: BN;
 	@autoserializeUsing(BNSerializeAndDeserializeFns) pnlTransfer: BN;
 	@autoserializeAs(Number) liabilityMarketIndex!: number;
@@ -1295,9 +1289,7 @@ export class UISerializableLiquidateBorrowForPerpPnlRecord extends SerializableL
 	}
 }
 
-export class SerializableLiquidatePerpPnlForDepositRecord
-	implements LiquidatePerpPnlForDepositRecord
-{
+export class SerializableLiquidatePerpPnlForDepositRecord implements LiquidatePerpPnlForDepositRecord {
 	@autoserializeUsing(BNSerializeAndDeserializeFns) marketOraclePrice: BN;
 	@autoserializeUsing(BNSerializeAndDeserializeFns) pnlTransfer: BN;
 	@autoserializeAs(Number) assetMarketIndex!: number;
@@ -1965,9 +1957,7 @@ export class CompetitionResult {
 
 export type InsuranceFundRecordEvent = Event<InsuranceFundRecord>;
 
-export class SerializableInsuranceFundRecord
-	implements InsuranceFundRecordEvent
-{
+export class SerializableInsuranceFundRecord implements InsuranceFundRecordEvent {
 	@autoserializeUsing(BNSerializeAndDeserializeFns) ts: BN;
 	@autoserializeAs(String) txSig!: string;
 	@autoserializeAs(Number) txSigIndex!: number;
@@ -2026,9 +2016,7 @@ export class UISerializableInsuranceFundRecord extends SerializableInsuranceFund
 
 export type InsuranceFundStakeRecordEvent = Event<InsuranceFundStakeRecord>;
 
-export class SerializableInsuranceFundStakeRecord
-	implements InsuranceFundStakeRecordEvent
-{
+export class SerializableInsuranceFundStakeRecord implements InsuranceFundStakeRecordEvent {
 	@autoserializeUsing(BNSerializeAndDeserializeFns) ts: BN;
 	@autoserializeAs(String) txSig!: string;
 	@autoserializeAs(Number) txSigIndex!: number;

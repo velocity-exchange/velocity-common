@@ -129,7 +129,7 @@ export const getRedisClusterClient = (
 					maxRetriesPerRequest: null,
 					tls: getTlsConfiguration(),
 				},
-				...(opts ?? {}),
+				...opts,
 			}
 		);
 
@@ -183,7 +183,7 @@ export const getRedisClient = (
 			},
 			maxRetriesPerRequest: null,
 			tls: getTlsConfiguration(),
-			...(opts ?? {}),
+			...opts,
 		});
 
 		redisClient.on('connect', () => {

@@ -31,9 +31,8 @@ const checkIfUserAccountExists = async (
 		);
 	}
 
-	const accountInfo = await velocityClient.connection.getAccountInfo(
-		userPubKey
-	);
+	const accountInfo =
+		await velocityClient.connection.getAccountInfo(userPubKey);
 
 	return accountInfo !== null;
 };

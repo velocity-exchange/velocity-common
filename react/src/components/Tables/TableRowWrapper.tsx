@@ -22,8 +22,8 @@ export const TableRowWrapper = ({
 	const borderClass = noBorder
 		? ''
 		: strongBottomBorder
-		? 'border-b-3 border-container-border'
-		: 'border-b border-container-border';
+			? 'border-b-3 border-container-border'
+			: 'border-b border-container-border';
 
 	const topBorderClass = topBorder ? 'border-t border-container-border' : '';
 	const lastChildClass = lastChildNoBorder ? 'last:border-b-0' : '';

@@ -162,7 +162,7 @@ export const useSyncOraclePriceStore = (
 									? BigNum.from(
 											oraclePriceData.maxPrice,
 											PRICE_PRECISION_EXP
-									  ).toNum()
+										).toNum()
 									: undefined,
 							},
 							rawPriceData: oraclePriceData,

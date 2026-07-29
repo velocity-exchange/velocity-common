@@ -32,8 +32,8 @@ const groupHistoricalPricesByAverage = (
 		duration === HistoricalTokenPriceDuration.ONE_DAY
 			? 3 // 15 mins interval
 			: duration === HistoricalTokenPriceDuration.ONE_WEEK
-			? 2 // 2 hours interval
-			: 8; // 8 hours interval
+				? 2 // 2 hours interval
+				: 8; // 8 hours interval
 
 	// if the time of the first price is not at the start of the interval, e.g. XX:05
 	// we reduce the group size for the first interval, e.g. average of XX:05, XX:10

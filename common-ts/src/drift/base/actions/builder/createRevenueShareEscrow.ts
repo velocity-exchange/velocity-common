@@ -83,8 +83,7 @@ export const createRevenueShareEscrowIx = async ({
 	);
 };
 
-interface CreateRevenueShareEscrowTxnParams
-	extends WithTxnParams<CreateRevenueShareEscrowIxParams> {
+interface CreateRevenueShareEscrowTxnParams extends WithTxnParams<CreateRevenueShareEscrowIxParams> {
 	/**
 	 * The builder to add to the escrow account.
 	 */

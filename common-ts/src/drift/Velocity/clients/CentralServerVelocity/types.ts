@@ -19,7 +19,7 @@ type CsdBaseMarketOrderParams = Omit<
 >;
 
 export type CentralServerGetOpenPerpMarketOrderTxnParams<
-	T extends boolean = boolean
+	T extends boolean = boolean,
 > = T extends true
 	? Omit<CsdBaseMarketOrderParams, 'placeAndTake'> & {
 			useSwift: true;
@@ -29,13 +29,13 @@ export type CentralServerGetOpenPerpMarketOrderTxnParams<
 				'additionalDeposits'
 			>;
 			userAccountPublicKey: PublicKey;
-	  }
+		}
 	: WithTxnParams<
 			CsdBaseMarketOrderParams & {
 				useSwift: false;
 				userAccountPublicKey: PublicKey;
 			}
-	  >;
+		>;
 
 type CsdBaseNonMarketOrderParams = Omit<
 	OpenPerpNonMarketOrderBaseParams,
@@ -43,7 +43,7 @@ type CsdBaseNonMarketOrderParams = Omit<
 >;
 
 export type CentralServerGetOpenPerpNonMarketOrderTxnParams<
-	T extends boolean = boolean
+	T extends boolean = boolean,
 > = (T extends true
 	? CsdBaseNonMarketOrderParams & {
 			useSwift: true;
@@ -52,12 +52,12 @@ export type CentralServerGetOpenPerpNonMarketOrderTxnParams<
 				IsolatedPositionDepositsOverride,
 				'additionalDeposits'
 			>;
-	  }
+		}
 	: WithTxnParams<
 			CsdBaseNonMarketOrderParams & {
 				useSwift: false;
 			}
-	  >) & {
+		>) & {
 	userAccountPublicKey: PublicKey;
 };
 
@@ -96,11 +96,10 @@ export interface CentralServerGetCloseAndWithdrawIsolatedPerpPositionTxnParams {
 }
 
 /** Params for deposit from wallet + open isolated perp position (wallet → isolated → place). */
-export interface CentralServerGetDepositAndOpenIsolatedPerpPositionTxnParams
-	extends Omit<
-		CentralServerGetOpenPerpMarketOrderTxnParams<false>,
-		'isolatedPositionDepositsOverride' | 'useSwift' | 'marginMode'
-	> {
+export interface CentralServerGetDepositAndOpenIsolatedPerpPositionTxnParams extends Omit<
+	CentralServerGetOpenPerpMarketOrderTxnParams<false>,
+	'isolatedPositionDepositsOverride' | 'useSwift' | 'marginMode'
+> {
 	/** Amount to deposit from wallet directly into isolated (QUOTE_PRECISION, e.g. USDT). */
 	depositAmount: BN;
 }

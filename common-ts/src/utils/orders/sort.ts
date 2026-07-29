@@ -53,8 +53,8 @@ const getChronologicalValueForOrderAction = (action: OrderAction) => {
 	return matchEnum(action, OrderAction.PLACE)
 		? 0
 		: matchEnum(action, OrderAction.FILL)
-		? 1
-		: 2;
+			? 1
+			: 2;
 };
 
 /**

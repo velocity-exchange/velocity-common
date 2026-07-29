@@ -41,7 +41,7 @@ const makeUser = (
 			subAccountId: 0,
 			spotPositions,
 		}),
-	} as unknown as User);
+	}) as unknown as User;
 
 const depositUser = makeUser([
 	{

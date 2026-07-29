@@ -137,7 +137,7 @@ export const DefaultSelect = ({
 							{!selectedOption?.value && defaultLabel
 								? defaultLabel
 								: selectedOption?.label}
-							{selectedOption?.icon && selectedOption.icon}
+							{selectedOption?.icon}
 						</Typo.T4>
 					</div>
 
@@ -184,7 +184,7 @@ export const DefaultSelect = ({
 											)}
 										>
 											{option.label}
-											{option.icon && option.icon}
+											{option.icon}
 										</div>
 									</GradientText>
 								</div>
@@ -213,8 +213,8 @@ const SelectWrapper = (
 			className={twMerge(
 				'relative',
 				props.useFullWidth && 'w-full',
-				props.customWidth && props.customWidth,
-				props.customHeight && props.customHeight,
+				props.customWidth,
+				props.customHeight,
 				props.disabled && `hover:cursor-not-allowed pointer-events-none`
 			)}
 			ref={props.setWrapperRef}
@@ -283,12 +283,12 @@ const useSelectState = (
 	};
 
 	useEffect(() => {
-		window.addEventListener('mousedown', (e) => handleClick(e as PointerEvent));
+		// Must be a stable reference so removeEventListener actually detaches it.
+		const onMouseDown = (e: MouseEvent) => handleClick(e as PointerEvent);
 
-		return () =>
-			window.removeEventListener('mousedown', (e) =>
-				handleClick(e as PointerEvent)
-			);
+		window.addEventListener('mousedown', onMouseDown);
+
+		return () => window.removeEventListener('mousedown', onMouseDown);
 	}, [props.showPopup]);
 
 	return {

@@ -401,7 +401,7 @@ export class AuthorityVelocity {
 						...DEFAULT_ORDERBOOK_SUBSCRIPTION_CONFIG,
 						grouping: orderbookGrouping,
 						marketId: this.selectedTradeMarket,
-				  }
+					}
 				: undefined,
 		});
 	}

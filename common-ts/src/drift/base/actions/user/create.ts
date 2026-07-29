@@ -151,7 +151,7 @@ export const createUserAndDepositCollateralBaseIxs = async ({
 		? {
 				referrer: referrerNameAccount.user,
 				referrerStats: referrerNameAccount.userStats,
-		  }
+			}
 		: undefined;
 
 	const { ixs: createAndDepositIxs, userAccountPublicKey } =
@@ -195,7 +195,7 @@ export const createUserAndDepositCollateralBaseIxs = async ({
 				subAccountId: nextSubaccountId,
 				userAccountPublicKey: nextSubAccountPublicKey,
 				authority,
-		  })
+			})
 		: undefined;
 
 	if (delegateIx) {
@@ -209,8 +209,7 @@ export const createUserAndDepositCollateralBaseIxs = async ({
 	};
 };
 
-interface CreateUserAndDepositCollateralBaseTxnParams
-	extends CreateUserAndDepositCollateralBaseIxsParams {
+interface CreateUserAndDepositCollateralBaseTxnParams extends CreateUserAndDepositCollateralBaseIxsParams {
 	txParams?: TxParams;
 }
 

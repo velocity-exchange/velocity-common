@@ -22,10 +22,12 @@ velocity-common/
 ├── icons/              # @velocity-exchange/icons — Figma-generated React icons
 ├── posthog-types/      # @velocity-exchange/posthog-types — shared analytics types
 ├── .github/            # CI workflows, release-please config
-├── .husky/             # git hooks (commitlint, prettier, lint)
+├── .husky/             # git hooks (commitlint, oxfmt, oxlint)
+├── .oxlintrc.json      # lint rules (shared by every package)
+├── .oxfmtrc.json       # formatting rules (shared by every package)
 ├── release-please-config.json
 ├── commitlint.config.js
-└── package.json        # root: shared tooling (eslint, prettier, husky, tsc)
+└── package.json        # root: shared tooling (oxlint, oxfmt, husky, tsc)
 ```
 
 The root `package.json` only holds shared tooling. There is no Yarn/Bun workspaces wiring — each package manages its own `bun.lock` and is installed independently.
@@ -60,8 +62,8 @@ If you're only working in one package, you can usually just `cd` into it and `bu
 
 | Script | What it does |
 | --- | --- |
-| `bun run lint` / `lint:fix` | ESLint over all `.ts`/`.tsx` |
-| `bun run prettify` / `prettify:write` | Prettier check / write |
+| `bun run lint` / `lint:fix` | [oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole repo |
+| `bun run format` / `format:write` | [oxfmt](https://oxc.rs/docs/guide/usage/formatter) check / write over all `.ts`/`.tsx` |
 | `bun run typecheck` | `tsc --noEmit` for the `common-ts` project |
 
 Per-package scripts (`build`, `test`, `watch`, etc.) live in each subpackage's `package.json`.
@@ -70,7 +72,8 @@ Per-package scripts (`build`, `test`, `watch`, etc.) live in each subpackage's `
 
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/) — enforced by commitlint via Husky. Use `feat:`, `fix:`, `refactor:`, `chore:`, etc. Release-please derives versions and changelogs from these prefixes.
 - **Releases** are automated: merging conventional commits to `master` opens / updates a release-please PR per package; merging that PR tags and publishes.
-- **Formatting** is Prettier-enforced; lint runs on push via Husky.
+- **Formatting** is oxfmt-enforced; oxfmt + oxlint run on commit via Husky. Both read the root
+  `.oxfmtrc.json` / `.oxlintrc.json` — packages don't carry their own lint or format config.
 
 ## Notes
 

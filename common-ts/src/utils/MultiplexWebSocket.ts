@@ -134,9 +134,9 @@ type IMultiplexWebSocket<T = Record<string, unknown>> = {
  * - The websocket is closed when the number of subscriptions is 0
  * - The websocket will be refreshed (new instance) when it disconnects unexpectedly or errors, until it reaches the maximum number of reconnect attempts
  */
-export class MultiplexWebSocket<T = Record<string, unknown>>
-	implements IMultiplexWebSocket<T>
-{
+export class MultiplexWebSocket<
+	T = Record<string, unknown>,
+> implements IMultiplexWebSocket<T> {
 	/**
 	 * A lookup of all websockets by their URL.
 	 */

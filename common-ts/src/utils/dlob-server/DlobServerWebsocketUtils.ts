@@ -14,15 +14,15 @@ type BaseSubscriptionOutputProps<T extends DlobServerChannel> = {
 	channel: T;
 };
 
-interface OrderbookSubscriptionOutputProps
-	extends BaseSubscriptionOutputProps<'orderbook' | 'orderbook_indicative'> {
+interface OrderbookSubscriptionOutputProps extends BaseSubscriptionOutputProps<
+	'orderbook' | 'orderbook_indicative'
+> {
 	marketType: 'perp';
 	market: string;
 	grouping?: OrderbookGrouping;
 }
 
-interface TradeSubscriptionOutputProps
-	extends BaseSubscriptionOutputProps<'trades'> {
+interface TradeSubscriptionOutputProps extends BaseSubscriptionOutputProps<'trades'> {
 	marketType: 'perp';
 	market: string;
 }
@@ -36,15 +36,15 @@ type BaseUnsubscriptionOutputProps<T extends DlobServerChannel> = {
 	channel: T;
 };
 
-interface OrderbookUnsubscriptionOutputProps
-	extends BaseUnsubscriptionOutputProps<'orderbook' | 'orderbook_indicative'> {
+interface OrderbookUnsubscriptionOutputProps extends BaseUnsubscriptionOutputProps<
+	'orderbook' | 'orderbook_indicative'
+> {
 	marketType: 'perp';
 	market: string;
 	grouping?: OrderbookGrouping;
 }
 
-interface TradeUnsubscriptionOutputProps
-	extends BaseUnsubscriptionOutputProps<'trades'> {
+interface TradeUnsubscriptionOutputProps extends BaseUnsubscriptionOutputProps<'trades'> {
 	marketType: 'perp';
 	market: string;
 }
@@ -60,14 +60,14 @@ type BaseSubscriptionProps<T extends DlobServerChannel> = {
 type TargetMarketProps = { market: MarketId };
 
 interface OrderbookSubscriptionProps
-	extends BaseSubscriptionProps<'orderbook' | 'orderbook_indicative'>,
+	extends
+		BaseSubscriptionProps<'orderbook' | 'orderbook_indicative'>,
 		TargetMarketProps {
 	grouping?: OrderbookGrouping;
 }
 
 interface TradesSubscriptionProps
-	extends BaseSubscriptionProps<'trades'>,
-		TargetMarketProps {}
+	extends BaseSubscriptionProps<'trades'>, TargetMarketProps {}
 
 type WebsocketSubscriptionProps =
 	| TradesSubscriptionProps

@@ -197,9 +197,8 @@ const createDriftActions = (
 	) => {
 		// This method seems pretty slow, is there a better way?
 		// Nothing else I've tried is working...
-		const userAccounts = await driftClient.getUserAccountsForAuthority(
-			authority
-		);
+		const userAccounts =
+			await driftClient.getUserAccountsForAuthority(authority);
 
 		await Promise.all(
 			userAccounts.map((account) =>

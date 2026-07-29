@@ -24,9 +24,8 @@ export const createSettleFundingIx = async ({
 }: CreateSettleFundingIxParams): Promise<TransactionInstruction[]> => {
 	const userAccountPublicKey = user.getUserAccountPublicKey();
 
-	const settleFundingIx = await velocityClient.getSettleFundingPaymentIx(
-		userAccountPublicKey
-	);
+	const settleFundingIx =
+		await velocityClient.getSettleFundingPaymentIx(userAccountPublicKey);
 
 	return [settleFundingIx];
 };

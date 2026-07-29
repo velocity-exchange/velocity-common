@@ -56,7 +56,7 @@ export const createWithdrawIx = async ({
 							SpotBalanceType.DEPOSIT
 						),
 						spotMarketConfig.precisionExp
-				  )
+					)
 				: undefined;
 
 		// Only over-estimate when the max closes out the whole deposit, to absorb interest

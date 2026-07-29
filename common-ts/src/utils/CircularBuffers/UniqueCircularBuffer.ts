@@ -1,7 +1,10 @@
 import { CircularBuffer } from './CircularBuffer';
 
 class Node<T> {
-	constructor(public value: T, public next: Node<T> | null = null) {}
+	constructor(
+		public value: T,
+		public next: Node<T> | null = null
+	) {}
 }
 
 /**

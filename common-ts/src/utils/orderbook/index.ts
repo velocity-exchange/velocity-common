@@ -554,7 +554,7 @@ const filterOutDisabledLiquidityTypes = (
 							...level.sources,
 							...disabledSourceObj,
 						},
-				  }
+					}
 				: level;
 		})
 		.filter((level) => level.size.gt(ZERO));
@@ -575,7 +575,7 @@ export const l2ToDisplayBidsAndAsks = (
 			? filterOutDisabledLiquidityTypes(
 					l2Orderbook.bids,
 					disabledLiquidityTypes
-			  )
+				)
 			: l2Orderbook.bids;
 
 	const filteredAsks =
@@ -583,7 +583,7 @@ export const l2ToDisplayBidsAndAsks = (
 			? filterOutDisabledLiquidityTypes(
 					l2Orderbook.asks,
 					disabledLiquidityTypes
-			  )
+				)
 			: l2Orderbook.asks;
 
 	// # Uncross the liquidity

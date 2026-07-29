@@ -693,7 +693,7 @@ export class VelocityOperations {
 				? {
 						authToken: params.swapClientType.authToken,
 						url: params.swapClientType.url,
-				  }
+					}
 				: undefined;
 
 		const swapProvider = new UnifiedSwapClient({
@@ -785,9 +785,8 @@ export class VelocityOperations {
 			txParams: this.getTxParams(),
 		});
 
-		const { txSig } = await this.velocityClient.sendTransaction(
-			cancelOrdersTxn
-		);
+		const { txSig } =
+			await this.velocityClient.sendTransaction(cancelOrdersTxn);
 
 		return txSig;
 	}
