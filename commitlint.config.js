@@ -10,8 +10,8 @@ module.exports = {
 		'subject-case': [0],
 	},
 	ignores: [
-		(message) => /^chore: release /.test(message),
+		(message) => message.startsWith('chore: release '),
 		(message) => /\[skip ci\]/.test(message),
-		(message) => /^Merge /.test(message),
+		(message) => message.startsWith('Merge '),
 	],
 };

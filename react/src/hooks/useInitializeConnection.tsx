@@ -20,7 +20,7 @@ const useInitializeConnection = (
 					label: 'RPC Override',
 					value: Env.rpcOverride,
 					allowAdditionalConnection: false,
-			  }
+				}
 			: currentRpc;
 
 		if (Env.isDev) {

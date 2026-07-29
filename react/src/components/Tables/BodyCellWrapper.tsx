@@ -40,8 +40,8 @@ export const BodyCellWrapper = ({
 					alignCenter
 						? 'items-center'
 						: alignRight
-						? 'items-end'
-						: 'items-start',
+							? 'items-end'
+							: 'items-start',
 					flexCol ? 'flex-col' : 'flex-row',
 					innerClassName
 				)}

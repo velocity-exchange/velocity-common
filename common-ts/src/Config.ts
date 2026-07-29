@@ -21,16 +21,9 @@ export const Config: {
 export const Initialize = (env: VelocityEnv) => {
 	const SDKConfig = initialize({ env });
 
-	const maxSpotMarketIndex = Math.max(
-		...SDKConfig.SPOT_MARKETS.map((market) => market.marketIndex)
-	);
-
-	const maxPerpMarketIndex = Math.max(
-		...SDKConfig.PERP_MARKETS.map((market) => market.marketIndex)
-	);
-
-	const spotMarkets = new Array(maxSpotMarketIndex);
-	const markets = new Array(maxPerpMarketIndex);
+	// Sparse, indexed by marketIndex rather than densely packed.
+	const spotMarkets: SpotMarketConfig[] = [];
+	const markets: PerpMarketConfig[] = [];
 
 	SDKConfig.SPOT_MARKETS.forEach((spotMarket) => {
 		spotMarkets[spotMarket.marketIndex] = spotMarket;

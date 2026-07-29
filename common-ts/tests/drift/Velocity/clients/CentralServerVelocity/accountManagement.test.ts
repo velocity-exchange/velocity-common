@@ -115,9 +115,8 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 				await signAndSendTransaction(txn as VersionedTransaction, testWallet);
 
 				// check that the user account exists
-				const userAccount = await defaultConnection.getAccountInfo(
-					userAccountPublicKey
-				);
+				const userAccount =
+					await defaultConnection.getAccountInfo(userAccountPublicKey);
 				expect(userAccount).to.exist;
 
 				// check that subaccount id is correct

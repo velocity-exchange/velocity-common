@@ -44,6 +44,7 @@ class MockDataApiWsClient {
 
 // Mock the DataApiWsClient module
 const originalDataApiWsClient = DataApiWsClient;
+// oxlint-disable-next-line no-import-assign -- ts-node emits CJS, so the binding is writable
 (DataApiWsClient as any) = MockDataApiWsClient;
 
 describe('MarketDataFeed', () => {
@@ -95,6 +96,7 @@ describe('MarketDataFeed', () => {
 
 	after(() => {
 		// Restore the original DataApiWsClient
+		// oxlint-disable-next-line no-import-assign
 		(DataApiWsClient as any) = originalDataApiWsClient;
 	});
 

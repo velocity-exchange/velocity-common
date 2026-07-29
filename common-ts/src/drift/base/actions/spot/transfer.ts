@@ -33,8 +33,7 @@ export const createTransferCollateralIx = async ({
 	);
 };
 
-interface CreateTransferCollateralTxnParams
-	extends CreateTransferCollateralIxParams {
+interface CreateTransferCollateralTxnParams extends CreateTransferCollateralIxParams {
 	txParams?: TxParams;
 }
 

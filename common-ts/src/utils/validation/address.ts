@@ -35,10 +35,10 @@ function isValidBitcoinAddress(address: string): boolean {
 		);
 	}
 	// Bech32 — must be single-case (lowercase or uppercase, not mixed)
-	if (/^bc1/.test(address)) {
+	if (address.startsWith('bc1')) {
 		return /^bc1[0-9a-z]{25,62}$/.test(address);
 	}
-	if (/^BC1/.test(address)) {
+	if (address.startsWith('BC1')) {
 		return /^BC1[0-9A-Z]{25,62}$/.test(address);
 	}
 	return false;

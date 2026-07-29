@@ -19,7 +19,8 @@ export type NoProperties = {};
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface PostHogEventMap
-	extends CollateralEvents,
+	extends
+		CollateralEvents,
 		TradeEvents,
 		VaultEvents,
 		IfStakingEvents,
@@ -69,7 +70,7 @@ export type CaptureEvent<TMap extends PostHogEventMap = PostHogEventMap> = {
  */
 export type ExtendEventMap<
 	TOverrides extends Partial<Record<PostHogEvent, object>> = NoProperties,
-	TNew extends Record<string, object> = NoProperties
+	TNew extends Record<string, object> = NoProperties,
 > = {
 	[K in PostHogEvent]: K extends keyof TOverrides
 		? PostHogEventMap[K] & TOverrides[K]

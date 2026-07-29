@@ -176,9 +176,8 @@ async function settleFundingExample() {
 		console.log(`👤 User Account: ${userAccountPublicKey.toString()}`);
 		console.log('📋 Settling funding payments for all perp positions...');
 
-		const settleFundingTxn = await centralServerVelocity.getSettleFundingTxn(
-			userAccountPublicKey
-		);
+		const settleFundingTxn =
+			await centralServerVelocity.getSettleFundingTxn(userAccountPublicKey);
 
 		await executeVersionedTransaction(
 			settleFundingTxn as VersionedTransaction,

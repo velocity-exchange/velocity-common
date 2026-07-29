@@ -584,9 +584,8 @@ async function settleFundingCommand(args: CliArgs): Promise<void> {
 	console.log('--- 💰 Settle Funding Transaction ---');
 	console.log(`👤 User Account: ${userAccount}`);
 
-	const settleFundingTxn = await centralServerVelocity.getSettleFundingTxn(
-		userAccountPubkey
-	);
+	const settleFundingTxn =
+		await centralServerVelocity.getSettleFundingTxn(userAccountPubkey);
 
 	await executeTransaction(
 		settleFundingTxn as VersionedTransaction,
@@ -792,16 +791,16 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 			? {
 					orderType,
 					limitPrice: limitPriceBN!,
-			  }
+				}
 			: orderType === 'takeProfit' || orderType === 'stopLoss'
-			? {
-					orderType,
-					triggerPrice: triggerPriceBN!,
-			  }
-			: {
-					orderType,
-					oraclePriceOffset: oraclePriceOffsetBN!,
-			  };
+				? {
+						orderType,
+						triggerPrice: triggerPriceBN!,
+					}
+				: {
+						orderType,
+						oraclePriceOffset: oraclePriceOffsetBN!,
+					};
 
 	console.log('--- 📋 Open Perp Non-Market Order ---');
 	console.log(`👤 User Account: ${userAccount}`);

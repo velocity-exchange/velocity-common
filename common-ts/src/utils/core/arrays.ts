@@ -1,8 +1,7 @@
 export const chunks = <T>(array: readonly T[], size: number): T[][] => {
-	return new Array(Math.ceil(array.length / size))
-		.fill(null)
-		.map((_, index) => index * size)
-		.map((begin) => array.slice(begin, begin + size));
+	return Array.from({ length: Math.ceil(array.length / size) }, (_, index) =>
+		array.slice(index * size, index * size + size)
+	);
 };
 
 export const glueArray = <T>(size: number, elements: T[]): T[][] => {

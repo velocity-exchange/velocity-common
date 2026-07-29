@@ -59,10 +59,10 @@ const getHeliusPriorityFeeEstimate = async (
 			targetPercentile > 75
 				? 'veryHigh'
 				: targetPercentile > 50
-				? 'high'
-				: targetPercentile > 25
-				? 'medium'
-				: 'low';
+					? 'high'
+					: targetPercentile > 25
+						? 'medium'
+						: 'low';
 
 		return result?.result?.priorityFeeLevels?.[resultToUse];
 	} catch (e) {

@@ -21,15 +21,13 @@ export const getOracleCrankIxs = async (
 		return [];
 	}
 
-	const [pythLazerIxs] = await Promise.all([
-		getPythLazerUpdateIxs(
-			marketConfigs,
-			velocityClient,
-			fetchCrankData,
-			maxPythLazerCranks,
-			precedingIxsCount
-		),
-	]);
+	const pythLazerIxs = await getPythLazerUpdateIxs(
+		marketConfigs,
+		velocityClient,
+		fetchCrankData,
+		maxPythLazerCranks,
+		precedingIxsCount
+	);
 
 	return [...pythLazerIxs];
 };

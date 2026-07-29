@@ -11,7 +11,7 @@ export type PropertyType =
 export type PropertyAndType<KeyOfObject> = [
 	property: KeyOfObject,
 	type: PropertyType,
-	customEqualityFn?: (a: any, b: any) => boolean
+	customEqualityFn?: (a: any, b: any) => boolean,
 ];
 
 const arePropertiesEqual = (

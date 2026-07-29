@@ -44,8 +44,10 @@ import {
 } from '../isolatedPositionDeposit';
 import { logger } from '../../../../../../utils/logger';
 
-export interface OpenPerpNonMarketOrderBaseParams
-	extends Omit<NonMarketOrderParamsConfig, 'marketType' | 'baseAssetAmount'> {
+export interface OpenPerpNonMarketOrderBaseParams extends Omit<
+	NonMarketOrderParamsConfig,
+	'marketType' | 'baseAssetAmount'
+> {
 	velocityClient: VelocityClient;
 	user: User;
 	// Either new approach
@@ -81,8 +83,7 @@ export interface OpenPerpNonMarketOrderBaseParams
 	builderParams?: BuilderParams;
 }
 
-export interface OpenPerpNonMarketOrderParamsWithSwift
-	extends OpenPerpNonMarketOrderBaseParams {
+export interface OpenPerpNonMarketOrderParamsWithSwift extends OpenPerpNonMarketOrderBaseParams {
 	swiftOptions: SwiftOrderOptions;
 }
 
@@ -91,16 +92,16 @@ export type OpenPerpNonMarketOrderParams<
 	S extends Omit<SwiftOrderOptions, 'swiftServerUrl'> = Omit<
 		SwiftOrderOptions,
 		'swiftServerUrl'
-	>
+	>,
 > = T extends true
 	? OpenPerpNonMarketOrderBaseParams & {
 			useSwift: T;
 			swiftOptions: S;
-	  }
+		}
 	: OpenPerpNonMarketOrderBaseParams & {
 			useSwift: T;
 			swiftOptions?: never;
-	  };
+		};
 
 // TODO: add isolated margin?
 /**
@@ -128,7 +129,7 @@ export const createMultipleOpenPerpNonMarketOrderIx = async (params: {
 
 	const orderParams = orderParamsConfigs.map((config) => ({
 		...buildNonMarketOrderParams(config),
-		...(builderParams ?? {}),
+		...builderParams,
 	}));
 
 	const placeOrderIx = await velocityClient.getPlaceOrdersIx(
@@ -224,7 +225,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 								mainSignerOverride
 							)
 						)
-				  )
+					)
 				: Promise.resolve([] as (TransactionInstruction | undefined)[]),
 			getIsolatedPositionDepositIxIfNeeded(
 				velocityClient,
@@ -308,7 +309,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 		if (!createdPlaceAndTakeIx) {
 			allOrders.push({
 				...limitAuctionOrderParams,
-				...(builderParams ?? {}),
+				...builderParams,
 			});
 		}
 	} else {
@@ -325,7 +326,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 
 		allOrders.push({
 			...orderParams,
-			...(builderParams ?? {}),
+			...builderParams,
 		});
 	}
 
@@ -422,7 +423,7 @@ async function prepSwiftLimitOrderData(
 					orderConfig: orderConfig as LimitOrderParamsOrderConfig & {
 						limitAuction: LimitAuctionConfig;
 					},
-			  })
+				})
 			: buildNonMarketOrderParams({
 					marketIndex,
 					marketType: MarketType.PERP,
@@ -432,7 +433,7 @@ async function prepSwiftLimitOrderData(
 					reduceOnly: params.reduceOnly,
 					postOnly: params.postOnly,
 					userOrderId: params.userOrderId,
-			  });
+				});
 	} else if (orderConfig.orderType === 'oracleLimit') {
 		if (orderConfig.oraclePriceOffset.isZero()) {
 			throw new Error('ORACLE_LIMIT orders require oraclePriceOffset');

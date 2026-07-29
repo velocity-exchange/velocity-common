@@ -51,7 +51,7 @@ const movingWindowTargetPercentileStrategy = (
 			const pFee = shouldSplitWithBelow
 				? (allRecentSamplesAscendingSorted[targetPercentileIndex] +
 						allRecentSamplesAscendingSorted[targetPercentileIndex - 1]) /
-				  2
+					2
 				: allRecentSamplesAscendingSorted[targetPercentileIndex];
 
 			if (filteredSamples.length > 0) {

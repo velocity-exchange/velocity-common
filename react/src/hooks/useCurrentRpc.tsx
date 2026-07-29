@@ -27,14 +27,14 @@ const _useCurrentRpc = () => {
 
 	return [dedupedRpc, setSavedRpc] as [
 		RpcEndpoint,
-		(savedRpc: RpcEndpoint) => void
+		(savedRpc: RpcEndpoint) => void,
 	];
 };
 
 export const useCurrentRpc = singletonHook(
 	[DEFAULT_MAINNET_RPC, () => {}] as [
 		RpcEndpoint,
-		(savedRpc: RpcEndpoint) => void
+		(savedRpc: RpcEndpoint) => void,
 	],
 	_useCurrentRpc
 );

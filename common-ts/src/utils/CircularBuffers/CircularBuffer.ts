@@ -1,5 +1,8 @@
 class Node<T> {
-	constructor(public readonly value: T, public next: Node<T> | null = null) {}
+	constructor(
+		public readonly value: T,
+		public next: Node<T> | null = null
+	) {}
 }
 
 export class CircularBuffer<T> {

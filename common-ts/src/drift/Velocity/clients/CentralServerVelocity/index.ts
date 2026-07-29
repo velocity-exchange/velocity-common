@@ -1132,9 +1132,8 @@ export class CentralServerVelocity {
 					user.getUserAccountOrThrow().subAccountId
 				);
 
-				const cancelAllOrdersTxn = await this._velocityClient.buildTransaction(
-					ix
-				);
+				const cancelAllOrdersTxn =
+					await this._velocityClient.buildTransaction(ix);
 
 				return cancelAllOrdersTxn;
 			}

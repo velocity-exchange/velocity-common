@@ -7,7 +7,7 @@
 	"author": "Velocity Exchange",
 	"license": "MIT",
 	"scripts": {
-		"lint": "eslint './**/*.{ts,tsx}' --quiet",
+		"lint": "oxlint -c ../.oxlintrc.json . --quiet",
 		"build": "bun clean && tsc && bun copy-files",
 		"build:watch": "bun clean && tsc --watch",
 		"copy-files": "copyfiles -u 1 src/**/*.html src/**/*.css lib/",
@@ -23,8 +23,8 @@
 		"@velocity-exchange/sdk": "0.10.0",
 		"copyfiles": "2.4.1",
 		"encoding": "0.1.13",
-		"eslint": "8.43.0",
 		"lokijs": "1.5.12",
+		"oxlint": "1.75.0",
 		"pino-pretty": "10.2.3",
 		"react": "19.0.3",
 		"react-dom": "19.0.3",

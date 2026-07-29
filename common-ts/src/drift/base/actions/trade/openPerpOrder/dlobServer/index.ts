@@ -450,10 +450,10 @@ export function deriveFromL2Inputs({
 					worstPrice: priceImpactData.worstPrice,
 					oraclePrice,
 					dynamicSlippageConfig,
-			  })
+				})
 			: typeof slippageToleranceInput === 'number'
-			? slippageToleranceInput
-			: 0.005;
+				? slippageToleranceInput
+				: 0.005;
 
 	const auctionOrderParams = deriveMarketOrderParams({
 		marketType,

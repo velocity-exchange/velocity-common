@@ -261,13 +261,13 @@ export const prepSwiftOrder = ({
 			? {
 					baseAssetAmount: orderParams.stopLoss.baseAssetAmount,
 					triggerPrice: orderParams.stopLoss.triggerPrice,
-			  }
+				}
 			: null,
 		takeProfitOrderParams: orderParams.takeProfit
 			? {
 					baseAssetAmount: orderParams.takeProfit.baseAssetAmount,
 					triggerPrice: orderParams.takeProfit.triggerPrice,
-			  }
+				}
 			: null,
 		maxMarginRatio: orderParams.positionMaxLeverage
 			? convertLeverageToMarginRatio(orderParams.positionMaxLeverage)
@@ -284,11 +284,11 @@ export const prepSwiftOrder = ({
 		? {
 				...baseSignedMsgOrderParamsMessage,
 				takerPubkey: takerUserAccount.pubKey,
-		  }
+			}
 		: {
 				...baseSignedMsgOrderParamsMessage,
 				subAccountId: takerUserAccount.subAccountId,
-		  };
+			};
 
 	const encodedOrderMessage = velocityClient.encodeSignedMsgOrderParamsMessage(
 		signedMsgOrderParamsMessage,
@@ -493,7 +493,7 @@ const computeSwiftOrderTiming = (
 			: Math.max(
 					MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS,
 					userSigningSlotBuffer + mainOrderParams.auctionDuration
-			  )
+				)
 		: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS;
 
 	const expirationTimeMs =

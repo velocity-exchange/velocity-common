@@ -98,7 +98,10 @@ export class UIMarket {
 		this._uiSymbols = uiSymbols;
 	}
 
-	constructor(readonly marketIndex: number, readonly marketType: MarketType) {
+	constructor(
+		readonly marketIndex: number,
+		readonly marketType: MarketType
+	) {
 		const marketId = new MarketId(marketIndex, marketType);
 		const perpMarkets = useAsyncMarketConfigs
 			? UIMarket.perpMarkets
@@ -243,7 +246,7 @@ export class UIMarket {
 							? marketConfig.symbol.slice(
 									0,
 									marketConfig.symbol.lastIndexOf('-')
-							  )
+								)
 							: marketConfig.symbol.split('-')[0]
 					) as MarketDisplaySymbol;
 				}

@@ -78,7 +78,7 @@ export const getLimitAuctionOrderParams = async ({
 		oraclePriceBands = orderConfig.limitAuction.oraclePrice
 			? getOraclePriceBands(perpMarketAccount, {
 					price: orderConfig.limitAuction.oraclePrice,
-			  })
+				})
 			: undefined;
 
 		auctionDuration = getPerpAuctionDuration(

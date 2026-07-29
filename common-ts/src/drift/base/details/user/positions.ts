@@ -98,7 +98,7 @@ export const getPriceBasedPositionInfo = (
 						.div(quoteAmount)
 						.toNumber() / 1_000_000;
 				return pnlPct * (accountLeverage || 1);
-		  })()
+			})()
 		: 0;
 
 	return {

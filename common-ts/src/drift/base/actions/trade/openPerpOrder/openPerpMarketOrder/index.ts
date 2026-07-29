@@ -110,8 +110,10 @@ export interface OpenPerpMarketOrderBaseParams {
 	};
 }
 
-export interface OpenPerpMarketOrderBaseParamsWithSwift
-	extends Omit<OpenPerpMarketOrderBaseParams, 'placeAndTake'> {
+export interface OpenPerpMarketOrderBaseParamsWithSwift extends Omit<
+	OpenPerpMarketOrderBaseParams,
+	'placeAndTake'
+> {
 	swiftOptions: SwiftOrderOptions;
 }
 
@@ -120,18 +122,18 @@ export type OpenPerpMarketOrderParams<
 	S extends Omit<SwiftOrderOptions, 'swiftServerUrl'> = Omit<
 		SwiftOrderOptions,
 		'swiftServerUrl'
-	>
+	>,
 > = T extends true
 	? OpenPerpMarketOrderBaseParams & {
 			useSwift: T;
 			swiftOptions: S;
 			placeAndTake?: never;
-	  }
+		}
 	: OpenPerpMarketOrderBaseParams & {
 			useSwift: T;
 			placeAndTake?: PlaceAndTakeParams;
 			swiftOptions?: never;
-	  };
+		};
 /**
  * Shared prep logic for swift market orders: validates input, fetches auction params,
  * computes bit flags, and resolves the user account.
@@ -406,7 +408,7 @@ export const createPlaceAndTakePerpMarketOrderIx = async ({
 	}));
 
 	const placeAndTakeIx = await velocityClient.getPlaceAndTakePerpOrderIx(
-		{ ...fetchedOrderParams, ...(builderParams ?? {}) },
+		{ ...fetchedOrderParams, ...builderParams },
 		topMakersInfo,
 		undefined,
 		auctionDurationPercentage,
@@ -503,7 +505,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 								mainSignerOverride
 							)
 						)
-				  )
+					)
 				: Promise.resolve([] as (TransactionInstruction | undefined)[]),
 			getIsolatedPositionDepositIxIfNeeded(
 				velocityClient,
@@ -572,7 +574,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 		const orderParams = {
 			...fetchedOrderParams,
 			userOrderId,
-			...(builderParams ?? {}),
+			...builderParams,
 		};
 
 		allOrders.push(orderParams);

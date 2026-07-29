@@ -40,7 +40,7 @@ export const TableCellCardValue = ({
 		>
 			<div className="flex space-x-2 text-xs text-text-label">
 				{label}
-				{icon && icon}
+				{icon}
 			</div>
 			<div className={size ? `text-${size}` : ''}>{value}</div>
 		</div>
