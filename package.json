@@ -14,7 +14,7 @@
 		"lint:fix": "oxlint . --fix",
 		"prepare": "husky install",
 		"format": "oxfmt --check './**/*.{ts,tsx}'",
-		"format:write": "oxfmt --write './**/*.{ts,tsx}'",
+		"format:fix": "oxfmt --write './**/*.{ts,tsx}'",
 		"typecheck": "tsc --project common-ts --noEmit"
 	},
 	"dependencies": {
