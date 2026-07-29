@@ -10,7 +10,6 @@ import {
 	MarketType,
 	PerpMarketConfig,
 	PerpMarkets,
-	QuoteResponse,
 	SpotMarketConfig,
 	SpotMarkets,
 	SwapMode,
@@ -18,6 +17,7 @@ import {
 	WhileValidTxSender,
 	IWalletV2,
 	TxParams,
+	SwapQuote,
 } from '@velocity-exchange/sdk';
 import { Connection, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { createPlaceholderIWallet } from '../../../../utils/accounts/wallet';
@@ -821,7 +821,7 @@ export class AuthorityVelocity {
 			swapMode?: SwapMode;
 			onlyDirectRoutes?: boolean;
 		}
-	): Promise<QuoteResponse> {
+	): Promise<SwapQuote> {
 		return this.velocityOperations.getSwapQuote(params);
 	}
 

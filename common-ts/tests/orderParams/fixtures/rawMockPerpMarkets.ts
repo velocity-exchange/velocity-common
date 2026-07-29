@@ -213,6 +213,8 @@ function mockPerpMarketCommon(): Omit<
 		fundingRampSlope: 1000000,
 		orderStepSize: new BN(1),
 		orderTickSize: new BN(1),
+		pendingRevenueShare: new BN(0),
+		bankruptcyIfFloorPct: 0,
 	};
 }
 

@@ -27,11 +27,11 @@ import {
 	SpotMarketConfig,
 	SwapMode,
 	TxParams,
-	UnifiedQuoteResponse,
 	UnifiedSwapClient,
 	User,
 	WhileValidTxSender,
 	ZERO,
+	SwapQuote,
 } from '@velocity-exchange/sdk';
 import {
 	Connection,
@@ -1153,7 +1153,7 @@ export class CentralServerVelocity {
 			slippageBps?: number;
 			swapMode?: SwapMode;
 			onlyDirectRoutes?: boolean;
-			quote?: UnifiedQuoteResponse;
+			quote?: SwapQuote;
 		}
 	): Promise<VersionedTransaction | Transaction> {
 		return this.velocityClientContextWrapper(
@@ -1178,7 +1178,7 @@ export class CentralServerVelocity {
 					);
 				}
 
-				const swapClient = new UnifiedSwapClient({
+				const swapProvider = new UnifiedSwapClient({
 					clientType: 'jupiter',
 					connection: this._velocityClient.connection,
 				});
@@ -1186,7 +1186,7 @@ export class CentralServerVelocity {
 				// Get quote if not provided
 				let quote = options?.quote;
 				if (!quote) {
-					quote = await swapClient.getQuote({
+					quote = await swapProvider.getQuote({
 						inputMint: fromSpotMarketConfig.mint,
 						outputMint: toSpotMarketConfig.mint,
 						amount,
@@ -1198,7 +1198,7 @@ export class CentralServerVelocity {
 
 				const swapTxn = await createSwapTxn({
 					velocityClient: this._velocityClient,
-					swapClient,
+					swapProvider,
 					user,
 					swapFromMarketIndex: fromMarketIndex,
 					swapToMarketIndex: toMarketIndex,
