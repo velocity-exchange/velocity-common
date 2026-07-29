@@ -5,8 +5,9 @@
 		"jsx": "react-jsx",
 		"module": "ES2022",
 		"target": "ES2022",
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"sourceMap": true,
+		"rootDir": "./src",
 		"outDir": "lib",
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
@@ -14,8 +15,7 @@
 		"skipLibCheck": true,
 		"declaration": true,
 		"paths": {
-			"@drift/common": ["../common-ts"],
-			"@velocity-exchange/icons": ["../icons/dist"]
+			"@velocity-exchange/sdk": ["./node_modules/@velocity-exchange/sdk"]
 		}
 	},
 	"include": ["src"],
