@@ -4,13 +4,13 @@ import {
 	JupiterClient,
 	MarketType,
 	MAX_LEVERAGE_ORDER_SIZE,
-	QuoteResponse,
 	SwapMode,
 	TxParams,
 	UnifiedSwapClient,
 	User,
 	UserStatsAccount,
 	ZERO,
+	SwapQuote,
 } from '@velocity-exchange/sdk';
 import { TransactionSignature } from '@solana/web3.js';
 import { getMarketConfig } from '../../../../../utils/markets/config';
@@ -630,7 +630,7 @@ export class VelocityOperations {
 			swapMode?: SwapMode;
 			onlyDirectRoutes?: boolean;
 		}
-	): Promise<QuoteResponse> {
+	): Promise<SwapQuote> {
 		const jupiterClient = new JupiterClient({
 			connection: this.velocityClient.connection,
 		});
@@ -696,7 +696,7 @@ export class VelocityOperations {
 				  }
 				: undefined;
 
-		const swapClient = new UnifiedSwapClient({
+		const swapProvider = new UnifiedSwapClient({
 			clientType: params.swapClientType?.type ?? 'jupiter',
 			connection: this.velocityClient.connection,
 			...auth,
@@ -708,7 +708,7 @@ export class VelocityOperations {
 
 		const swapTxn = await createSwapTxn({
 			velocityClient: this.velocityClient,
-			swapClient,
+			swapProvider,
 			user: accountData.userClient,
 			swapFromMarketIndex: params.fromMarketIndex,
 			swapToMarketIndex: params.toMarketIndex,

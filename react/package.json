@@ -20,7 +20,7 @@
 		"@solana/spl-token": "0.3.8",
 		"@solana/web3.js": "1.98.0",
 		"@types/react": "npm:types-react@19.0.0-rc.1",
-		"@velocity-exchange/sdk": "0.3.0",
+		"@velocity-exchange/sdk": "0.10.0",
 		"copyfiles": "2.4.1",
 		"encoding": "0.1.13",
 		"eslint": "8.43.0",
@@ -33,17 +33,16 @@
 	"peerDependencies": {
 		"@solana/spl-token": "0.3.8",
 		"@solana/web3.js": "1.98.0",
-		"@velocity-exchange/sdk": "0.2.4",
 		"react": "19.0.3",
 		"react-dom": "19.0.3"
 	},
 	"dependencies": {
-		"@velocity-exchange/icons": "file:../icons",
-		"@drift/common": "npm:@velocity-exchange/common@0.1.5",
+		"@drift/common": "npm:@velocity-exchange/common@0.4.1",
 		"@floating-ui/react": "0.27.9",
 		"@solana/wallet-adapter-base": "0.9.23",
 		"@solana/wallet-adapter-react": "0.15.35",
 		"@solana/wallet-adapter-wallets": "0.19.32",
+		"@velocity-exchange/icons": "1.0.2",
 		"dayjs": "1.11.13",
 		"immer": "10.0.2",
 		"react-singleton-hook": "4.0.1",
@@ -55,7 +54,10 @@
 	"overrides": {
 		"@types/react": "npm:types-react@19.0.3",
 		"@types/react-dom": "npm:types-react-dom@19.0.3",
-		"@ledgerhq/errors": "6.16.3"
+		"@ledgerhq/errors": "6.16.3",
+		"@solana/web3.js": "1.98.0",
+		"@solana/errors": "2.0.0-preview.4",
+		"@solana/codecs-data-structures": "2.0.0-preview.4"
 	},
 	"resolutions": {
 		"@types/react": "npm:types-react@19.0.3",
@@ -63,7 +65,6 @@
 		"@ledgerhq/errors": "6.16.3",
 		"@solana/web3.js": "1.98.0",
 		"@solana/errors": "2.0.0-preview.4",
-		"@solana/codecs-data-structures": "2.0.0-preview.4",
-		"@velocity-exchange/sdk": "0.2.4"
+		"@solana/codecs-data-structures": "2.0.0-preview.4"
 	}
 }

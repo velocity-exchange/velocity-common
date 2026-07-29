@@ -2,9 +2,9 @@ import {
 	BN,
 	VelocityClient,
 	TxParams,
-	UnifiedQuoteResponse,
-	UnifiedSwapClient,
 	User,
+	SwapQuote,
+	SwapProvider,
 } from '@velocity-exchange/sdk';
 import {
 	AddressLookupTableAccount,
@@ -20,9 +20,9 @@ interface CreateSwapIxDetailsParams {
 	/** The Velocity client instance for interacting with the Velocity protocol */
 	velocityClient: VelocityClient;
 	/** Quote response from swap provider containing swap route information */
-	quote: UnifiedQuoteResponse;
+	quote: SwapQuote;
 	/** Swap client instance for performing the swap */
-	swapClient: UnifiedSwapClient;
+	swapProvider: SwapProvider;
 	/** Market index of the token being swapped from */
 	swapFromMarketIndex: number;
 	/** Market index of the token being swapped to */
@@ -49,7 +49,7 @@ interface CreateSwapIxDetailsParams {
  */
 export const createSwapIxDetails = async ({
 	velocityClient,
-	swapClient,
+	swapProvider,
 	quote,
 	swapFromMarketIndex,
 	swapToMarketIndex,
@@ -61,8 +61,8 @@ export const createSwapIxDetails = async ({
 }> => {
 	const userPublicKey = user.userAccountPublicKey;
 
-	const swapIxsDetails = await velocityClient.getSwapIxV2({
-		swapClient,
+	const swapIxsDetails = await velocityClient.getProviderSwapIx({
+		swapProvider,
 		outMarketIndex: swapToMarketIndex,
 		inMarketIndex: swapFromMarketIndex,
 		amount,
@@ -97,7 +97,7 @@ interface CreateSwapTxnParams extends CreateSwapIxDetailsParams {
  */
 export const createSwapTxn = async ({
 	velocityClient,
-	swapClient,
+	swapProvider,
 	quote,
 	swapFromMarketIndex,
 	swapToMarketIndex,
@@ -107,7 +107,7 @@ export const createSwapTxn = async ({
 }: CreateSwapTxnParams): Promise<Transaction | VersionedTransaction> => {
 	const swapIxsDetails = await createSwapIxDetails({
 		velocityClient,
-		swapClient,
+		swapProvider,
 		quote,
 		swapFromMarketIndex,
 		swapToMarketIndex,

@@ -17,7 +17,6 @@ describe('Oracle Source Helpers', () => {
 
 		it('should return false for non-PYTH_LAZER sources', () => {
 			expect(isPythLazer(OracleSource.PYTH_PULL)).to.be.false;
-			expect(isPythLazer(OracleSource.SWITCHBOARD_ON_DEMAND)).to.be.false;
 			expect(isPythLazer(OracleSource.PYTH)).to.be.false;
 		});
 	});
@@ -39,7 +38,6 @@ describe('Oracle Source Helpers', () => {
 		});
 
 		it('should return false for non-PYTH sources', () => {
-			expect(isPythOracle(OracleSource.SWITCHBOARD_ON_DEMAND)).to.be.false;
 			expect(isPythOracle(OracleSource.QUOTE_ASSET)).to.be.false;
 		});
 	});
@@ -59,7 +57,6 @@ describe('Oracle Source Helpers', () => {
 		it('should return false for legacy PYTH and non-PYTH sources', () => {
 			expect(isPullOracle(OracleSource.PYTH)).to.be.false;
 			expect(isPullOracle(OracleSource.PYTH_1K)).to.be.false;
-			expect(isPullOracle(OracleSource.SWITCHBOARD_ON_DEMAND)).to.be.false;
 			expect(isPullOracle(OracleSource.QUOTE_ASSET)).to.be.false;
 		});
 	});

@@ -3,7 +3,7 @@ import {
 	PositionDirection,
 	PostOnlyParams,
 	PublicKey,
-	QuoteResponse,
+	SwapQuote,
 } from '@velocity-exchange/sdk';
 import { OptionalAuctionParamsRequestInputs } from '../../../../base/actions/trade/openPerpOrder/dlobServer';
 import { SwiftOrderOptions } from '../../../../base/actions/trade/openPerpOrder/openSwiftOrder';
@@ -131,7 +131,7 @@ export interface SwapParams {
 	toMarketIndex: number;
 	amount: BigNum;
 	subAccountId: number;
-	quote?: QuoteResponse;
+	quote?: SwapQuote;
 	swapClientType?:
 		| {
 				type: 'jupiter';
