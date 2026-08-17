@@ -4,7 +4,7 @@
 	"devDependencies": {
 		"@commitlint/cli": "19.6.1",
 		"@commitlint/config-conventional": "19.6.0",
-		"husky": "8.0.3",
+		"husky": "9.1.7",
 		"oxfmt": "0.60.0",
 		"oxlint": "1.75.0",
 		"typescript": "5.1.6"
