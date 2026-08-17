@@ -17,45 +17,45 @@
 		"lib": "lib"
 	},
 	"devDependencies": {
-		"@solana/spl-token": "0.3.8",
-		"@solana/web3.js": "1.98.0",
+		"@solana/spl-token": "0.4.15",
+		"@solana/web3.js": "1.98.4",
 		"@types/react": "npm:types-react@19.0.0-rc.1",
-		"@velocity-exchange/sdk": "0.10.0",
+		"@velocity-exchange/sdk": "0.13.0",
 		"copyfiles": "2.4.1",
 		"encoding": "0.1.13",
 		"lokijs": "1.5.12",
-		"oxlint": "1.75.0",
+		"oxlint": "1.77.0",
 		"pino-pretty": "10.2.3",
 		"react": "19.0.3",
-		"react-dom": "19.0.3",
+		"react-dom": "19.2.8",
 		"typescript": "5.1.6"
 	},
 	"peerDependencies": {
-		"@solana/spl-token": "0.3.8",
-		"@solana/web3.js": "1.98.0",
+		"@solana/spl-token": "0.4.15",
+		"@solana/web3.js": "1.98.4",
 		"react": "19.0.3",
-		"react-dom": "19.0.3"
+		"react-dom": "19.2.8"
 	},
 	"dependencies": {
 		"@drift/common": "npm:@velocity-exchange/common@0.4.1",
-		"@floating-ui/react": "0.27.9",
-		"@solana/wallet-adapter-base": "0.9.23",
-		"@solana/wallet-adapter-react": "0.15.35",
-		"@solana/wallet-adapter-wallets": "0.19.32",
+		"@floating-ui/react": "0.27.20",
+		"@solana/wallet-adapter-base": "0.9.27",
+		"@solana/wallet-adapter-react": "0.15.39",
+		"@solana/wallet-adapter-wallets": "0.19.38",
 		"@velocity-exchange/icons": "1.0.2",
-		"dayjs": "1.11.13",
+		"dayjs": "1.11.21",
 		"immer": "10.0.2",
 		"react-singleton-hook": "4.0.1",
-		"react-use": "17.4.0",
+		"react-use": "17.6.1",
 		"tailwind-merge": "2.5.4",
-		"use-immer": "0.9.0",
+		"use-immer": "0.11.0",
 		"zustand": "4.3.8"
 	},
 	"overrides": {
 		"@types/react": "npm:types-react@19.0.3",
 		"@types/react-dom": "npm:types-react-dom@19.0.3",
 		"@ledgerhq/errors": "6.16.3",
-		"@solana/web3.js": "1.98.0",
+		"@solana/web3.js": "1.98.4",
 		"@solana/errors": "2.0.0-preview.4",
 		"@solana/codecs-data-structures": "2.0.0-preview.4"
 	},
@@ -63,7 +63,7 @@
 		"@types/react": "npm:types-react@19.0.3",
 		"@types/react-dom": "npm:types-react-dom@19.0.3",
 		"@ledgerhq/errors": "6.16.3",
-		"@solana/web3.js": "1.98.0",
+		"@solana/web3.js": "1.98.4",
 		"@solana/errors": "2.0.0-preview.4",
 		"@solana/codecs-data-structures": "2.0.0-preview.4"
 	}
