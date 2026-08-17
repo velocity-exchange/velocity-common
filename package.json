@@ -5,8 +5,8 @@
 		"@commitlint/cli": "19.6.1",
 		"@commitlint/config-conventional": "19.6.0",
 		"husky": "8.0.3",
-		"oxfmt": "0.60.0",
-		"oxlint": "1.75.0",
+		"oxfmt": "0.62.0",
+		"oxlint": "1.77.0",
 		"typescript": "5.1.6"
 	},
 	"scripts": {
@@ -19,7 +19,7 @@
 	},
 	"dependencies": {
 		"@types/big.js": "6.2.2",
-		"posthog-js": "1.72.1"
+		"posthog-js": "1.415.1"
 	},
 	"version": "0.0.1"
 }
