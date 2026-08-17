@@ -22,11 +22,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch trusted parser
+        run: |
+          set -euo pipefail
+          # GITHUB_BASE_REF is a runner-provided env var for pull_request events -- using
+          # it instead of templating ${{ github.base_ref }} into the script keeps the
+          # branch name out of the shell command line entirely.
+          base="origin/$GITHUB_BASE_REF"
+          # Run the base branch's copy of the parser, not the PR's own -- otherwise a PR
+          # could add a malicious package and neuter the gate in the same diff by editing
+          # the script that's supposed to catch it. drift-common is public, so a
+          # fork PR mounting exactly this attack is a real scenario, not hypothetical.
+          # A PR that adds the script for the first time has no base copy to fetch; fall
+          # back to the head copy in that case (there is nothing yet for a first-time
+          # addition to neuter).
+          git show "$base:.github/scripts/lockfile_packages.py" > /tmp/lockfile_packages.py \
+            2>/dev/null || cp .github/scripts/lockfile_packages.py /tmp/lockfile_packages.py
+
       - name: Collect newly added packages
         id: collect
         run: |
           set -euo pipefail
-          base="origin/${{ github.base_ref }}"
+          base="origin/$GITHUB_BASE_REF"
           : > /tmp/new-packages.txt
           for lock in $LOCKFILES; do
             [ -f "$lock" ] || continue
@@ -35,7 +52,7 @@ jobs:
             mkdir -p "/tmp/base/$(dirname "$lock")"
             # Lockfile may be new in this PR; an absent base copy means everything is new.
             git show "$base:$lock" > "/tmp/base/$lock" 2>/dev/null || : > "/tmp/base/$lock"
-            python3 .github/scripts/lockfile_packages.py "/tmp/base/$lock" "$lock" \
+            python3 /tmp/lockfile_packages.py "/tmp/base/$lock" "$lock" \
               | sed "s#^#${lock}\t#" >> /tmp/new-packages.txt
           done
           count=$(wc -l < /tmp/new-packages.txt | tr -d ' ')
@@ -43,15 +60,44 @@ jobs:
           echo "Newly added packages: $count"
           cat /tmp/new-packages.txt
 
+      - name: Find existing gate comment
+        id: find_comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # A fork PR gets a read-only GITHUB_TOKEN, so this read can fail there; don't
+          # let that abort the job before the real enforcement below runs.
+          id=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '[.[] | select(.body | contains("<!-- new-dependency-gate -->"))] | last | .id // empty' \
+            2>/dev/null || true)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
       - name: Report and enforce
-        if: steps.collect.outputs.count != '0'
         env:
           GH_TOKEN: ${{ github.token }}
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
+          EXISTING_COMMENT_ID: ${{ steps.find_comment.outputs.id }}
         run: |
           set -euo pipefail
+
+          if [ "${{ steps.collect.outputs.count }}" = "0" ]; then
+            # Nothing new. If an earlier push left a stale gate comment behind, update it
+            # in place rather than leaving outdated package names on the PR.
+            if [ -n "$EXISTING_COMMENT_ID" ]; then
+              {
+                echo "<!-- new-dependency-gate -->"
+                echo "### :package: New dependency gate"
+                echo
+                echo "No new packages remain in the watched lockfiles as of the latest push."
+              } > /tmp/comment.md
+              gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
+                -f body=@/tmp/comment.md \
+                || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?)."
+            fi
+            exit 0
+          fi
+
           {
             echo "<!-- new-dependency-gate -->"
             echo "### :package: New dependencies in this PR"
@@ -65,20 +111,14 @@ jobs:
             awk -F'\t' '{print "| `" $1 "` | `" $2 "` |"}' /tmp/new-packages.txt
           } > /tmp/comment.md
 
-          # Maintain a single sticky comment instead of piling one up per push.
-          # A fork PR gets a read-only GITHUB_TOKEN, so posting/editing the
-          # comment can fail there -- don't let that mask the real gate below.
-          # gh's own --slurp can't be combined with --jq, so pipe raw pages
-          # (kept separate from stderr) through a plain jq -s instead.
-          existing_id="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate 2>/dev/null \
-            | jq -s 'add | [.[] | select(.body | contains("<!-- new-dependency-gate -->"))][-1].id // empty' \
-            2>/dev/null || true)"
-
-          if [ -n "${existing_id:-}" ]; then
-            gh api --method PATCH "repos/${REPO}/issues/comments/${existing_id}" -f body=@/tmp/comment.md \
+          # A failed post/update (e.g. a fork PR's read-only token) must not mask the
+          # actual label enforcement below.
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
+              -f body=@/tmp/comment.md \
               || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
           else
-            gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body-file /tmp/comment.md \
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment.md \
               || echo "::warning::could not post the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
           fi
 

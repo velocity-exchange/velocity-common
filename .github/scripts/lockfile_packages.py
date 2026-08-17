@@ -32,10 +32,24 @@ def split_name(spec):
 
 def bun(text):
     # "packages": { "<key>": ["<name>@<version>", "<registry>", {...}, "<hash>"] }
-    return {
-        split_name(m.group(1))
-        for m in re.finditer(r'^\s*"[^"]+":\s*\[\s*"([^"]+)"', text, re.M)
-    }
+    # The key is not always the plain package name -- bun.lock represents a hoisted
+    # duplicate version with a compound key like "anchor-bankrun/@coral-xyz/anchor",
+    # so the name must come from the array's own first element, not the key.
+    #
+    # bun.lock is also JSONC, so formatting is not significant to bun itself -- a
+    # hand-edited file can legally place two entries on one line, which a line-anchored
+    # regex would miss. Match `"<key>": [ "<first-elem>"` anywhere in the text (not
+    # anchored to line-start), and only treat it as a package entry when the first
+    # element actually carries a version/protocol suffix that split_name strips off.
+    # That rejects the format's other bracketed keys -- "os": [...], "cpu": [...] --
+    # whose elements ("linux", "x64", ...) have no such suffix to strip.
+    names = set()
+    for m in re.finditer(r'"[^"]+":\s*\[\s*"([^"]+)"', text):
+        first = m.group(1)
+        name = split_name(first)
+        if name != first:
+            names.add(name)
+    return names
 
 
 def yarn(text):
