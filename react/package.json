@@ -44,7 +44,7 @@
 		"@solana/wallet-adapter-wallets": "0.19.32",
 		"@velocity-exchange/icons": "1.0.2",
 		"dayjs": "1.11.13",
-		"immer": "10.0.2",
+		"immer": "11.1.15",
 		"react-singleton-hook": "4.0.1",
 		"react-use": "17.4.0",
 		"tailwind-merge": "2.5.4",
