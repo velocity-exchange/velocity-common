@@ -80,13 +80,16 @@ jobs:
           # Only the gate's own comments count. Anyone able to comment on the PR could
           # otherwise paste the approval marker below and forge a sign-off.
           id=""; approved=""
+          # gh runs --jq once per page, so each page contributes a row and a page with no
+          # match contributes an empty one. Keep the last row that matched.
           # shellcheck disable=SC2016  # $c below is a jq variable, not a shell one
-          if row=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '
+          row=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '
                 ([.[] | select(.user.login == "github-actions[bot]")
                       | select(.body | contains("<!-- new-dependency-gate -->"))] | last) as $c
                 | "\($c.id // "")\t\((($c.body // "")
                     | [scan("<!-- gate-approved: ([0-9a-f]+) -->")] | flatten | first) // "")"
-              ' 2>/dev/null); then
+              ' 2>/dev/null | grep -v '^[[:space:]]*$' | tail -1) || true
+          if [ -n "$row" ]; then
             id=${row%%$'\t'*}
             approved=${row#*$'\t'}
           fi
