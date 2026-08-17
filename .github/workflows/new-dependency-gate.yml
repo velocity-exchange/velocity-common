@@ -92,7 +92,7 @@ jobs:
                 echo "No new packages remain in the watched lockfiles as of the latest push."
               } > /tmp/comment.md
               gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-                -f body=@/tmp/comment.md \
+                -F body=@/tmp/comment.md \
                 || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?)."
             fi
             exit 0
@@ -115,7 +115,7 @@ jobs:
           # actual label enforcement below.
           if [ -n "$EXISTING_COMMENT_ID" ]; then
             gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-              -f body=@/tmp/comment.md \
+              -F body=@/tmp/comment.md \
               || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
           else
             gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment.md \
