@@ -1,192 +1,40 @@
 name: New dependency gate
 
+# Flags packages this pull request newly introduces, and existing packages it
+# repoints at a different source, then requires the `deps-reviewed` label before
+# it can merge. Sign-off is bound to a digest of the findings, so approving one
+# set does not clear a set added afterwards.
+#
+# The parser and all of the collect/report/enforce logic live in
+# velocity-exchange/dependency-gate, reached via $GITHUB_ACTION_PATH, so a pull
+# request cannot weaken the check that is inspecting it by editing a script here.
+#
+# FOLLOW-UP once this is on master: switch the trigger to `pull_request_target`
+# and set `require-pull-request-target: true`. Under `pull_request` the workflow
+# file itself comes from the pull request, so a pull request can still edit or
+# delete its own gate; the action warns about this on every run. That switch is
+# not possible before merge, because `pull_request_target` runs the base
+# branch's copy of the workflow and there is none until this lands.
+
 on:
-  # pull_request_target runs this workflow from the base branch instead of from the PR.
-  # Under pull_request it is the PR's own copy of this file that runs, so a PR could
-  # empty LOCKFILES, rename the job or make enforcement exit 0 in the same diff that
-  # adds a malicious package. The usual pull_request_target hazard does not apply here
-  # because the PR is never checked out: its lockfiles are read as bytes through the
-  # contents API at a pinned head sha, and parsed by the base branch's parser.
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
-  issues: write # label removal goes through the issues API
+  issues: write # deleting a stale label goes through the issues API
   pull-requests: write
-
-env:
-  # Space-separated lockfiles to watch. Set per repo.
-  LOCKFILES: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
-  OVERRIDE_LABEL: deps-reviewed
 
 jobs:
   new-dependency-gate:
     name: New dependency gate
     runs-on: ubicloud
     steps:
-      # Checks out the base branch, which is what pull_request_target resolves to.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # required: the action diffs against the base commit
 
-      - name: Collect new packages and changed sources
-        id: collect
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # One authoritative listing of the head tree. "Not Found" alone cannot be used
-          # to skip a lockfile: a wrong sha, a revoked token and an absent path all look
-          # alike, and treating any of them as "nothing was added" would open the gate.
-          # Anything wrong with this listing fails the job instead.
-          gh api "repos/$REPO/git/trees/$HEAD_SHA?recursive=1" > /tmp/head-tree.json
-          if [ "$(jq -r '.truncated' /tmp/head-tree.json)" != "false" ]; then
-            echo "::error::the head tree listing was truncated; cannot establish which lockfiles exist."
-            exit 1
-          fi
-          jq -r '.tree[] | select(.type == "blob") | .path' /tmp/head-tree.json > /tmp/head-paths.txt
-
-          : > /tmp/findings.txt
-          for lock in $LOCKFILES; do
-            # Genuinely absent from the PR head, so there is nothing to compare.
-            grep -qxF "$lock" /tmp/head-paths.txt || continue
-            mkdir -p "/tmp/head/$(dirname "$lock")"
-            # Read as bytes at a pinned sha: the PR's commits never enter this checkout,
-            # so there is nothing of the PR's to execute. A failure here is fatal.
-            gh api "repos/$REPO/contents/$lock?ref=$HEAD_SHA" \
-              -H "Accept: application/vnd.github.raw" > "/tmp/head/$lock"
-            # "$lock" is the base branch's copy from the checkout above. A path missing
-            # there is a lockfile this PR adds, so everything in it counts as new.
-            python3 .github/scripts/lockfile_packages.py "$lock" "/tmp/head/$lock" \
-              | sed "s#^#${lock}\t#" >> /tmp/findings.txt
-          done
-          count=$(wc -l < /tmp/findings.txt | tr -d ' ')
-          # Sign-off is bound to this digest, so adding packages after approval invalidates it.
-          digest=$(sort /tmp/findings.txt | sha256sum | cut -c1-16)
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Findings: $count (digest $digest)"
-          cat /tmp/findings.txt
-
-      - name: Read gate comment
-        id: comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          # Only the gate's own comments count. Anyone able to comment on the PR could
-          # otherwise paste the approval marker below and forge a sign-off.
-          id=""; approved=""
-          # gh runs --jq once per page, so each page contributes a row and a page with no
-          # match contributes an empty one. Keep the last row that matched.
-          # shellcheck disable=SC2016  # $c below is a jq variable, not a shell one
-          row=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '
-                ([.[] | select(.user.login == "github-actions[bot]")
-                      | select(.body | contains("<!-- new-dependency-gate -->"))] | last) as $c
-                | "\($c.id // "")\t\((($c.body // "")
-                    | [scan("<!-- gate-approved: ([0-9a-f]+) -->")] | flatten | first) // "")"
-              ' 2>/dev/null | grep -v '^[[:space:]]*$' | tail -1) || true
-          if [ -n "$row" ]; then
-            id=${row%%$'\t'*}
-            approved=${row#*$'\t'}
-          fi
-          [[ "$id" =~ ^[0-9]*$ ]] || id=""
-          [[ "$approved" =~ ^[0-9a-f]*$ ]] || approved=""
-          echo "id=$id" >> "$GITHUB_OUTPUT"
-          echo "approved=$approved" >> "$GITHUB_OUTPUT"
-
-      - name: Report and enforce
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          COUNT: ${{ steps.collect.outputs.count }}
-          DIGEST: ${{ steps.collect.outputs.digest }}
-          COMMENT_ID: ${{ steps.comment.outputs.id }}
-          APPROVED_DIGEST: ${{ steps.comment.outputs.approved }}
-          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          EVENT_ACTION: ${{ github.event.action }}
-          LABEL_CHANGED: ${{ github.event.label.name }}
-        run: |
-          set -euo pipefail
-
-          # Package names reach the comment through a file, never a command line.
-          post() {
-            if [ -n "$COMMENT_ID" ]; then
-              gh api --method PATCH "repos/$REPO/issues/comments/$COMMENT_ID" -F body=@"$1"
-            else
-              gh pr comment "$PR" --body-file "$1"
-            fi
-          }
-
-          if [ "$COUNT" = "0" ]; then
-            # Nothing new. Refresh a stale comment from an earlier push rather than
-            # leaving outdated package names on the PR.
-            [ -n "$COMMENT_ID" ] || exit 0
-            {
-              echo "<!-- new-dependency-gate -->"
-              echo "### :package: New dependency gate"
-              echo
-              echo "No new packages and no changed package sources remain in the watched"
-              echo "lockfiles as of the latest push."
-            } > /tmp/comment.md
-            post /tmp/comment.md || echo "::warning::could not refresh the dependency-gate comment."
-            exit 0
-          fi
-
-          label_present=false
-          if echo "$LABELS" | grep -q "\"$OVERRIDE_LABEL\""; then
-            label_present=true
-          fi
-
-          approved=false
-          if [ "$label_present" = true ]; then
-            if [ "$EVENT_ACTION" = "labeled" ] && [ "$LABEL_CHANGED" = "$OVERRIDE_LABEL" ]; then
-              # The label was just applied, so it signs off the findings reported below.
-              approved=true
-            elif [ -n "$APPROVED_DIGEST" ] && [ "$APPROVED_DIGEST" = "$DIGEST" ]; then
-              approved=true
-            else
-              # The label was applied for a different set of packages. Drop it so the
-              # current set gets reviewed instead of inheriting the earlier sign-off.
-              gh api --method DELETE "repos/$REPO/issues/$PR/labels/$OVERRIDE_LABEL" >/dev/null 2>&1 \
-                || echo "::warning::could not remove the stale '$OVERRIDE_LABEL' label."
-              echo "::warning::'$OVERRIDE_LABEL' was applied for a different set of packages; re-apply it after reviewing the current set."
-            fi
-          fi
-
-          {
-            echo "<!-- new-dependency-gate -->"
-            if [ "$approved" = true ]; then
-              echo "<!-- gate-approved: $DIGEST -->"
-            fi
-            echo "### :package: New dependencies in this PR"
-            echo
-            echo "This PR adds packages, or changes where existing packages are fetched from,"
-            echo "relative to the base lockfile. Confirm each one's **source, maintainer and"
-            echo "integrity** before merging, then apply the "'`'"$OVERRIDE_LABEL"'`'" label."
-            echo
-            echo "Sign-off covers exactly this set (digest "'`'"$DIGEST"'`'"). Adding more"
-            echo "packages afterwards drops the label and requires a fresh review."
-            echo
-            echo '| Lockfile | Change | Package | Source |'
-            echo '| --- | --- | --- | --- |'
-            awk -F'\t' '{
-              change = ($2 == "new") ? "new package" : "**source changed**"
-              print "| `" $1 "` | " change " | `" $3 "` | `" $4 "` |"
-            }' /tmp/findings.txt
-          } > /tmp/comment.md
-
-          # A failed post must not mask the enforcement below.
-          post /tmp/comment.md \
-            || echo "::warning::could not post the dependency-gate comment; still enforcing the label check."
-
-          if [ "$approved" = true ]; then
-            echo "::notice::$COUNT finding(s), signed off via '$OVERRIDE_LABEL'."
-          else
-            echo "::error::$COUNT finding(s) need review. Apply the '$OVERRIDE_LABEL' label to merge."
-            exit 1
-          fi
+      - uses: velocity-exchange/dependency-gate@e039f99f9238eafe289d9879caae848c450a1b8e # v2.0.0
+        with:
+          # Every published package's lockfile, plus the workspace root.
+          lockfiles: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
