@@ -48,9 +48,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           {
+            echo "<!-- new-dependency-gate -->"
             echo "### :package: New dependencies in this PR"
             echo
             echo "This PR adds packages that were not in the base lockfile. Confirm each one's"
@@ -62,7 +65,22 @@ jobs:
             awk -F'\t' '{print "| `" $1 "` | `" $2 "` |"}' /tmp/new-packages.txt
           } > /tmp/comment.md
 
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment.md
+          # Maintain a single sticky comment instead of piling one up per push.
+          # A fork PR gets a read-only GITHUB_TOKEN, so posting/editing the
+          # comment can fail there -- don't let that mask the real gate below.
+          # gh's own --slurp can't be combined with --jq, so pipe raw pages
+          # (kept separate from stderr) through a plain jq -s instead.
+          existing_id="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate 2>/dev/null \
+            | jq -s 'add | [.[] | select(.body | contains("<!-- new-dependency-gate -->"))][-1].id // empty' \
+            2>/dev/null || true)"
+
+          if [ -n "${existing_id:-}" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${existing_id}" -f body=@/tmp/comment.md \
+              || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
+          else
+            gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body-file /tmp/comment.md \
+              || echo "::warning::could not post the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
+          fi
 
           if echo "$LABELS" | grep -q "\"$OVERRIDE_LABEL\""; then
             echo "::notice::${{ steps.collect.outputs.count }} new package(s), signed off via '$OVERRIDE_LABEL'."

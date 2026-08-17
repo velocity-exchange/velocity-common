@@ -2,9 +2,11 @@ version: 2
 
 updates:
   # ────────────────────────────────────────────────────────────────────
-  # npm ecosystems (bun.lock is handled under the npm ecosystem)
+  # bun ecosystem -- `bun.lock` is its own package-ecosystem value
+  # (>=v1.1.39), separate from `npm`. See:
+  # https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#bun
   # ────────────────────────────────────────────────────────────────────
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
@@ -28,7 +30,7 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /common-ts
     schedule:
       interval: weekly
@@ -52,7 +54,7 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /react
     schedule:
       interval: weekly
@@ -76,7 +78,7 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /icons
     schedule:
       interval: weekly
@@ -100,7 +102,7 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /posthog-types
     schedule:
       interval: weekly
