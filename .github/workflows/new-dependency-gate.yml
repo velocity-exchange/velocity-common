@@ -1,0 +1,72 @@
+name: New dependency gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # Space-separated lockfiles to watch. Set per repo.
+  LOCKFILES: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
+  OVERRIDE_LABEL: deps-reviewed
+
+jobs:
+  new-dependency-gate:
+    name: New dependency gate
+    runs-on: ubicloud
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Collect newly added packages
+        id: collect
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          : > /tmp/new-packages.txt
+          for lock in $LOCKFILES; do
+            [ -f "$lock" ] || continue
+            # Mirror the path under /tmp/base so the basename -- and therefore the
+            # parser's format dispatch -- is preserved.
+            mkdir -p "/tmp/base/$(dirname "$lock")"
+            # Lockfile may be new in this PR; an absent base copy means everything is new.
+            git show "$base:$lock" > "/tmp/base/$lock" 2>/dev/null || : > "/tmp/base/$lock"
+            python3 .github/scripts/lockfile_packages.py "/tmp/base/$lock" "$lock" \
+              | sed "s#^#${lock}\t#" >> /tmp/new-packages.txt
+          done
+          count=$(wc -l < /tmp/new-packages.txt | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Newly added packages: $count"
+          cat /tmp/new-packages.txt
+
+      - name: Report and enforce
+        if: steps.collect.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### :package: New dependencies in this PR"
+            echo
+            echo "This PR adds packages that were not in the base lockfile. Confirm each one's"
+            echo "**source, maintainer and integrity** before merging, then apply the"
+            echo '`'"$OVERRIDE_LABEL"'`'" label."
+            echo
+            echo '| Lockfile | Package |'
+            echo '| --- | --- |'
+            awk -F'\t' '{print "| `" $1 "` | `" $2 "` |"}' /tmp/new-packages.txt
+          } > /tmp/comment.md
+
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment.md
+
+          if echo "$LABELS" | grep -q "\"$OVERRIDE_LABEL\""; then
+            echo "::notice::${{ steps.collect.outputs.count }} new package(s), signed off via '$OVERRIDE_LABEL'."
+          else
+            echo "::error::${{ steps.collect.outputs.count }} new package(s) need review. Apply the '$OVERRIDE_LABEL' label to merge."
+            exit 1
+          fi
