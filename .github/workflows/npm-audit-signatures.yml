@@ -44,7 +44,9 @@ jobs:
         # bun.lock has no npm/yarn equivalent lockfile checked in, and bun/yarn
         # do not implement `audit signatures`, so resolve a tree with npm here
         # purely to verify registry signatures and provenance attestations.
-        run: npm install --package-lock-only --ignore-scripts
+        # `npm audit signatures` reads installed node_modules, not just a
+        # lockfile, so this needs a real install rather than --package-lock-only.
+        run: npm install --ignore-scripts
 
       - name: Verify registry signatures and provenance
         run: npm audit signatures
