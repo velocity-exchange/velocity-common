@@ -9,15 +9,15 @@ name: New dependency gate
 # velocity-exchange/dependency-gate, reached via $GITHUB_ACTION_PATH, so a pull
 # request cannot weaken the check that is inspecting it by editing a script here.
 #
-# FOLLOW-UP once this is on master: switch the trigger to `pull_request_target`
-# and set `require-pull-request-target: true`. Under `pull_request` the workflow
-# file itself comes from the pull request, so a pull request can still edit or
-# delete its own gate; the action warns about this on every run. That switch is
-# not possible before merge, because `pull_request_target` runs the base
-# branch's copy of the workflow and there is none until this lands.
+# This runs on `pull_request_target`, so the workflow file itself always comes
+# from the base branch: a pull request cannot edit or delete its own gate.
+# The action never checks out the pull request head; it reads head lockfiles
+# as bytes through the GitHub contents API at a pinned head SHA and parses
+# them with the base branch's parser, so the usual privileged-token hazard of
+# `pull_request_target` does not apply here.
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
@@ -38,3 +38,5 @@ jobs:
         with:
           # Every published package's lockfile, plus the workspace root.
           lockfiles: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
+          # Fail loudly if this workflow is ever downgraded back to `pull_request`.
+          require-pull-request-target: true
