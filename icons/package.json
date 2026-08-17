@@ -35,7 +35,7 @@
 		"@rollup/plugin-typescript": "8.5.0",
 		"@svgr/core": "5.5.0",
 		"@svgr/plugin-prettier": "5.5.0",
-		"@svgr/plugin-svgo": "5.5.0",
+		"@svgr/plugin-svgo": "8.1.0",
 		"@types/fs-extra": "9.0.13",
 		"@types/node": "17.0.8",
 		"@types/react": "npm:types-react@19.0.0-rc.1",
