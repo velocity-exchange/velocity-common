@@ -59,7 +59,7 @@ jobs:
       run:
         working-directory: ./common-ts
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs['common-ts--tag_name'] }}
 
@@ -89,7 +89,7 @@ jobs:
       run:
         working-directory: ./icons
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs['icons--tag_name'] }}
 
@@ -116,7 +116,7 @@ jobs:
       run:
         working-directory: ./posthog-types
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs['posthog-types--tag_name'] }}
 
