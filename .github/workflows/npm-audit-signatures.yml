@@ -1,0 +1,81 @@
+name: npm audit signatures
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  audit-signatures:
+    name: audit signatures (${{ matrix.directory }})
+    runs-on: ubicloud
+    timeout-minutes: 10
+    # Non-blocking to start: flip this once a baseline has been measured against
+    # the locked tree. An immediately-red check gets ignored, which is worse
+    # than no check.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [., common-ts, icons, posthog-types, react]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24.x.x'
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # Install with bun, from the committed lockfile, so the audited tree is the
+      # tree that ships. `npm audit signatures` reads node_modules rather than a
+      # lockfile, so it verifies a bun-installed tree perfectly well; asking npm
+      # to resolve instead audits whatever npm prefers today, which is a
+      # different set of versions to the one bun.lock pins.
+      - name: Install the locked tree with bun
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Verify registry signatures and provenance
+        id: audit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm audit signatures 2>&1 | tee "$RUNNER_TEMP/audit.log"
+
+      # react/package.json carries @types/react as npm:types-react@19.0.0-rc.1
+      # while overrides pins it to 19.0.3. bun installs that without complaint,
+      # but `npm audit signatures` validates overrides against direct
+      # dependencies itself and aborts with EOVERRIDE before auditing anything,
+      # so the conflict is not avoidable by choosing a different installer.
+      # Annotate that one known case rather than leaving a permanently red cell
+      # that trains reviewers to ignore this check. Any other failure is loud.
+      - name: Explain a failed audit
+        if: steps.audit.outcome == 'failure'
+        env:
+          DIR: ${{ matrix.directory }}
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/audit.log"
+          if [ "$DIR" = react ] && grep -q 'EOVERRIDE' "$log" && grep -q '@types/react' "$log"; then
+            echo "::notice::react/ is not verified -- npm audit signatures refuses the tree over the known @types/react override conflict. Signatures stay unchecked here until package.json is reconciled."
+          else
+            echo "::error::npm audit signatures failed for a reason other than the known react/ override conflict -- investigate."
+            exit 1
+          fi

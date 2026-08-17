@@ -1,0 +1,40 @@
+name: New dependency gate
+
+# Flags packages this pull request newly introduces, and existing packages it
+# repoints at a different source, then requires the `deps-reviewed` label before
+# it can merge. Sign-off is bound to a digest of the findings, so approving one
+# set does not clear a set added afterwards.
+#
+# The parser and all of the collect/report/enforce logic live in
+# velocity-exchange/dependency-gate, reached via $GITHUB_ACTION_PATH, so a pull
+# request cannot weaken the check that is inspecting it by editing a script here.
+#
+# FOLLOW-UP once this is on master: switch the trigger to `pull_request_target`
+# and set `require-pull-request-target: true`. Under `pull_request` the workflow
+# file itself comes from the pull request, so a pull request can still edit or
+# delete its own gate; the action warns about this on every run. That switch is
+# not possible before merge, because `pull_request_target` runs the base
+# branch's copy of the workflow and there is none until this lands.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: write # deleting a stale label goes through the issues API
+  pull-requests: write
+
+jobs:
+  new-dependency-gate:
+    name: New dependency gate
+    runs-on: ubicloud
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # required: the action diffs against the base commit
+
+      - uses: velocity-exchange/dependency-gate@e039f99f9238eafe289d9879caae848c450a1b8e # v2.0.0
+        with:
+          # Every published package's lockfile, plus the workspace root.
+          lockfiles: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
