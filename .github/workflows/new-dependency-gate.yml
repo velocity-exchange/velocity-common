@@ -4,8 +4,9 @@ on:
   # pull_request_target runs this workflow from the base branch instead of from the PR.
   # Under pull_request it is the PR's own copy of this file that runs, so a PR could
   # empty LOCKFILES, rename the job or make enforcement exit 0 in the same diff that
-  # adds a malicious package. Nothing below checks out or executes PR code: the PR's
-  # lockfiles are read as data with `git show` and parsed by the base branch's parser.
+  # adds a malicious package. The usual pull_request_target hazard does not apply here
+  # because the PR is never checked out: its lockfiles are read as bytes through the
+  # contents API at a pinned head sha, and parsed by the base branch's parser.
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
@@ -30,16 +31,31 @@ jobs:
       - name: Collect new packages and changed sources
         id: collect
         env:
-          PR_HEAD: refs/pull/${{ github.event.pull_request.number }}/head
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin "$PR_HEAD"
+          # One authoritative listing of the head tree. "Not Found" alone cannot be used
+          # to skip a lockfile: a wrong sha, a revoked token and an absent path all look
+          # alike, and treating any of them as "nothing was added" would open the gate.
+          # Anything wrong with this listing fails the job instead.
+          gh api "repos/$REPO/git/trees/$HEAD_SHA?recursive=1" > /tmp/head-tree.json
+          if [ "$(jq -r '.truncated' /tmp/head-tree.json)" != "false" ]; then
+            echo "::error::the head tree listing was truncated; cannot establish which lockfiles exist."
+            exit 1
+          fi
+          jq -r '.tree[] | select(.type == "blob") | .path' /tmp/head-tree.json > /tmp/head-paths.txt
+
           : > /tmp/findings.txt
           for lock in $LOCKFILES; do
+            # Genuinely absent from the PR head, so there is nothing to compare.
+            grep -qxF "$lock" /tmp/head-paths.txt || continue
             mkdir -p "/tmp/head/$(dirname "$lock")"
-            # Read-only: the PR's lockfile as bytes, never a checkout and never an install.
-            # Absent from the head means the PR does not carry this lockfile at all.
-            git show "FETCH_HEAD:$lock" > "/tmp/head/$lock" 2>/dev/null || continue
+            # Read as bytes at a pinned sha: the PR's commits never enter this checkout,
+            # so there is nothing of the PR's to execute. A failure here is fatal.
+            gh api "repos/$REPO/contents/$lock?ref=$HEAD_SHA" \
+              -H "Accept: application/vnd.github.raw" > "/tmp/head/$lock"
             # "$lock" is the base branch's copy from the checkout above. A path missing
             # there is a lockfile this PR adds, so everything in it counts as new.
             python3 .github/scripts/lockfile_packages.py "$lock" "/tmp/head/$lock" \
