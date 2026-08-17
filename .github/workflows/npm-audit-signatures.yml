@@ -22,8 +22,9 @@ jobs:
     name: audit signatures (${{ matrix.directory }})
     runs-on: ubicloud
     timeout-minutes: 10
-    # Non-blocking to start: flip this once the baseline below is clean.
-    # An immediately-red check gets ignored, which is worse than no check.
+    # Non-blocking to start: flip this once a baseline has been measured against
+    # the locked tree. An immediately-red check gets ignored, which is worse
+    # than no check.
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -40,42 +41,41 @@ jobs:
         with:
           node-version: '24.x.x'
 
-      - name: Resolve dependency tree with npm
-        # bun.lock has no npm/yarn equivalent lockfile checked in, and bun/yarn
-        # do not implement `audit signatures`, so resolve a tree with npm here
-        # purely to verify registry signatures and provenance attestations.
-        # `npm audit signatures` reads installed node_modules, not just a
-        # lockfile, so this needs a real install rather than --package-lock-only.
-        id: install
-        continue-on-error: true
-        run: |
-          set +e
-          npm install --ignore-scripts 2> /tmp/npm-install.stderr
-          ec=$?
-          cat /tmp/npm-install.stderr >&2
-          exit $ec
+      - name: Setup bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-      - name: Handle the known react/ override conflict
-        # react/package.json has @types/react: npm:types-react@19.0.0-rc.1 as a
-        # direct devDependency while overrides/resolutions pin it to 19.0.3.
-        # bun resolves that fine; npm refuses with EOVERRIDE. Pre-existing,
-        # not introduced here. Rather than leave this matrix cell permanently
-        # red (which trains reviewers to ignore it), treat *this specific*
-        # known conflict as an explicit, annotated skip -- any other install
-        # failure in react/ still fails the job loudly.
-        if: matrix.directory == 'react' && steps.install.outcome == 'failure'
-        run: |
-          if grep -q 'EOVERRIDE' /tmp/npm-install.stderr && grep -q '@types/react' /tmp/npm-install.stderr; then
-            echo "::notice::react/ skipped -- known EOVERRIDE conflict between the @types/react devDependency and the overrides pin (bun tolerates it, npm doesn't). Signatures are not verified for this directory until package.json is reconciled."
-          else
-            echo "::error::npm install failed in react/ for a reason other than the known EOVERRIDE conflict -- investigate."
-            exit 1
-          fi
-
-      - name: Fail on unresolved install error
-        if: matrix.directory != 'react' && steps.install.outcome == 'failure'
-        run: exit 1
+      # Install with bun, from the committed lockfile, so the audited tree is the
+      # tree that ships. `npm audit signatures` reads node_modules rather than a
+      # lockfile, so it verifies a bun-installed tree perfectly well; asking npm
+      # to resolve instead audits whatever npm prefers today, which is a
+      # different set of versions to the one bun.lock pins.
+      - name: Install the locked tree with bun
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Verify registry signatures and provenance
-        if: steps.install.outcome == 'success'
-        run: npm audit signatures
+        id: audit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm audit signatures 2>&1 | tee "$RUNNER_TEMP/audit.log"
+
+      # react/package.json carries @types/react as npm:types-react@19.0.0-rc.1
+      # while overrides pins it to 19.0.3. bun installs that without complaint,
+      # but `npm audit signatures` validates overrides against direct
+      # dependencies itself and aborts with EOVERRIDE before auditing anything,
+      # so the conflict is not avoidable by choosing a different installer.
+      # Annotate that one known case rather than leaving a permanently red cell
+      # that trains reviewers to ignore this check. Any other failure is loud.
+      - name: Explain a failed audit
+        if: steps.audit.outcome == 'failure'
+        env:
+          DIR: ${{ matrix.directory }}
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/audit.log"
+          if [ "$DIR" = react ] && grep -q 'EOVERRIDE' "$log" && grep -q '@types/react' "$log"; then
+            echo "::notice::react/ is not verified -- npm audit signatures refuses the tree over the known @types/react override conflict. Signatures stay unchecked here until package.json is reconciled."
+          else
+            echo "::error::npm audit signatures failed for a reason other than the known react/ override conflict -- investigate."
+            exit 1
+          fi
