@@ -18,7 +18,7 @@
 		"typecheck": "tsc --project common-ts --noEmit"
 	},
 	"dependencies": {
-		"@types/big.js": "6.2.2",
+		"@types/big.js": "7.0.0",
 		"posthog-js": "1.72.1"
 	},
 	"version": "0.0.1"
