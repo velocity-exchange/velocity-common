@@ -1,11 +1,17 @@
 name: New dependency gate
 
 on:
-  pull_request:
+  # pull_request_target runs this workflow from the base branch instead of from the PR.
+  # Under pull_request it is the PR's own copy of this file that runs, so a PR could
+  # empty LOCKFILES, rename the job or make enforcement exit 0 in the same diff that
+  # adds a malicious package. Nothing below checks out or executes PR code: the PR's
+  # lockfiles are read as data with `git show` and parsed by the base branch's parser.
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
+  issues: write # label removal goes through the issues API
   pull-requests: write
 
 env:
@@ -18,113 +24,150 @@ jobs:
     name: New dependency gate
     runs-on: ubicloud
     steps:
+      # Checks out the base branch, which is what pull_request_target resolves to.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
 
-      - name: Fetch trusted parser
-        run: |
-          set -euo pipefail
-          # GITHUB_BASE_REF is a runner-provided env var for pull_request events -- using
-          # it instead of templating ${{ github.base_ref }} into the script keeps the
-          # branch name out of the shell command line entirely.
-          base="origin/$GITHUB_BASE_REF"
-          # Run the base branch's copy of the parser, not the PR's own -- otherwise a PR
-          # could add a malicious package and neuter the gate in the same diff by editing
-          # the script that's supposed to catch it. drift-common is public, so a
-          # fork PR mounting exactly this attack is a real scenario, not hypothetical.
-          # A PR that adds the script for the first time has no base copy to fetch; fall
-          # back to the head copy in that case (there is nothing yet for a first-time
-          # addition to neuter).
-          git show "$base:.github/scripts/lockfile_packages.py" > /tmp/lockfile_packages.py \
-            2>/dev/null || cp .github/scripts/lockfile_packages.py /tmp/lockfile_packages.py
-
-      - name: Collect newly added packages
+      - name: Collect new packages and changed sources
         id: collect
+        env:
+          PR_HEAD: refs/pull/${{ github.event.pull_request.number }}/head
         run: |
           set -euo pipefail
-          base="origin/$GITHUB_BASE_REF"
-          : > /tmp/new-packages.txt
+          git fetch --no-tags --depth=1 origin "$PR_HEAD"
+          : > /tmp/findings.txt
           for lock in $LOCKFILES; do
-            [ -f "$lock" ] || continue
-            # Mirror the path under /tmp/base so the basename -- and therefore the
-            # parser's format dispatch -- is preserved.
-            mkdir -p "/tmp/base/$(dirname "$lock")"
-            # Lockfile may be new in this PR; an absent base copy means everything is new.
-            git show "$base:$lock" > "/tmp/base/$lock" 2>/dev/null || : > "/tmp/base/$lock"
-            python3 /tmp/lockfile_packages.py "/tmp/base/$lock" "$lock" \
-              | sed "s#^#${lock}\t#" >> /tmp/new-packages.txt
+            mkdir -p "/tmp/head/$(dirname "$lock")"
+            # Read-only: the PR's lockfile as bytes, never a checkout and never an install.
+            # Absent from the head means the PR does not carry this lockfile at all.
+            git show "FETCH_HEAD:$lock" > "/tmp/head/$lock" 2>/dev/null || continue
+            # "$lock" is the base branch's copy from the checkout above. A path missing
+            # there is a lockfile this PR adds, so everything in it counts as new.
+            python3 .github/scripts/lockfile_packages.py "$lock" "/tmp/head/$lock" \
+              | sed "s#^#${lock}\t#" >> /tmp/findings.txt
           done
-          count=$(wc -l < /tmp/new-packages.txt | tr -d ' ')
+          count=$(wc -l < /tmp/findings.txt | tr -d ' ')
+          # Sign-off is bound to this digest, so adding packages after approval invalidates it.
+          digest=$(sort /tmp/findings.txt | sha256sum | cut -c1-16)
           echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "Newly added packages: $count"
-          cat /tmp/new-packages.txt
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Findings: $count (digest $digest)"
+          cat /tmp/findings.txt
 
-      - name: Find existing gate comment
-        id: find_comment
+      - name: Read gate comment
+        id: comment
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          # A fork PR gets a read-only GITHUB_TOKEN, so this read can fail there; don't
-          # let that abort the job before the real enforcement below runs.
-          id=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            --jq '[.[] | select(.body | contains("<!-- new-dependency-gate -->"))] | last | .id // empty' \
-            2>/dev/null || true)
+          # Only the gate's own comments count. Anyone able to comment on the PR could
+          # otherwise paste the approval marker below and forge a sign-off.
+          id=""; approved=""
+          # shellcheck disable=SC2016  # $c below is a jq variable, not a shell one
+          if row=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '
+                ([.[] | select(.user.login == "github-actions[bot]")
+                      | select(.body | contains("<!-- new-dependency-gate -->"))] | last) as $c
+                | "\($c.id // "")\t\((($c.body // "")
+                    | [scan("<!-- gate-approved: ([0-9a-f]+) -->")] | flatten | first) // "")"
+              ' 2>/dev/null); then
+            id=${row%%$'\t'*}
+            approved=${row#*$'\t'}
+          fi
+          [[ "$id" =~ ^[0-9]*$ ]] || id=""
+          [[ "$approved" =~ ^[0-9a-f]*$ ]] || approved=""
           echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "approved=$approved" >> "$GITHUB_OUTPUT"
 
       - name: Report and enforce
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          COUNT: ${{ steps.collect.outputs.count }}
+          DIGEST: ${{ steps.collect.outputs.digest }}
+          COMMENT_ID: ${{ steps.comment.outputs.id }}
+          APPROVED_DIGEST: ${{ steps.comment.outputs.approved }}
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          EXISTING_COMMENT_ID: ${{ steps.find_comment.outputs.id }}
+          EVENT_ACTION: ${{ github.event.action }}
+          LABEL_CHANGED: ${{ github.event.label.name }}
         run: |
           set -euo pipefail
 
-          if [ "${{ steps.collect.outputs.count }}" = "0" ]; then
-            # Nothing new. If an earlier push left a stale gate comment behind, update it
-            # in place rather than leaving outdated package names on the PR.
-            if [ -n "$EXISTING_COMMENT_ID" ]; then
-              {
-                echo "<!-- new-dependency-gate -->"
-                echo "### :package: New dependency gate"
-                echo
-                echo "No new packages remain in the watched lockfiles as of the latest push."
-              } > /tmp/comment.md
-              gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-                -F body=@/tmp/comment.md \
-                || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?)."
+          # Package names reach the comment through a file, never a command line.
+          post() {
+            if [ -n "$COMMENT_ID" ]; then
+              gh api --method PATCH "repos/$REPO/issues/comments/$COMMENT_ID" -F body=@"$1"
+            else
+              gh pr comment "$PR" --body-file "$1"
             fi
+          }
+
+          if [ "$COUNT" = "0" ]; then
+            # Nothing new. Refresh a stale comment from an earlier push rather than
+            # leaving outdated package names on the PR.
+            [ -n "$COMMENT_ID" ] || exit 0
+            {
+              echo "<!-- new-dependency-gate -->"
+              echo "### :package: New dependency gate"
+              echo
+              echo "No new packages and no changed package sources remain in the watched"
+              echo "lockfiles as of the latest push."
+            } > /tmp/comment.md
+            post /tmp/comment.md || echo "::warning::could not refresh the dependency-gate comment."
             exit 0
+          fi
+
+          label_present=false
+          if echo "$LABELS" | grep -q "\"$OVERRIDE_LABEL\""; then
+            label_present=true
+          fi
+
+          approved=false
+          if [ "$label_present" = true ]; then
+            if [ "$EVENT_ACTION" = "labeled" ] && [ "$LABEL_CHANGED" = "$OVERRIDE_LABEL" ]; then
+              # The label was just applied, so it signs off the findings reported below.
+              approved=true
+            elif [ -n "$APPROVED_DIGEST" ] && [ "$APPROVED_DIGEST" = "$DIGEST" ]; then
+              approved=true
+            else
+              # The label was applied for a different set of packages. Drop it so the
+              # current set gets reviewed instead of inheriting the earlier sign-off.
+              gh api --method DELETE "repos/$REPO/issues/$PR/labels/$OVERRIDE_LABEL" >/dev/null 2>&1 \
+                || echo "::warning::could not remove the stale '$OVERRIDE_LABEL' label."
+              echo "::warning::'$OVERRIDE_LABEL' was applied for a different set of packages; re-apply it after reviewing the current set."
+            fi
           fi
 
           {
             echo "<!-- new-dependency-gate -->"
+            if [ "$approved" = true ]; then
+              echo "<!-- gate-approved: $DIGEST -->"
+            fi
             echo "### :package: New dependencies in this PR"
             echo
-            echo "This PR adds packages that were not in the base lockfile. Confirm each one's"
-            echo "**source, maintainer and integrity** before merging, then apply the"
-            echo '`'"$OVERRIDE_LABEL"'`'" label."
+            echo "This PR adds packages, or changes where existing packages are fetched from,"
+            echo "relative to the base lockfile. Confirm each one's **source, maintainer and"
+            echo "integrity** before merging, then apply the "'`'"$OVERRIDE_LABEL"'`'" label."
             echo
-            echo '| Lockfile | Package |'
-            echo '| --- | --- |'
-            awk -F'\t' '{print "| `" $1 "` | `" $2 "` |"}' /tmp/new-packages.txt
+            echo "Sign-off covers exactly this set (digest "'`'"$DIGEST"'`'"). Adding more"
+            echo "packages afterwards drops the label and requires a fresh review."
+            echo
+            echo '| Lockfile | Change | Package | Source |'
+            echo '| --- | --- | --- | --- |'
+            awk -F'\t' '{
+              change = ($2 == "new") ? "new package" : "**source changed**"
+              print "| `" $1 "` | " change " | `" $3 "` | `" $4 "` |"
+            }' /tmp/findings.txt
           } > /tmp/comment.md
 
-          # A failed post/update (e.g. a fork PR's read-only token) must not mask the
-          # actual label enforcement below.
-          if [ -n "$EXISTING_COMMENT_ID" ]; then
-            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-              -F body=@/tmp/comment.md \
-              || echo "::warning::could not update the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
-          else
-            gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment.md \
-              || echo "::warning::could not post the dependency-gate comment (read-only token on a fork PR?); still enforcing the label check."
-          fi
+          # A failed post must not mask the enforcement below.
+          post /tmp/comment.md \
+            || echo "::warning::could not post the dependency-gate comment; still enforcing the label check."
 
-          if echo "$LABELS" | grep -q "\"$OVERRIDE_LABEL\""; then
-            echo "::notice::${{ steps.collect.outputs.count }} new package(s), signed off via '$OVERRIDE_LABEL'."
+          if [ "$approved" = true ]; then
+            echo "::notice::$COUNT finding(s), signed off via '$OVERRIDE_LABEL'."
           else
-            echo "::error::${{ steps.collect.outputs.count }} new package(s) need review. Apply the '$OVERRIDE_LABEL' label to merge."
+            echo "::error::$COUNT finding(s) need review. Apply the '$OVERRIDE_LABEL' label to merge."
             exit 1
           fi
