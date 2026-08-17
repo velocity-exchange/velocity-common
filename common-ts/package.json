@@ -24,7 +24,7 @@
 		"bcryptjs-react": "2.4.6",
 		"cerializr": "3.1.4",
 		"dotenv": "17.4.2",
-		"immer": "10.0.3",
+		"immer": "11.1.15",
 		"ioredis": "5.4.1",
 		"isomorphic-ws": "5.0.0",
 		"localstorage-memory": "1.0.3",
