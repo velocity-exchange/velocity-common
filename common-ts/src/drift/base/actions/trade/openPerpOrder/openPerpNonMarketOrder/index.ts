@@ -7,6 +7,7 @@ import {
 	OptionalOrderParams,
 	PositionDirection,
 	OrderType,
+	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import {
 	PublicKey,
@@ -50,6 +51,8 @@ export interface OpenPerpNonMarketOrderBaseParams extends Omit<
 > {
 	velocityClient: VelocityClient;
 	user: User;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	// Either new approach
 	amount?: BN;
 	assetType?: 'base' | 'quote';
@@ -166,6 +169,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 		mainSignerOverride,
 		isolatedPositionDepositsOverride,
 		builderParams,
+		slotDuration,
 	} = params;
 	// Support both new (amount + assetType) and legacy (baseAssetAmount) approaches
 	const finalBaseAssetAmount = resolveBaseAssetAmount({
@@ -293,6 +297,7 @@ export const createOpenPerpNonMarketOrderIxs = async (
 						orderConfig.limitAuction.usePlaceAndTake.auctionDurationPercentage,
 					takerEscrow: orderConfig.limitAuction.usePlaceAndTake.takerEscrow,
 					builderParams,
+					slotDuration,
 				});
 				allIxs.push(placeAndTakeIx);
 				createdPlaceAndTakeIx = true;
@@ -497,6 +502,7 @@ export const createSwiftLimitOrder = async (
 		userAccountPubKey: user.userAccountPublicKey,
 		marketIndex,
 		userSigningSlotBuffer: swiftOptions.userSigningSlotBuffer ?? 0,
+		slotDuration: params.slotDuration,
 		swiftOptions,
 		orderParams: {
 			main: orderParams,
@@ -557,6 +563,7 @@ export const createSwiftLimitOrderMessage = async (
 		userAccountPubKey: user.userAccountPublicKey,
 		marketIndex,
 		userSigningSlotBuffer: userSigningSlotBuffer ?? 0,
+		slotDuration: params.slotDuration,
 		isDelegate,
 		orderParams: {
 			main: orderParams,

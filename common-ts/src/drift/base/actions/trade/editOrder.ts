@@ -5,6 +5,7 @@ import {
 	OrderType,
 	PositionDirection,
 	PostOnlyParams,
+	SlotDurationMs,
 	User,
 } from '@velocity-exchange/sdk';
 import {
@@ -63,6 +64,8 @@ export interface CreateEditOrderIxParams {
 	user: User;
 	orderId: number;
 	editOrderParams: EditOrderParams;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	mainSignerOverride?: PublicKey;
 	limitAuctionOrderConfig?: LimitOrderParamsOrderConfig & {
 		limitAuction: LimitAuctionConfig;
@@ -88,6 +91,7 @@ export const createEditOrderIx = async (
 		editOrderParams,
 		mainSignerOverride,
 		limitAuctionOrderConfig,
+		slotDuration,
 	} = params;
 	const currentOrder = user.getOrder(orderId);
 
@@ -118,6 +122,7 @@ export const createEditOrderIx = async (
 			postOnly: currentOrder.postOnly,
 			orderConfig: limitAuctionOrderConfig,
 			positionMaxLeverage: editOrderParams.positionMaxLeverage ?? 0,
+			slotDuration,
 		});
 
 		finalEditOrderParams = {

@@ -54,6 +54,13 @@ jobs:
         with:
           working-directory: ./common-ts
 
+      - name: No deprecated slot-time constant
+        run: |
+          if grep -rn "SLOT_TIME_ESTIMATE_MS" src tests; then
+            echo "SLOT_TIME_ESTIMATE_MS is deprecated: read the live slot duration from State instead."
+            exit 1
+          fi
+
       - name: Typecheck
         run: bun run typecheck
 

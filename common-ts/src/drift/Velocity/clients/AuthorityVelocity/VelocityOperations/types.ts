@@ -3,6 +3,7 @@ import {
 	PositionDirection,
 	PostOnlyParams,
 	PublicKey,
+	SlotDurationMs,
 	SwapQuote,
 } from '@velocity-exchange/sdk';
 import { OptionalAuctionParamsRequestInputs } from '../../../../base/actions/trade/openPerpOrder/dlobServer';
@@ -58,6 +59,8 @@ export interface CreateRevenueShareEscrowParams {
 export type PerpOrderParams = {
 	subAccountId: number;
 	marketIndex: number;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	direction: PositionDirection;
 	assetType: 'base' | 'quote';
 	size: BigNum;

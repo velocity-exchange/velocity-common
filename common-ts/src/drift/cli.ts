@@ -1,6 +1,7 @@
 import * as anchor from '@coral-xyz/anchor';
 import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import {
+	activeSlotDurationFromState,
 	BN,
 	loadKeypair,
 	PositionDirection,
@@ -11,6 +12,7 @@ import {
 	PRICE_PRECISION,
 	MainnetSpotMarkets,
 	DevnetSpotMarkets,
+	SlotDurationMs,
 	VelocityEnv,
 } from '@velocity-exchange/sdk';
 import { sign } from 'tweetnacl';
@@ -251,6 +253,16 @@ async function initializeCentralServerVelocity(): Promise<void> {
 }
 
 /**
+ * The live slot duration, read from `State` against the current chain slot. The
+ * CLI is the outermost caller, so it resolves the value the library receives.
+ */
+async function resolveSlotDuration(): Promise<SlotDurationMs> {
+	const client = centralServerVelocity.velocityClient;
+	const slot = await client.connection.getSlot('confirmed');
+	return activeSlotDurationFromState(client.getStateAccount(), new BN(slot));
+}
+
+/**
  * Execute a regular transaction
  */
 async function executeTransaction(
@@ -292,6 +304,7 @@ async function signAndSendSwiftOrderMessage(
 		},
 		hexEncodedSwiftOrderMessage:
 			swiftMessage.hexEncodedSwiftOrderMessage.uInt8Array,
+		signingDeadlineSlot: swiftMessage.signingDeadlineSlot,
 		expirationTimeMs: swiftMessage.expirationTimeMs,
 	});
 
@@ -309,6 +322,7 @@ async function signAndSendSwiftOrderMessage(
 		takerAuthority: wallet.publicKey,
 		signingAuthority: wallet.publicKey,
 		slotsTillAuctionEnd: swiftMessage.slotsTillAuctionEnd,
+		slotDuration: await resolveSlotDuration(),
 	});
 
 	await new Promise<void>((resolve, reject) => {
@@ -663,6 +677,7 @@ async function openPerpMarketOrderCommand(args: CliArgs): Promise<void> {
 		amount: amountBN,
 		useSwift: false,
 		positionMaxLeverage: 10,
+		slotDuration: await resolveSlotDuration(),
 	});
 
 	await executeTransaction(orderTxn as VersionedTransaction, 'Open Perp Order');
@@ -715,6 +730,7 @@ async function openPerpMarketOrderSwiftCommand(args: CliArgs): Promise<void> {
 			amount: amountBN,
 			useSwift: true,
 			positionMaxLeverage: 10,
+			slotDuration: await resolveSlotDuration(),
 		});
 
 		await signAndSendSwiftOrderMessage(
@@ -847,6 +863,7 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 		assetType: assetType as 'base' | 'quote',
 		amount: amountBN,
 		positionMaxLeverage: 10,
+		slotDuration: await resolveSlotDuration(),
 	});
 
 	await executeTransaction(
@@ -947,6 +964,7 @@ async function openPerpNonMarketOrderSwiftCommand(
 				amount: amountBN,
 				useSwift: true,
 				positionMaxLeverage: 10,
+				slotDuration: await resolveSlotDuration(),
 			});
 
 		await signAndSendSwiftOrderMessage(
@@ -1179,7 +1197,8 @@ async function editOrderCommand(args: CliArgs): Promise<void> {
 	const editOrderTxn = await centralServerVelocity.getEditOrderTxn(
 		userAccountPubkey,
 		orderId,
-		editParams
+		editParams,
+		await resolveSlotDuration()
 	);
 
 	await executeTransaction(editOrderTxn as VersionedTransaction, 'Edit Order');

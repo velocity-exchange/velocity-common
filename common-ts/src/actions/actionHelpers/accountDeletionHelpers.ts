@@ -2,8 +2,9 @@ import {
 	ACCOUNT_AGE_DELETION_CUTOFF_SECONDS,
 	BN,
 	VelocityClient,
-	IDLE_TIME_SLOTS,
-	SLOT_TIME_ESTIMATE_MS,
+	IDLE_TIME,
+	millisFromSlots,
+	SlotDurationMs,
 	User,
 	UserStats,
 	UserStatsAccount,
@@ -92,14 +93,18 @@ type CanBeDeletedState =
 const getAccountCanBeDeletedInstantly = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	currentSlot: number
+	currentSlot: number,
+	slotDuration: SlotDurationMs
 ): CanBeDeletedState => {
 	const statsAccountIsPastDeletionCutoff =
 		getStatsAccountIsPastDeletionCutoff(userStatsAccount);
 
 	const userIsIdle = user.getUserAccountOrThrow().idle;
 
-	const userCanBeMarkedIdle = user.canMakeIdle(new BN(currentSlot));
+	const userCanBeMarkedIdle = user.canMakeIdle(
+		new BN(currentSlot),
+		slotDuration
+	);
 
 	const accountHasOpenPerpSpotOrOrders = accountHasOpenPositionsOrOrders(user);
 
@@ -132,7 +137,8 @@ const getAccountCanBeDeletedInstantly = (
 const getAccountDeletionStepsToTake = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	currentSlot: number
+	currentSlot: number,
+	slotDuration: SlotDurationMs
 ): AccountDeletionStep[] => {
 	const userAccount = user.getUserAccountOrThrow();
 	const statsAccountIsPastDeletionCutoff =
@@ -158,7 +164,7 @@ const getAccountDeletionStepsToTake = (
 	}
 
 	// Account can be marked idle and then deleted
-	const canBeMarkedIdle = user.canMakeIdle(new BN(currentSlot));
+	const canBeMarkedIdle = user.canMakeIdle(new BN(currentSlot), slotDuration);
 
 	if (canBeMarkedIdle) {
 		return ['sendTriggerAccountIdleIx', 'sendAccountDeletionIx'];
@@ -180,12 +186,14 @@ const tryDeleteUserAccount = async (
 	velocityClient: VelocityClient,
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	latestSlot: number
+	latestSlot: number,
+	slotDuration: SlotDurationMs
 ) => {
 	const canBeDeleted = getAccountCanBeDeletedInstantly(
 		user,
 		userStatsAccount,
-		latestSlot
+		latestSlot,
+		slotDuration
 	);
 
 	if (canBeDeleted === 'no' || canBeDeleted === 'no-wait-for-idle') {
@@ -222,23 +230,28 @@ const tryDeleteUserAccount = async (
 	return txSig;
 };
 
-export const getIdleWaitTimeMinutes = (user: User, currentSlot: number) => {
+/**
+ * The program gates idleness on wall-clock, so the elapsed slot delta is
+ * converted at the live duration rather than assumed; the remaining time is
+ * rounded up so the estimate never under-states the wait.
+ */
+export const getIdleWaitTimeMinutes = (
+	user: User,
+	currentSlot: number,
+	slotDuration: SlotDurationMs
+) => {
 	const lastActiveSlot = user.getUserAccountOrThrow().lastActiveSlot;
 
-	const inactiveAccountTime = Math.max(
-		currentSlot - lastActiveSlot.toNumber(),
+	const inactiveSlots = Math.max(currentSlot - lastActiveSlot.toNumber(), 0);
+
+	const remainingMs = Math.max(
+		IDLE_TIME.sub(
+			millisFromSlots(new BN(inactiveSlots), slotDuration)
+		).toNumber(),
 		0
 	);
 
-	const slotsToWait = IDLE_TIME_SLOTS - inactiveAccountTime;
-
-	const secondsPerSlot = SLOT_TIME_ESTIMATE_MS / 1000;
-
-	const timeEstimateSeconds = slotsToWait * secondsPerSlot;
-
-	const minutesEstimate = Math.ceil(timeEstimateSeconds / 60);
-
-	return minutesEstimate;
+	return Math.ceil(remainingMs / 60_000);
 };
 
 export const ACCOUNT_DELETION_HELPERS = {
