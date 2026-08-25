@@ -1,8 +1,8 @@
 import * as anchor from '@coral-xyz/anchor';
 import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import {
-	activeSlotDurationFromState,
 	BN,
+	currentSlotClock,
 	loadKeypair,
 	PositionDirection,
 	PostOnlyParams,
@@ -259,7 +259,15 @@ async function initializeCentralServerVelocity(): Promise<void> {
 async function resolveSlotDuration(): Promise<SlotDurationMs> {
 	const client = centralServerVelocity.velocityClient;
 	const slot = await client.connection.getSlot('confirmed');
-	return activeSlotDurationFromState(client.getStateAccount(), new BN(slot));
+	const { slotDurationMs, isLive } = currentSlotClock(client, slot);
+
+	if (!isLive) {
+		console.warn(
+			`⚠️  Live slot duration unavailable, assuming ${slotDurationMs}ms per slot`
+		);
+	}
+
+	return slotDurationMs;
 }
 
 /**
