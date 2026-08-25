@@ -3,6 +3,7 @@ import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import {
 	BN,
 	currentSlotClock,
+	SLOT_DURATION_FLOOR,
 	loadKeypair,
 	PositionDirection,
 	PostOnlyParams,
@@ -255,6 +256,12 @@ async function initializeCentralServerVelocity(): Promise<void> {
 /**
  * The live slot duration, read from `State` against the current chain slot. The
  * CLI is the outermost caller, so it resolves the value the library receives.
+ *
+ * Everything this CLI feeds the duration to is a user-protection window: order
+ * signing budgets and auction ramps. On a dead feed it therefore assumes the
+ * shortest scheduled slot rather than the baseline, which under-promises the
+ * wall clock instead of doubling it. Baseline is the safe assumption in the
+ * other direction, for staleness ceilings, which nothing here computes.
  */
 async function resolveSlotDuration(): Promise<SlotDurationMs> {
 	const client = centralServerVelocity.velocityClient;
@@ -263,8 +270,9 @@ async function resolveSlotDuration(): Promise<SlotDurationMs> {
 
 	if (!isLive) {
 		console.warn(
-			`⚠️  Live slot duration unavailable, assuming ${slotDurationMs}ms per slot`
+			`⚠️  Live slot duration unavailable, assuming ${SLOT_DURATION_FLOOR}ms per slot`
 		);
+		return SLOT_DURATION_FLOOR;
 	}
 
 	return slotDurationMs;

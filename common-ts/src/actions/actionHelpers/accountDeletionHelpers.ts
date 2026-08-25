@@ -3,7 +3,9 @@ import {
 	BN,
 	VelocityClient,
 	IDLE_TIME,
+	millisFromSecs,
 	millisFromSlots,
+	QUOTE_PRECISION,
 	SlotDurationMs,
 	User,
 	UserStats,
@@ -13,6 +15,12 @@ import {
 	positionIsAvailable,
 } from '@velocity-exchange/sdk';
 import { TransactionInstruction } from '@solana/web3.js';
+
+/**
+ * The non-accelerated idle threshold (one week) from `validate_user_is_idle`.
+ * The SDK only exports the accelerated hour as `IDLE_TIME`.
+ */
+const IDLE_TIME_UNACCELERATED = millisFromSecs(604_800);
 
 type AccountDeletionStep =
 	| 'askToCloseAllPositionsOrdersBorrows'
@@ -234,6 +242,10 @@ const tryDeleteUserAccount = async (
  * The program gates idleness on wall-clock, so the elapsed slot delta is
  * converted at the live duration rather than assumed; the remaining time is
  * rounded up so the estimate never under-states the wait.
+ *
+ * The threshold itself is equity-dependent, mirroring `validate_user_is_idle`:
+ * an hour below $1000 of equity, a week at or above it. Reading the hour
+ * unconditionally under-states the wait by a week for a funded account.
  */
 export const getIdleWaitTimeMinutes = (
 	user: User,
@@ -244,10 +256,18 @@ export const getIdleWaitTimeMinutes = (
 
 	const inactiveSlots = Math.max(currentSlot - lastActiveSlot.toNumber(), 0);
 
+	const { totalAssetValue, totalLiabilityValue } =
+		user.getSpotMarketAssetAndLiabilityValue();
+	const equity = totalAssetValue.sub(totalLiabilityValue);
+
+	const idleAfter = equity.lt(QUOTE_PRECISION.muln(1000))
+		? IDLE_TIME
+		: IDLE_TIME_UNACCELERATED;
+
 	const remainingMs = Math.max(
-		IDLE_TIME.sub(
-			millisFromSlots(new BN(inactiveSlots), slotDuration)
-		).toNumber(),
+		idleAfter
+			.sub(millisFromSlots(new BN(inactiveSlots), slotDuration))
+			.toNumber(),
 		0
 	);
 

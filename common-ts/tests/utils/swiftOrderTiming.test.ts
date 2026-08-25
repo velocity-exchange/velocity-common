@@ -52,6 +52,35 @@ const restingLimitOrder = (): OptionalOrderParams =>
 		price: PRICE_PRECISION,
 	});
 
+const limitAuctionOrder = (auctionDuration: number): OptionalOrderParams =>
+	getLimitOrderParams({
+		marketIndex: 0,
+		marketType: MarketType.PERP,
+		direction: PositionDirection.LONG,
+		baseAssetAmount: BASE_PRECISION,
+		price: PRICE_PRECISION,
+		auctionDuration,
+		auctionStartPrice: PRICE_PRECISION,
+		auctionEndPrice: PRICE_PRECISION.muln(101).divn(100),
+	});
+
+/**
+ * The slot past which the program stops placing the order, as an offset from the
+ * prep slot: `order_slot + auction_duration`, where `order_slot` is the auction
+ * start. Derived from the program's rule and the published buffer constants, not
+ * from the timing helper's own intermediates, so the assertion is independent.
+ */
+const onChainMaxSlotOffset = (
+	auctionDuration: number,
+	slotDuration: SlotDurationMs
+) => {
+	const budgetMs = auctionDuration
+		? USER_SIGNING_MESSAGE_BUFFER_MS
+		: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS;
+
+	return Math.ceil(budgetMs / slotDuration) + auctionDuration;
+};
+
 const timing = (main: OptionalOrderParams, slotDuration: SlotDurationMs) =>
 	prepSwiftOrderMessage({
 		velocityClient: clientStub(),
@@ -77,21 +106,32 @@ describe('swift order timing', () => {
 		expect(nonAuction.expirationTimeMs).to.equal(12_000);
 	});
 
-	it('keeps the signing deadline inside the auction window at every gate', async () => {
+	it('keeps the signing deadline inside the placement window at every gate', async () => {
 		for (const slotDuration of GATES) {
-			const mains = [
-				marketOrder(getDefaultMarketAuctionDurationSlots(slotDuration)),
-				marketOrder(1),
-				restingLimitOrder(),
+			const cases: [OptionalOrderParams, number][] = [
+				[
+					marketOrder(getDefaultMarketAuctionDurationSlots(slotDuration)),
+					getDefaultMarketAuctionDurationSlots(slotDuration),
+				],
+				[marketOrder(1), 1],
+				[restingLimitOrder(), 0],
+				// A near-touch limit order: the confirmation floor runs well past
+				// the auction, so a deadline clamped against that floor instead of
+				// the chain's bound would let the user sign an order the program
+				// will silently decline to place.
+				[limitAuctionOrder(1), 1],
+				[limitAuctionOrder(5), 5],
+				[limitAuctionOrder(20), 20],
 			];
 
-			for (const main of mains) {
-				const { slotsTillAuctionEnd, signingDeadlineSlot } = await timing(
-					main,
-					slotDuration
-				);
-				expect(signingDeadlineSlot).to.be.below(
-					CURRENT_SLOT + slotsTillAuctionEnd
+			for (const [main, auctionDuration] of cases) {
+				const { signingDeadlineSlot } = await timing(main, slotDuration);
+
+				expect(
+					signingDeadlineSlot,
+					`auctionDuration ${auctionDuration} at ${slotDuration}ms`
+				).to.be.below(
+					CURRENT_SLOT + onChainMaxSlotOffset(auctionDuration, slotDuration)
 				);
 			}
 		}

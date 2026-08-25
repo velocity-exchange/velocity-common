@@ -530,19 +530,6 @@ export const sendSwiftOrder = ({
 };
 
 /**
- * Computes the timing parameters for a SWIFT order:
- * - slotsTillAuctionEnd: how many slots until the auction is considered ended
- * - signingDeadlineSlot: the absolute slot the signature must land before
- * - expirationTimeMs: the same window in ms, a backstop for a dead slot feed
- *
- * For market orders, auction duration + signing buffer is used directly.
- * For non-market orders, a minimum is enforced because limit auctions can have
- * very small durations but the order is still valid after the auction ends.
- *
- * The deadline is anchored on the prep `currentSlot`, not on the order's own
- * slot, because `slotsTillAuctionEnd` already includes the signing buffer.
- */
-/**
  * The signing window for a prepared order. `signingDeadlineSlot` is the
  * authoritative bound: `expirationTimeMs` is the same window converted at the
  * live duration, a backstop for when the slot feed is dead. Consumers showing
@@ -555,6 +542,21 @@ export type SwiftOrderTiming = {
 	expirationTimeMs: number;
 };
 
+/**
+ * Computes the timing parameters for a SWIFT order:
+ * - slotsTillAuctionEnd: how many slots until the auction is considered ended
+ * - signingDeadlineSlot: the absolute slot the signature must land before
+ * - expirationTimeMs: the same window in ms, a backstop for a dead slot feed
+ *
+ * For market orders, auction duration + signing buffer is used directly. For
+ * non-market orders a minimum is enforced, because a limit auction can be very
+ * short and the wallet prompt still needs a usable budget. That minimum governs
+ * the confirmation timeout only; it is not a placement deadline, since the
+ * program stops placing the order once the auction window has passed.
+ *
+ * The deadline is anchored on the prep `currentSlot`, not on the order's own
+ * slot, because both windows here are measured from prep time.
+ */
 const computeSwiftOrderTiming = (
 	mainOrderParams: OptionalOrderParams,
 	userSigningSlotBuffer: number,
@@ -577,16 +579,20 @@ const computeSwiftOrderTiming = (
 				)
 		: minimumNonAuctionSlots;
 
-	// The minimum floor can exceed a very short auction, which would put the
-	// deadline at or past the auction end and let the guard pass an order that
-	// can no longer fill. Cap it one slot short of the end so the deadline is
-	// always strictly inside the window. No-op for the durations in use today.
+	// The program stops placing the order once `order_slot + auction_duration`
+	// has passed, and `order_slot` is the auction start, i.e. the prep slot plus
+	// the signing buffer. `slotsTillAuctionEnd` carries a floor that can exceed
+	// that bound, so clamping against it would leave the deadline past the point
+	// the order can still be placed. Clamp against the chain's bound instead.
+	const onChainMaxSlotOffset =
+		userSigningSlotBuffer + (mainOrderParams.auctionDuration ?? 0);
+
 	const signingWindowSlots = Math.min(
 		Math.max(
 			slotsTillAuctionEnd - SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS,
 			MINIMUM_SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS
 		),
-		slotsTillAuctionEnd - 1
+		onChainMaxSlotOffset - 1
 	);
 
 	return {
