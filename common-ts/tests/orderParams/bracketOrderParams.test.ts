@@ -7,7 +7,7 @@ import {
 	PRICE_PRECISION,
 } from '@velocity-exchange/sdk';
 import { expect } from 'chai';
-import { buildNonMarketOrderParams } from '../../src/drift/utils/orderParams';
+import { buildNonMarketOrderParams } from '../../src/velocity/utils/orderParams';
 import { ENUM_UTILS } from '../../src';
 
 // Bracket orders are built by callers with `direction` already flipped to the

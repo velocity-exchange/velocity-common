@@ -35,17 +35,17 @@ describe('abbreviateAddress', () => {
 
 describe('abbreviateAccountName', () => {
 	it('truncates with trailing ellipsis', () => {
-		expect(abbreviateAccountName('DriftUserAccount', 8)).to.equal(
-			'DriftUse...'
+		expect(abbreviateAccountName('VelocityUserAccount', 8)).to.equal(
+			'Velocity...'
 		);
 	});
 
 	it('supports middle ellipsis mode', () => {
 		expect(
-			abbreviateAccountName('DriftUserAccount', 8, {
+			abbreviateAccountName('VelocityUserAccount', 8, {
 				ellipsisMiddle: true,
 			})
-		).to.equal('Drif...ount');
+		).to.equal('Velo...ount');
 	});
 
 	it('returns name unchanged when shorter than size', () => {

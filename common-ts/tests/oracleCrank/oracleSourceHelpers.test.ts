@@ -4,7 +4,7 @@ import {
 	isPythLazer,
 	isPythOracle,
 	isPullOracle,
-} from '../../src/drift/base/actions/markets/oracleCrank/oracleSourceHelpers';
+} from '../../src/velocity/base/actions/markets/oracleCrank/oracleSourceHelpers';
 
 describe('Oracle Source Helpers', () => {
 	describe('isPythLazer', () => {

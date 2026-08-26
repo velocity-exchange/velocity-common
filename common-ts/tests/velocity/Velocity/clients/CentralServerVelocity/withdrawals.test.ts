@@ -64,7 +64,7 @@ describe('CentralServerVelocity - Withdraw Transactions', function () {
 	) {
 		// Get user balance before withdrawal
 		const user = new User({
-			driftClient: velocityClient,
+			velocityClient: velocityClient,
 			userAccountPublicKey: devWalletUser0,
 			accountSubscription: {
 				type: 'custom',
@@ -105,7 +105,7 @@ describe('CentralServerVelocity - Withdraw Transactions', function () {
 
 		// Verify the withdrawal was reflected in the user's balance
 		const userAfter = new User({
-			driftClient: velocityClient,
+			velocityClient: velocityClient,
 			userAccountPublicKey: devWalletUser0,
 			accountSubscription: {
 				type: 'custom',

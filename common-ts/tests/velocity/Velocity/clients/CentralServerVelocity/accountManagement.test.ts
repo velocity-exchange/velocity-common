@@ -71,7 +71,7 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 					testWalletAuthority
 				);
 				const userStats = new UserStats({
-					driftClient: velocityClient,
+					velocityClient: velocityClient,
 					userStatsAccountPublicKey: userStatsAccountPublicKey,
 					accountSubscription: {
 						type: 'custom',
@@ -88,7 +88,7 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 				try {
 					await userStats.subscribe();
 					expectedSubAccountId =
-						userStats.getAccount().numberOfSubAccountsCreated;
+						userStats.getAccountOrThrow().numberOfSubAccountsCreated;
 				} catch (error: any) {
 					// do nothing; assume that user stats account does not exist and expectedSubAccountId is 0
 				}
@@ -121,7 +121,7 @@ describe('CentralServerVelocity - Account Management Transactions', function () 
 
 				// check that subaccount id is correct
 				const user = new User({
-					driftClient: velocityClient,
+					velocityClient: velocityClient,
 					userAccountPublicKey: userAccountPublicKey,
 					accountSubscription: {
 						type: 'custom',

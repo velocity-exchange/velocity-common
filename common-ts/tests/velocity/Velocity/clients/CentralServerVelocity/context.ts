@@ -5,7 +5,7 @@ import {
 	Wallet,
 	WalletV2,
 } from '@velocity-exchange/sdk';
-import { CentralServerVelocity } from '../../../../../src/drift/Velocity/clients/CentralServerVelocity';
+import { CentralServerVelocity } from '../../../../../src/velocity/Velocity/clients/CentralServerVelocity';
 import { EnvironmentConstants } from '../../../../../src/EnvironmentConstants';
 import { getDevWallet, getTestWallet } from '../../../../utils/wallet';
 import { VersionedTransaction } from '@solana/web3.js';

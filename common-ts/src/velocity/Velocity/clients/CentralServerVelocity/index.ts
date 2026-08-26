@@ -135,8 +135,8 @@ export class CentralServerVelocity {
 	/**
 	 * @param solanaRpcEndpoint - The Solana RPC endpoint to use for reading RPC data.
 	 * @param velocityEnv - The Velocity environment to use for the Velocity client.
-	 * @param supportedPerpMarkets - The perp markets indexes to support. See https://github.com/drift-labs/protocol-v2/blob/master/sdk/src/constants/perpMarkets.ts for all available markets. It is recommended to only include markets that will be used.
-	 * @param supportedSpotMarkets - The spot markets indexes to support. See https://github.com/drift-labs/protocol-v2/blob/master/sdk/src/constants/spotMarkets.ts for all available markets. It is recommended to only include markets that will be used.
+	 * @param supportedPerpMarkets - The perp markets indexes to support. See https://github.com/velocity-exchange/velocity-v1/blob/master/packages/sdk/src/constants/perpMarkets.ts for all available markets. It is recommended to only include markets that will be used.
+	 * @param supportedSpotMarkets - The spot markets indexes to support. See https://github.com/velocity-exchange/velocity-v1/blob/master/packages/sdk/src/constants/spotMarkets.tsfor all available markets. It is recommended to only include markets that will be used.
 	 */
 	constructor(config: {
 		solanaRpcEndpoint: string;
@@ -414,7 +414,7 @@ export class CentralServerVelocity {
 	/**
 	 * Returns a User object for a given user account public key. This fetches the user account data once.
 	 *
-	 * You may read more about the User object [here](https://github.com/drift-labs/protocol-v2/blob/master/sdk/src/user.ts)
+	 * You may read more about the User object [here](https://github.com/velocity-exchange/velocity-v1/blob/master/packages/sdk/src/user.ts)
 	 *
 	 * @param userAccountPublicKey - The user account public key
 	 */

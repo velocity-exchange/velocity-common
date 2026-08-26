@@ -2,12 +2,12 @@ import { VelocityClient, OracleSource } from '@velocity-exchange/sdk';
 import { TransactionInstruction } from '@solana/web3.js';
 import { expect } from 'chai';
 import sinon from 'sinon';
-import { getPythLazerUpdateIxs } from '../../src/drift/base/actions/markets/oracleCrank/pythLazerCrank';
+import { getPythLazerUpdateIxs } from '../../src/velocity/base/actions/markets/oracleCrank/pythLazerCrank';
 import {
 	OracleCrankDataFetcher,
 	OracleMarketConfig,
-} from '../../src/drift/base/actions/markets/oracleCrank/types';
-import { DEFAULT_PRECEDING_IXS_COUNT } from '../../src/drift/base/actions/markets/oracleCrank/constants';
+} from '../../src/velocity/base/actions/markets/oracleCrank/types';
+import { DEFAULT_PRECEDING_IXS_COUNT } from '../../src/velocity/base/actions/markets/oracleCrank/constants';
 
 describe('getPythLazerUpdateIxs', () => {
 	let velocityClient: sinon.SinonStubbedInstance<VelocityClient>;

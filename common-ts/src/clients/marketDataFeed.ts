@@ -728,7 +728,7 @@ class SubscriptionManager {
 }
 
 /**
- * This class will handle subscribing to market data from the Drift Data API's websocket. See https://data.api.drift.trade/playground for more information about the API.
+ * This class will handle subscribing to market data from the Velocity Data API's websocket. See https://data.velocity.exchange/playground for more information about the API.
  *
  * It currently supports subscribing to candles and to trades.
  */

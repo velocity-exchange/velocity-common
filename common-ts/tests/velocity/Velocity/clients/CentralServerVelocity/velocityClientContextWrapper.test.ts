@@ -36,7 +36,7 @@ import { expect } from 'chai';
 import * as sinon from 'sinon';
 import { PublicKey } from '@solana/web3.js';
 import { VelocityEnv, User } from '@velocity-exchange/sdk';
-import { CentralServerVelocity } from '../../../../../src/drift/Velocity/clients/CentralServerVelocity';
+import { CentralServerVelocity } from '../../../../../src/velocity/Velocity/clients/CentralServerVelocity';
 import { EnvironmentConstants } from '../../../../../src/EnvironmentConstants';
 import { sleep } from '../../../../../src/utils';
 import { setupTestContext, invalidMockUserAccountPublicKey } from './context';
