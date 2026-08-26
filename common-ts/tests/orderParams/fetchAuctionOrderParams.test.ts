@@ -15,10 +15,10 @@ import {
 	fetchAuctionOrderParams,
 	fetchAuctionOrderParamsFromDlob,
 	fetchAuctionOrderParamsFromL2,
-} from '../../src/drift/base/actions/trade/openPerpOrder/dlobServer';
+} from '../../src/velocity/base/actions/trade/openPerpOrder/dlobServer';
 import { ENUM_UTILS } from '../../src';
 import { mockPerpMarket } from './fixtures/mockPerpMarket';
-import { getDefaultMarketAuctionDurationSlots } from '../../src/drift/base/constants/auction';
+import { getDefaultMarketAuctionDurationSlots } from '../../src/velocity/base/constants/auction';
 
 const DLOB_SERVER_HTTP_URL = 'https://test-dlob.example.com';
 

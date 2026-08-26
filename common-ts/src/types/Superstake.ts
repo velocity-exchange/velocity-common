@@ -3,5 +3,4 @@ export type LstMetrics = {
 	priceInSol: number;
 	lstPriceApy30d: number;
 	emissionsApy?: number;
-	driftEmissions?: number;
 };

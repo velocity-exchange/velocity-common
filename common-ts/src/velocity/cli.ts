@@ -228,7 +228,7 @@ async function initializeCentralServerVelocity(): Promise<void> {
 	console.log(`✅ RPC Endpoint: ${process.env.ENDPOINT}\n`);
 
 	// Initialize CentralServerVelocity
-	const velocityEnv = (process.env.DRIFT_ENV as VelocityEnv) ?? 'devnet';
+	const velocityEnv = (process.env.VELOCITY_ENV as VelocityEnv) ?? 'devnet';
 	console.log(`🏗️  Initializing CentralServerVelocity... (${velocityEnv})`);
 	const rpcEndpoint = process.env.ENDPOINT as string;
 	centralServerVelocity = new CentralServerVelocity({

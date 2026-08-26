@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import {
 	mapAuctionParamsResponseMeta,
 	ServerAuctionParamsResponse,
-} from '../../src/drift/utils/auctionParamsResponseMapper';
+} from '../../src/velocity/utils/auctionParamsResponseMapper';
 
 describe('mapAuctionParamsResponseMeta', () => {
 	it('normalizes the native fraction slippageTolerance to a percentage', () => {

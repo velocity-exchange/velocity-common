@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import { VelocityEnv } from '@velocity-exchange/sdk';
-import { CentralServerVelocity } from '../../../../../src/drift/Velocity/clients/CentralServerVelocity';
-import { CentralServerVelocityMarkets } from '../../../../../src/drift/Velocity/clients/CentralServerVelocity/markets';
+import { CentralServerVelocity } from '../../../../../src/velocity/Velocity/clients/CentralServerVelocity';
+import { CentralServerVelocityMarkets } from '../../../../../src/velocity/Velocity/clients/CentralServerVelocity/markets';
 import { EnvironmentConstants } from '../../../../../src/EnvironmentConstants';
 
 describe('CentralServerVelocity Constructor', () => {

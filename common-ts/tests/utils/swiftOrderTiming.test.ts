@@ -15,12 +15,12 @@ import {
 	MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
 	prepSwiftOrderMessage,
 	USER_SIGNING_MESSAGE_BUFFER_MS,
-} from '../../src/drift/base/actions/trade/openPerpOrder/openSwiftOrder';
+} from '../../src/velocity/base/actions/trade/openPerpOrder/openSwiftOrder';
 import {
 	getSwiftConfirmationTimeoutMs,
 	SWIFT_CONFIRMATION_ROUND_TRIP_MS,
 } from '../../src/utils/signedMsgs';
-import { getDefaultMarketAuctionDurationSlots } from '../../src/drift/base/constants/auction';
+import { getDefaultMarketAuctionDurationSlots } from '../../src/velocity/base/constants/auction';
 
 const GATES = [400, 350, 300, 250, 200] as SlotDurationMs[];
 

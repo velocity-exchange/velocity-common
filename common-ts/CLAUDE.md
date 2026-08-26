@@ -8,16 +8,16 @@ public API surface is a contract.
 
 ```bash
 bun run build          # tsc -> lib/, must stay clean
-bun run test           # mocha, non-drift suites
-bun run test:drift     # mocha, drift/Velocity suites
+bun run test           # mocha, non-Velocity suites
+bun run test:velocity  # mocha, Velocity suites
 bun run circular-deps  # madge, must report no cycles
 ```
 
 Run build + the relevant test suite + circular-deps before considering any change done.
 
-Baseline (master, as of 2026-06-18): build clean, non-drift tests 106 passing,
-circular-deps clean. `test:drift` is **already failing** on master from a pre-existing
-type error in `tests/drift/.../accountManagement.test.ts` (a `PublicKey` passed where a
+Baseline (master, as of 2026-06-18): build clean, non-Velocity tests 106 passing,
+circular-deps clean. `test:velocity` is **already failing** on master from a pre-existing
+type error in `tests/velocity/.../accountManagement.test.ts` (a `PublicKey` passed where a
 `User` is expected) — not caused by simplification work; don't attribute it to a change.
 
 ## Public API is a contract

@@ -8,7 +8,7 @@ import {
 	PERCENTAGE_PRECISION,
 	SlotDurationMs,
 } from '@velocity-exchange/sdk';
-import { MAX_AUCTION_DURATION_SLOTS } from '../../drift/base/constants/auction';
+import { MAX_AUCTION_DURATION_SLOTS } from '../../velocity/base/constants/auction';
 
 const MIN_AUCTION_DURATION_STEPS = new BN(1);
 const MAX_AUCTION_DURATION_STEPS = new BN(180);

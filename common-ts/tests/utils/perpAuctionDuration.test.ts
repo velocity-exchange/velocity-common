@@ -14,7 +14,7 @@ import {
 	DEFAULT_MARKET_AUCTION_DURATION_MS,
 	getDefaultLimitAuctionDurationSlots,
 	getDefaultMarketAuctionDurationSlots,
-} from '../../src/drift/base/constants/auction';
+} from '../../src/velocity/base/constants/auction';
 
 const GATES = [400, 350, 300, 250, 200] as SlotDurationMs[];
 

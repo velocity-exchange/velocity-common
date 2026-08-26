@@ -26,7 +26,7 @@ export const getDevWallet = () => {
 	const devWallet = new WalletV2(
 		Keypair.fromSecretKey(
 			Uint8Array.from(
-				JSON.parse(process.env.DRIFT_TEST_WALLET_PRIVATE_KEY as string) // fallback wallet
+				JSON.parse(process.env.VELOCITY_TEST_WALLET_PRIVATE_KEY as string) // fallback wallet
 			)
 		)
 	);

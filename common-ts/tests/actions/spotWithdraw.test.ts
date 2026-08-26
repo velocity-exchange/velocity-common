@@ -9,7 +9,7 @@ import {
 } from '@velocity-exchange/sdk';
 import { PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
-import { createWithdrawIx } from '../../src/drift/base/actions/spot/withdraw';
+import { createWithdrawIx } from '../../src/velocity/base/actions/spot/withdraw';
 
 // USDT-like market: 6 decimals, with 1.2x accrued deposit interest so that the
 // interest-adjusted token amount differs from the raw scaledBalance.

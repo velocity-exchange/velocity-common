@@ -46,7 +46,7 @@ describe('CentralServerVelocity - Deposit Transactions', function () {
 		try {
 			// Get user balance before deposit
 			const user = new User({
-				driftClient: velocityClient,
+				velocityClient: velocityClient,
 				userAccountPublicKey: devWalletUser0,
 				accountSubscription: {
 					type: 'custom',
@@ -87,7 +87,7 @@ describe('CentralServerVelocity - Deposit Transactions', function () {
 
 			// Verify the deposit was reflected in the user's balance
 			const userAfter = new User({
-				driftClient: velocityClient,
+				velocityClient: velocityClient,
 				userAccountPublicKey: devWalletUser0,
 				accountSubscription: {
 					type: 'custom',

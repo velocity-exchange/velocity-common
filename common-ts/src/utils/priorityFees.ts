@@ -1,4 +1,4 @@
-import { MAINNET_API_URLS } from '../drift/constants/apiUrls';
+import { MAINNET_API_URLS } from '../velocity/constants/apiUrls';
 import { MarketId } from 'src/types';
 
 const FEE_ENDPOINT = `${MAINNET_API_URLS.DLOB}/batchPriorityFees`;

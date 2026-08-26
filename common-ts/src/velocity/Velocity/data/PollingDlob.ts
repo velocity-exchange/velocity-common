@@ -50,10 +50,10 @@ export const POLLING_DEPTHS = {
  *
  * Example usage:
  * ```typescript
- * import { PollingDlob, MarketId } from '@drift/common';
+ * import { PollingDlob, MarketId } from '@velocity-exchange/common';
  *
  * const pollingDlob = new PollingDlob({
- *   dlobServerHttpUrl: 'https://dlob.drift.trade',
+ *   dlobServerHttpUrl: 'https://dlob.velocity.exchange',
  *   indicativeLiquidityEnabled: true
  * });
  *

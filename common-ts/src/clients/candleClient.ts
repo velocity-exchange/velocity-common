@@ -16,7 +16,7 @@ import { logger } from '../utils/logger';
 
 /**
  * # CANDLE CLIENT HIGH LEVEL EXPLANATION:
- * The Candle Client uses the Data API (see https://data.api.drift.trade/playground) to source candles to display.
+ * The Candle Client uses the Data API (see https://data.velocity.exchange/playground) to source candles to display.
  *
  * There are two key parts of the client:
  * - Fetching Candles
