@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.1...common-ts-v0.4.2) (2026-08-26)
+
+
+### Code Refactoring
+
+* **common-ts:** rename Drift to Velocity ([#429](https://github.com/velocity-exchange/velocity-common/issues/429)) ([442cd22](https://github.com/velocity-exchange/velocity-common/commit/442cd224e69518b53ae008d03c3c74b1a074b88c))
+
 ## [0.4.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.0...common-ts-v0.4.1) (2026-07-27)
 
 
