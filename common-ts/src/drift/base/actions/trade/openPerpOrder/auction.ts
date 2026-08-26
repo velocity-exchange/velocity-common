@@ -10,10 +10,11 @@ import {
 	VelocityClient,
 	User,
 	PositionDirection,
+	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import { getPerpAuctionDuration } from '../../../../../utils/orders/flags';
 import { getLimitAuctionParams } from '../../../../../utils/trading/auction';
-import { DEFAULT_LIMIT_AUCTION_DURATION } from '../../../constants/auction';
+import { getDefaultLimitAuctionDurationSlots } from '../../../constants/auction';
 import { ENUM_UTILS } from '../../../../../utils';
 import invariant from 'tiny-invariant';
 import { fetchAuctionOrderParams } from './dlobServer';
@@ -32,6 +33,7 @@ export const getLimitAuctionOrderParams = async ({
 	postOnly = PostOnlyParams.NONE,
 	orderConfig,
 	onAuctionParamsFetched,
+	slotDuration,
 }: {
 	velocityClient: VelocityClient;
 	user: User;
@@ -47,6 +49,8 @@ export const getLimitAuctionOrderParams = async ({
 		limitAuction: LimitAuctionConfig;
 	};
 	onAuctionParamsFetched?: AuctionParamsFetchedCallback;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 }): Promise<OptionalOrderParams> => {
 	const { orderParams } = await fetchAuctionOrderParams({
 		velocityClient,
@@ -61,6 +65,7 @@ export const getLimitAuctionOrderParams = async ({
 		optionalAuctionParamsInputs:
 			orderConfig.limitAuction.optionalLimitAuctionParams,
 		onAuctionParamsFetched: onAuctionParamsFetched,
+		slotDuration,
 	});
 
 	const isPerp = ENUM_UTILS.match(marketType, MarketType.PERP);
@@ -69,7 +74,7 @@ export const getLimitAuctionOrderParams = async ({
 	invariant(orderParams.auctionStartPrice, 'Auction start price not found');
 
 	let oraclePriceBands: [BN, BN] | undefined = undefined;
-	let auctionDuration = DEFAULT_LIMIT_AUCTION_DURATION;
+	let auctionDuration = getDefaultLimitAuctionDurationSlots(slotDuration);
 
 	if (isPerp) {
 		const perpMarketAccount = velocityClient.getPerpMarketAccount(marketIndex);
@@ -84,7 +89,8 @@ export const getLimitAuctionOrderParams = async ({
 		auctionDuration = getPerpAuctionDuration(
 			orderConfig.limitPrice.sub(orderParams.auctionStartPrice).abs(),
 			orderConfig.limitAuction.oraclePrice,
-			perpMarketAccount.contractTier
+			perpMarketAccount.contractTier,
+			slotDuration
 		);
 	}
 

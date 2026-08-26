@@ -4,6 +4,7 @@ import {
 	OrderType,
 	PositionDirection,
 	PRICE_PRECISION,
+	SLOT_DURATION_BASELINE,
 	User,
 	VelocityClient,
 } from '@velocity-exchange/sdk';
@@ -17,7 +18,7 @@ import {
 } from '../../src/drift/base/actions/trade/openPerpOrder/dlobServer';
 import { ENUM_UTILS } from '../../src';
 import { mockPerpMarket } from './fixtures/mockPerpMarket';
-import { DEFAULT_MARKET_AUCTION_DURATION } from '../../src/drift/base/constants/auction';
+import { getDefaultMarketAuctionDurationSlots } from '../../src/drift/base/constants/auction';
 
 const DLOB_SERVER_HTTP_URL = 'https://test-dlob.example.com';
 
@@ -113,6 +114,7 @@ const baseParams = {
 	amount: new BN(1_000_000_000),
 	dlobServerHttpUrl: DLOB_SERVER_HTTP_URL,
 	reduceOnly: false,
+	slotDuration: SLOT_DURATION_BASELINE,
 };
 
 const expectRejection = async (
@@ -486,7 +488,7 @@ describe('fetchAuctionOrderParams', () => {
 			).to.be.true;
 		});
 
-		it('defaults auctionDuration to DEFAULT_MARKET_AUCTION_DURATION when the caller omits it', async () => {
+		it('defaults auctionDuration to the default market auction duration when the caller omits it', async () => {
 			// The UI sends auctionDuration=undefined, relying on the DLOB server to
 			// fill it in. The network-free fallback must resolve a non-null duration
 			// itself, otherwise the swift server rejects the signed order with
@@ -498,7 +500,7 @@ describe('fetchAuctionOrderParams', () => {
 			});
 
 			expect(result.orderParams.auctionDuration).to.equal(
-				DEFAULT_MARKET_AUCTION_DURATION
+				getDefaultMarketAuctionDurationSlots(SLOT_DURATION_BASELINE)
 			);
 		});
 

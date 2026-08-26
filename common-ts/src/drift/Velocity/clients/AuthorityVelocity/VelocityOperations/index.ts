@@ -450,6 +450,7 @@ export class VelocityOperations {
 					const swiftOrderResult = await createOpenPerpMarketOrder({
 						velocityClient: this.velocityClient,
 						user,
+						slotDuration: params.slotDuration,
 						assetType: params.assetType,
 						useSwift: true,
 						swiftOptions: {
@@ -481,6 +482,7 @@ export class VelocityOperations {
 					const result = await createOpenPerpMarketOrder({
 						velocityClient: this.velocityClient,
 						user,
+						slotDuration: params.slotDuration,
 						assetType: params.assetType,
 						marketIndex: params.marketIndex,
 						direction: params.direction,
@@ -513,6 +515,7 @@ export class VelocityOperations {
 					const swiftOrderResult = await createOpenPerpNonMarketOrder({
 						velocityClient: this.velocityClient,
 						user,
+						slotDuration: params.slotDuration,
 						direction: params.direction,
 						marketIndex: params.marketIndex,
 						amount: amountBN,
@@ -547,6 +550,7 @@ export class VelocityOperations {
 					const txn = await createOpenPerpNonMarketOrder({
 						velocityClient: this.velocityClient,
 						user,
+						slotDuration: params.slotDuration,
 						direction: params.direction,
 						marketIndex: params.marketIndex,
 						amount: amountBN,
@@ -576,6 +580,7 @@ export class VelocityOperations {
 				const txn = await createOpenPerpNonMarketOrder({
 					velocityClient: this.velocityClient,
 					user,
+					slotDuration: params.slotDuration,
 					direction: params.direction,
 					marketIndex: params.marketIndex,
 					amount: amountBN,
@@ -599,6 +604,7 @@ export class VelocityOperations {
 				const txn = await createOpenPerpNonMarketOrder({
 					velocityClient: this.velocityClient,
 					user,
+					slotDuration: params.slotDuration,
 					direction: params.direction,
 					marketIndex: params.marketIndex,
 					amount: amountBN,

@@ -19,6 +19,7 @@ import {
 	calculateUnsettledFundingPnl,
 	isOracleValid,
 	AMM_RESERVE_PRECISION,
+	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import { OpenPosition } from '../../types';
 import { calculatePotentialProfit } from '../trading/pnl';
@@ -28,6 +29,7 @@ const getOpenPositionData = (
 	userPositions: PerpPosition[],
 	user: User,
 	perpMarketLookup: PerpMarketConfig[],
+	slotDuration: SlotDurationMs,
 	markPriceCallback?: (marketIndex: number) => BN
 ): OpenPosition[] => {
 	const oracleGuardRails = velocityClient.getStateAccount().oracleGuardRails;
@@ -171,7 +173,8 @@ const getOpenPositionData = (
 					perpMarket,
 					oraclePriceData,
 					oracleGuardRails,
-					perpMarket.amm.lastUpdateSlot?.toNumber()
+					perpMarket.amm.lastUpdateSlot?.toNumber(),
+					slotDuration
 				),
 				maxMarginRatio: position.maxMarginRatio,
 			};

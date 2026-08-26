@@ -10,6 +10,7 @@ import {
 	RevenueShareEscrowAccount,
 	fetchRevenueShareEscrowAccount,
 	escrowHasReferrer,
+	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import {
 	PublicKey,
@@ -54,6 +55,8 @@ export interface OpenPerpMarketOrderBaseParams {
 	direction: PositionDirection;
 	amount: BN;
 	dlobServerHttpUrl: string;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	reduceOnly?: boolean;
 	// mainly used for UI order identification
 	userOrderId?: number;
@@ -148,6 +151,7 @@ async function prepSwiftMarketOrderData(params: OpenPerpMarketOrderBaseParams) {
 		amount,
 		reduceOnly,
 		dlobServerHttpUrl,
+		slotDuration,
 		optionalAuctionParamsInputs,
 		userOrderId = 0,
 		callbacks,
@@ -166,6 +170,7 @@ async function prepSwiftMarketOrderData(params: OpenPerpMarketOrderBaseParams) {
 		direction,
 		amount,
 		dlobServerHttpUrl,
+		slotDuration,
 		optionalAuctionParamsInputs,
 		reduceOnly,
 		onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,
@@ -198,6 +203,7 @@ export async function createSwiftMarketOrder(
 		positionMaxLeverage,
 		marginMode,
 		builderParams,
+		slotDuration,
 	} = params;
 
 	const resolvedDeposits = resolveIsolatedPositionDepositsWithOverride(
@@ -222,6 +228,7 @@ export async function createSwiftMarketOrder(
 		userAccountPubKey: user.userAccountPublicKey,
 		marketIndex,
 		userSigningSlotBuffer: swiftOptions.userSigningSlotBuffer ?? 0,
+		slotDuration,
 		swiftOptions,
 		orderParams: {
 			main: orderParams,
@@ -263,6 +270,7 @@ export async function createSwiftMarketOrderMessage(
 		builderParams,
 		isDelegate = false,
 		userSigningSlotBuffer,
+		slotDuration,
 	} = params;
 
 	const resolvedDeposits = resolveIsolatedPositionDepositsWithOverride(
@@ -287,6 +295,7 @@ export async function createSwiftMarketOrderMessage(
 		userAccountPubKey: user.userAccountPublicKey,
 		marketIndex,
 		userSigningSlotBuffer: userSigningSlotBuffer ?? 0,
+		slotDuration,
 		isDelegate,
 		orderParams: {
 			main: orderParams,
@@ -321,6 +330,7 @@ export const createPlaceAndTakePerpMarketOrderIx = async ({
 	callbacks,
 	takerEscrow,
 	builderParams,
+	slotDuration,
 }: Omit<
 	OpenPerpMarketOrderBaseParams,
 	'marginMode' | 'isolatedPositionDepositsOverride'
@@ -351,6 +361,7 @@ export const createPlaceAndTakePerpMarketOrderIx = async ({
 				amount,
 				reduceOnly,
 				dlobServerHttpUrl,
+				slotDuration,
 				optionalAuctionParamsInputs,
 				onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,
 			}),
@@ -458,6 +469,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 	isolatedPositionDepositsOverride,
 	callbacks,
 	builderParams,
+	slotDuration,
 }: OpenPerpMarketOrderBaseParams): Promise<TransactionInstruction[]> => {
 	if (!amount || amount.isZero()) {
 		throw new Error('Amount must be greater than zero');
@@ -546,6 +558,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 				mainSignerOverride,
 				positionMaxLeverage,
 				builderParams,
+				slotDuration,
 			});
 			allIxs.push(placeAndTakeIx);
 		} catch (e) {
@@ -566,6 +579,7 @@ export const createOpenPerpMarketOrderIxs = async ({
 			direction,
 			amount,
 			dlobServerHttpUrl,
+			slotDuration,
 			optionalAuctionParamsInputs,
 			reduceOnly,
 			onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,

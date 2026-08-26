@@ -1,4 +1,9 @@
-import { BN, PositionDirection, TxParams } from '@velocity-exchange/sdk';
+import {
+	BN,
+	PositionDirection,
+	SlotDurationMs,
+	TxParams,
+} from '@velocity-exchange/sdk';
 import { WithTxnParams } from '../../../base/types';
 import { OpenPerpMarketOrderBaseParams } from '../../../base/actions/trade/openPerpOrder/openPerpMarketOrder';
 import { OpenPerpNonMarketOrderBaseParams } from '../../../base/actions/trade/openPerpOrder/openPerpNonMarketOrder';
@@ -84,6 +89,8 @@ export interface CentralServerGetCloseAndWithdrawIsolatedPerpPositionTxnParams {
 	baseAssetAmount: BN;
 	/** Direction of the close order (opposite of position). */
 	direction: PositionDirection;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	/** If true, includes collateral transfer ix after close order (will withdraw available isolated margin; amount is fill-dependent). */
 	withdrawCollateralAfterClose?: boolean;
 	/** If true and withdrawCollateralAfterClose, prepends settle PnL ix. */
@@ -112,6 +119,8 @@ export interface CentralServerGetCloseAndWithdrawIsolatedPerpPositionToWalletTxn
 	baseAssetAmount: BN;
 	/** Direction of the close order (opposite of position). */
 	direction: PositionDirection;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	/**
 	 * Amount to withdraw (QUOTE_PRECISION). When omitted or larger than available,
 	 * the SDK withdraws all. Pass a specific amount for partial withdrawal.

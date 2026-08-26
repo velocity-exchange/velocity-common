@@ -16,6 +16,7 @@ import {
 	createL2Levels,
 	DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
 	MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS,
+	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../../../../../utils';
 import { calculateSpreadBidAskMark } from '../../../../../../utils/math';
@@ -47,7 +48,7 @@ import {
 	getPriceObject,
 	deriveMarketOrderParams,
 } from '../../../../../../utils/trading/auction';
-import { DEFAULT_MARKET_AUCTION_DURATION } from '../../../../constants/auction';
+import { getDefaultMarketAuctionDurationSlots } from '../../../../constants/auction';
 import invariant from 'tiny-invariant';
 import { logger } from '../../../../../../utils/logger';
 
@@ -79,6 +80,8 @@ interface RegularOrderParams {
 	direction: PositionDirection;
 	amount: BN;
 	dlobServerHttpUrl: string;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	reduceOnly?: boolean;
 	optionalAuctionParamsInputs?: OptionalAuctionParamsRequestInputs;
 	dynamicSlippageConfig?: DynamicSlippageConfig;
@@ -354,6 +357,7 @@ export async function fetchAuctionOrderParamsFromL2({
 	optionalAuctionParamsInputs = {},
 	velocityClient,
 	dynamicSlippageConfig,
+	slotDuration,
 }: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
 	const marketId = new MarketId(marketIndex, marketType);
 	const baseAmount =
@@ -384,6 +388,7 @@ export async function fetchAuctionOrderParamsFromL2({
 		reduceOnly,
 		optionalAuctionParamsInputs,
 		dynamicSlippageConfig,
+		slotDuration,
 		source: 'l2',
 	});
 }
@@ -405,6 +410,7 @@ export function deriveFromL2Inputs({
 	reduceOnly,
 	optionalAuctionParamsInputs,
 	dynamicSlippageConfig,
+	slotDuration,
 	source,
 }: {
 	l2Data: L2OrderBook;
@@ -418,6 +424,7 @@ export function deriveFromL2Inputs({
 	reduceOnly?: boolean;
 	optionalAuctionParamsInputs: OptionalAuctionParamsRequestInputs;
 	dynamicSlippageConfig?: DynamicSlippageConfig;
+	slotDuration: SlotDurationMs;
 	source: AuctionOrderParamsMeta['source'];
 }): FetchAuctionOrderParamsResult {
 	const priceImpactData = calculatePriceImpactFromL2(
@@ -476,7 +483,7 @@ export function deriveFromL2Inputs({
 		// signed-message order is rejected by the swift server as InvalidOrderAuction.
 		auctionDuration:
 			optionalAuctionParamsInputs.auctionDuration ??
-			DEFAULT_MARKET_AUCTION_DURATION,
+			getDefaultMarketAuctionDurationSlots(slotDuration),
 		auctionStartPriceOffset:
 			optionalAuctionParamsInputs.auctionStartPriceOffset ?? 0,
 		auctionEndPriceOffset:
@@ -537,6 +544,7 @@ export async function deriveAuctionParamsFromVamm({
 	reduceOnly,
 	optionalAuctionParamsInputs = {},
 	dynamicSlippageConfig,
+	slotDuration,
 }: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
 	invariant(
 		ENUM_UTILS.match(marketType, MarketType.PERP),
@@ -564,6 +572,7 @@ export async function deriveAuctionParamsFromVamm({
 			marketIndex < 3
 				? MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS
 				: DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
+		slotDuration,
 	});
 	const l2Data: L2OrderBook = {
 		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),
@@ -603,6 +612,7 @@ export async function deriveAuctionParamsFromVamm({
 		reduceOnly,
 		optionalAuctionParamsInputs: bufferedInputs,
 		dynamicSlippageConfig,
+		slotDuration,
 		source: 'vamm',
 	});
 }

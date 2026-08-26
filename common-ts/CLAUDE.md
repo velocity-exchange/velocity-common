@@ -44,6 +44,20 @@ are internal-only (verify with `rg` across `src`) are free to refactor or delete
 - Real deduplication of large near-identical blocks is welcome; collapsing three short
   similar lines into a clever abstraction is not.
 
+## Slots and wall-clock time
+
+Solana's slot time is dropping from 400ms to 200ms through feature gates, so slots
+are integers compared against the live slot; wall-clock is ms converted at the read
+site; never write a slot length. This package does not resolve the live duration
+itself: every function whose behavior depends on slot length takes a `SlotDurationMs`
+parameter, and the outermost caller resolves it with the SDK's
+`currentSlotDuration(client, slot)` (or `currentSlotClock` to branch on
+`isLive`), which falls back to the 400ms baseline on a dead slot feed or an
+unsubscribed client. Convert with the SDK's `math/time` helpers
+(`millisFromSlots`, `msToSlotsCeilNum`, `slotsToMsNum`), ceiling user-protection
+budgets and flooring risk ceilings. `SLOT_TIME_ESTIMATE_MS` is deprecated and CI
+fails if it reappears.
+
 ## Type safety
 
 `strictNullChecks` is currently **off** in `tsconfig.json` (there's a standing TODO to

@@ -25,6 +25,7 @@ import {
 	PublicKey,
 	SettlePnlMode,
 	SpotMarketConfig,
+	SlotDurationMs,
 	SwapMode,
 	TxParams,
 	UnifiedSwapClient,
@@ -887,6 +888,7 @@ export class CentralServerVelocity {
 					assetType: params.assetType ?? 'base',
 					reduceOnly: true,
 					dlobServerHttpUrl: this._velocityEndpoints.dlobServerHttpUrl,
+					slotDuration: params.slotDuration,
 					positionMaxLeverage: 0,
 					mainSignerOverride: signingAuthority,
 					placeAndTake: params.placeAndTake,
@@ -1010,6 +1012,7 @@ export class CentralServerVelocity {
 					assetType: params.assetType ?? 'base',
 					reduceOnly: true,
 					dlobServerHttpUrl: this._velocityEndpoints.dlobServerHttpUrl,
+					slotDuration: params.slotDuration,
 					positionMaxLeverage: 0,
 					mainSignerOverride: signingAuthority,
 					placeAndTake: params.placeAndTake,
@@ -1075,7 +1078,8 @@ export class CentralServerVelocity {
 			maxTs?: BN;
 			policy?: number;
 			positionMaxLeverage?: number;
-		}
+		},
+		slotDuration: SlotDurationMs
 	): Promise<VersionedTransaction | Transaction> {
 		return this.velocityClientContextWrapper(
 			userAccountPublicKey,
@@ -1085,6 +1089,7 @@ export class CentralServerVelocity {
 					user,
 					orderId,
 					editOrderParams,
+					slotDuration,
 				});
 
 				return editOrderTxn;

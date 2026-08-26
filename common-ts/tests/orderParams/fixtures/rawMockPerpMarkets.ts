@@ -59,6 +59,8 @@ export const mockAMM: AMM = {
 	feePool: {
 		scaledBalance: new BN(0),
 		marketIndex: 0,
+		pendingInterestSplitDust: 0,
+		pendingInterestDust: new BN(0),
 	},
 	concentrationCoef: new BN(0),
 	minBaseAssetReserve: BASE_RESERVE.muln(9).divn(10),
@@ -146,10 +148,14 @@ function mockPerpMarketCommon(): Omit<
 		pnlPool: {
 			scaledBalance: new BN(0),
 			marketIndex: 0,
+			pendingInterestSplitDust: 0,
+			pendingInterestDust: new BN(0),
 		},
 		protocolFeePool: {
 			scaledBalance: new BN(0),
 			marketIndex: 0,
+			pendingInterestSplitDust: 0,
+			pendingInterestDust: new BN(0),
 		},
 		feeLedger: {
 			totalExchangeFee: new BN(0),
@@ -214,7 +220,9 @@ function mockPerpMarketCommon(): Omit<
 		orderStepSize: new BN(1),
 		orderTickSize: new BN(1),
 		pendingRevenueShare: new BN(0),
+		takerFeeAddonTenthBps: 0,
 		bankruptcyIfFloorPct: 0,
+		pendingBankruptcyClaims: 0,
 	};
 }
 

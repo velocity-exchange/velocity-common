@@ -2,8 +2,11 @@ import {
 	ACCOUNT_AGE_DELETION_CUTOFF_SECONDS,
 	BN,
 	VelocityClient,
-	IDLE_TIME_SLOTS,
-	SLOT_TIME_ESTIMATE_MS,
+	IDLE_TIME,
+	millisFromSecs,
+	millisFromSlots,
+	QUOTE_PRECISION,
+	SlotDurationMs,
 	User,
 	UserStats,
 	UserStatsAccount,
@@ -12,6 +15,12 @@ import {
 	positionIsAvailable,
 } from '@velocity-exchange/sdk';
 import { TransactionInstruction } from '@solana/web3.js';
+
+/**
+ * The non-accelerated idle threshold (one week) from `validate_user_is_idle`.
+ * The SDK only exports the accelerated hour as `IDLE_TIME`.
+ */
+const IDLE_TIME_UNACCELERATED = millisFromSecs(604_800);
 
 type AccountDeletionStep =
 	| 'askToCloseAllPositionsOrdersBorrows'
@@ -92,14 +101,18 @@ type CanBeDeletedState =
 const getAccountCanBeDeletedInstantly = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	currentSlot: number
+	currentSlot: number,
+	slotDuration: SlotDurationMs
 ): CanBeDeletedState => {
 	const statsAccountIsPastDeletionCutoff =
 		getStatsAccountIsPastDeletionCutoff(userStatsAccount);
 
 	const userIsIdle = user.getUserAccountOrThrow().idle;
 
-	const userCanBeMarkedIdle = user.canMakeIdle(new BN(currentSlot));
+	const userCanBeMarkedIdle = user.canMakeIdle(
+		new BN(currentSlot),
+		slotDuration
+	);
 
 	const accountHasOpenPerpSpotOrOrders = accountHasOpenPositionsOrOrders(user);
 
@@ -132,7 +145,8 @@ const getAccountCanBeDeletedInstantly = (
 const getAccountDeletionStepsToTake = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	currentSlot: number
+	currentSlot: number,
+	slotDuration: SlotDurationMs
 ): AccountDeletionStep[] => {
 	const userAccount = user.getUserAccountOrThrow();
 	const statsAccountIsPastDeletionCutoff =
@@ -158,7 +172,7 @@ const getAccountDeletionStepsToTake = (
 	}
 
 	// Account can be marked idle and then deleted
-	const canBeMarkedIdle = user.canMakeIdle(new BN(currentSlot));
+	const canBeMarkedIdle = user.canMakeIdle(new BN(currentSlot), slotDuration);
 
 	if (canBeMarkedIdle) {
 		return ['sendTriggerAccountIdleIx', 'sendAccountDeletionIx'];
@@ -180,12 +194,14 @@ const tryDeleteUserAccount = async (
 	velocityClient: VelocityClient,
 	user: User,
 	userStatsAccount: UserStatsAccount,
-	latestSlot: number
+	latestSlot: number,
+	slotDuration: SlotDurationMs
 ) => {
 	const canBeDeleted = getAccountCanBeDeletedInstantly(
 		user,
 		userStatsAccount,
-		latestSlot
+		latestSlot,
+		slotDuration
 	);
 
 	if (canBeDeleted === 'no' || canBeDeleted === 'no-wait-for-idle') {
@@ -222,23 +238,46 @@ const tryDeleteUserAccount = async (
 	return txSig;
 };
 
-export const getIdleWaitTimeMinutes = (user: User, currentSlot: number) => {
+/**
+ * The program gates idleness on wall-clock, so the elapsed slot delta is
+ * converted at the live duration rather than assumed; the remaining time is
+ * rounded up so the estimate never under-states the wait.
+ *
+ * The threshold is equity-dependent: `handle_update_user_idle` accelerates to
+ * an hour below $1000 of equity and holds a week at or above it, so reading the
+ * hour unconditionally under-states a funded account's wait.
+ *
+ * The equity here is spot-only, where the program's `calculate_user_equity`
+ * also carries a perp term. They agree wherever this estimate is meaningful,
+ * because `PerpPosition::is_available` gates both the program's equity walk and
+ * its idle validation: any perp position that would move the equity also blocks
+ * idleness outright, so the wait is not a question that has an answer yet.
+ */
+export const getIdleWaitTimeMinutes = (
+	user: User,
+	currentSlot: number,
+	slotDuration: SlotDurationMs
+) => {
 	const lastActiveSlot = user.getUserAccountOrThrow().lastActiveSlot;
 
-	const inactiveAccountTime = Math.max(
-		currentSlot - lastActiveSlot.toNumber(),
+	const inactiveSlots = Math.max(currentSlot - lastActiveSlot.toNumber(), 0);
+
+	const { totalAssetValue, totalLiabilityValue } =
+		user.getSpotMarketAssetAndLiabilityValue();
+	const equity = totalAssetValue.sub(totalLiabilityValue);
+
+	const idleAfter = equity.lt(QUOTE_PRECISION.muln(1000))
+		? IDLE_TIME
+		: IDLE_TIME_UNACCELERATED;
+
+	const remainingMs = Math.max(
+		idleAfter
+			.sub(millisFromSlots(new BN(inactiveSlots), slotDuration))
+			.toNumber(),
 		0
 	);
 
-	const slotsToWait = IDLE_TIME_SLOTS - inactiveAccountTime;
-
-	const secondsPerSlot = SLOT_TIME_ESTIMATE_MS / 1000;
-
-	const timeEstimateSeconds = slotsToWait * secondsPerSlot;
-
-	const minutesEstimate = Math.ceil(timeEstimateSeconds / 60);
-
-	return minutesEstimate;
+	return Math.ceil(remainingMs / 60_000);
 };
 
 export const ACCOUNT_DELETION_HELPERS = {

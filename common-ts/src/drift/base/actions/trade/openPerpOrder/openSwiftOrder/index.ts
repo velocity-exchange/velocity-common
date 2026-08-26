@@ -3,15 +3,17 @@ import {
 	OrderType,
 	SignedMsgOrderParamsDelegateMessage,
 	SignedMsgOrderParamsMessage,
-	SLOT_TIME_ESTIMATE_MS,
 } from '@velocity-exchange/sdk';
 import {
 	BN,
 	VelocityClient,
 	generateSignedMsgUuid,
 	getOrderParams,
+	msToSlotsCeilNum,
 	OptionalOrderParams,
 	PublicKey,
+	SlotDurationMs,
+	slotsToMsNum,
 } from '@velocity-exchange/sdk';
 import { ENUM_UTILS } from '../../../../../../utils';
 import { getSwiftConfirmationTimeoutMs } from '../../../../../../utils/signedMsgs';
@@ -30,20 +32,28 @@ import { convertLeverageToMarginRatio } from '../../../../../../utils/trading/le
 import { Connection } from '@solana/web3.js';
 
 /**
- * Buffer slots to account for signing of message by the user (default: 7 slots ~3 second, assumes user have to approves the signing in a UI wallet).
+ * Time allowed for the user to approve the signing prompt in a wallet UI, before
+ * the auction starts. Converted to actual slots at the live slot duration.
  */
-export const USER_SIGNING_MESSAGE_BUFFER_SLOTS = 7;
+export const USER_SIGNING_MESSAGE_BUFFER_MS = 2_800;
 
 /**
- * Orders without auction require a higher buffer (kink of the SWIFT server handling non-auction orders)
+ * Whole approval budget for orders without an auction (kink of the SWIFT server
+ * handling non-auction orders); enforced on chain, so it ceils.
  */
-export const MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS = 35;
+export const MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS = 14_000;
 
 /**
  * Buffer slots from the end of the auction to prevent the signing of the order message.
  */
 export const SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS = 5;
 export const MINIMUM_SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS = 5;
+
+/**
+ * Wall-clock cadence at which the slot feed is polled while the wallet prompt is
+ * open. A poll interval, not a slot length.
+ */
+const SIGNING_DEADLINE_POLL_INTERVAL_MS = 250;
 
 export interface SwiftOrderOptions {
 	wallet: {
@@ -59,6 +69,12 @@ export interface SwiftOrderOptions {
 	userSigningSlotBuffer?: number;
 	isDelegate?: boolean;
 	/**
+	 * Live chain slot, polled while the wallet prompt is open so the signing guard
+	 * fires on the real deadline. Return 0 (or omit) for a dead feed, which falls
+	 * back to the wall-clock timer.
+	 */
+	slotSource?: () => number;
+	/**
 	 * Multiplier for the SWIFT confirmation timeout (after sending SWIFT order). Default is 1.
 	 */
 	confirmationMultiplier?: number;
@@ -66,7 +82,8 @@ export interface SwiftOrderOptions {
 		onOrderParamsMessagePrepped?: (
 			orderParamsMessage:
 				| SignedMsgOrderParamsMessage
-				| SignedMsgOrderParamsDelegateMessage
+				| SignedMsgOrderParamsDelegateMessage,
+			timing: SwiftOrderTiming
 		) => void;
 		onSigningExpiry?: (
 			orderParamsMessage:
@@ -126,6 +143,8 @@ export interface SwiftOrderMessage {
 	marketIndex: number;
 	/** Number of slots till the auction ends (used for confirmation timeout) */
 	slotsTillAuctionEnd: number;
+	/** Absolute slot after which the order must no longer be signed */
+	signingDeadlineSlot: number;
 	/** Time in milliseconds before the signing window expires */
 	expirationTimeMs: number;
 }
@@ -144,6 +163,8 @@ interface PrepSwiftOrderParams {
 	};
 	/** Current blockchain slot number */
 	currentSlot: number;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	/** Whether this is a delegate order */
 	isDelegate: boolean;
 	/** Order parameters including main order and optional stop loss/take profit */
@@ -213,6 +234,7 @@ export const prepSwiftOrder = ({
 	velocityClient,
 	takerUserAccount,
 	currentSlot,
+	slotDuration,
 	isDelegate,
 	orderParams,
 	userSigningSlotBuffer,
@@ -235,16 +257,22 @@ export const prepSwiftOrder = ({
 	});
 
 	if (!userSigningSlotBuffer) {
-		userSigningSlotBuffer = mainOrderParams.auctionDuration
-			? USER_SIGNING_MESSAGE_BUFFER_SLOTS
-			: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS;
+		userSigningSlotBuffer = msToSlotsCeilNum(
+			mainOrderParams.auctionDuration
+				? USER_SIGNING_MESSAGE_BUFFER_MS
+				: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
+			slotDuration
+		);
 	}
 
 	// if it is not an auction order, there should be a minimum buffer used
 	if (!mainOrderParams.auctionDuration) {
 		userSigningSlotBuffer = Math.max(
 			userSigningSlotBuffer,
-			MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS
+			msToSlotsCeilNum(
+				MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
+				slotDuration
+			)
 		);
 	}
 
@@ -336,20 +364,26 @@ interface SignOrderMsgParams {
 	};
 	/** Hex-encoded swift order message to sign */
 	hexEncodedSwiftOrderMessage: Uint8Array;
+	/** Absolute slot after which the order must no longer be signed */
+	signingDeadlineSlot: number;
 	/** Time in milliseconds till the auction expires */
 	expirationTimeMs: number;
+	/** Live chain slot; 0 or omitted means the feed is dead */
+	slotSource?: () => number;
 	/** Callback function called when the auction expires */
 	onExpired?: () => void;
 }
 
 /**
  * Signs a swift order message with slot expiration monitoring.
- * Continuously monitors the current slot and rejects with AuctionSlotExpiredError
- * if the auction slot expires before signing is complete.
+ * The real deadline is a slot, so the live slot feed is the authority; the
+ * wall-clock timer is only a backstop for a dead feed.
  *
  * @param wallet - Wallet instance with message signing capability
  * @param hexEncodedSwiftOrderMessage - Hex-encoded swift order message to sign
+ * @param signingDeadlineSlot - Absolute slot after which the order must no longer be signed
  * @param expirationTimeMs - Time in milliseconds till the auction expires
+ * @param slotSource - Live chain slot, polled while the prompt is open
  * @param onExpired - Callback function called when the auction expires
  *
  * @returns Promise resolving to the signed message as Uint8Array
@@ -358,10 +392,13 @@ interface SignOrderMsgParams {
 export const signSwiftOrderMsg = async ({
 	wallet,
 	hexEncodedSwiftOrderMessage,
+	signingDeadlineSlot,
 	expirationTimeMs,
+	slotSource,
 	onExpired,
 }: SignOrderMsgParams): Promise<Uint8Array> => {
 	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	let intervalId: ReturnType<typeof setInterval> | undefined;
 
 	try {
 		// Sign the message
@@ -370,10 +407,21 @@ export const signSwiftOrderMsg = async ({
 		);
 
 		const signingExpiredPromise = new Promise<never>((_resolve, reject) => {
-			timeoutId = setTimeout(() => {
+			const expire = () => {
 				onExpired?.();
 				reject(new AuctionSlotExpiredError());
-			}, expirationTimeMs);
+			};
+
+			timeoutId = setTimeout(expire, expirationTimeMs);
+
+			if (slotSource) {
+				intervalId = setInterval(() => {
+					const slot = slotSource();
+					if (slot > 0 && slot >= signingDeadlineSlot) {
+						expire();
+					}
+				}, SIGNING_DEADLINE_POLL_INTERVAL_MS);
+			}
 		});
 
 		// Ensure that the user signs the message before the expiration time
@@ -386,6 +434,9 @@ export const signSwiftOrderMsg = async ({
 	} finally {
 		if (timeoutId) {
 			clearTimeout(timeoutId);
+		}
+		if (intervalId) {
+			clearInterval(intervalId);
 		}
 	}
 };
@@ -411,6 +462,8 @@ interface SendSwiftOrderParams {
 	signingAuthority: PublicKey;
 	/** Number of slots till the end of the auction (optional) */
 	slotsTillAuctionEnd: number;
+	/** Live slot duration, resolved by the caller from `State` */
+	slotDuration: SlotDurationMs;
 	/** Multiplier for the SWIFT confirmation timeout (after sending SWIFT order) */
 	confirmationMultiplier?: number;
 	/** Optionally send a different connection for the confirmation step, possibly for a faster commitment */
@@ -446,6 +499,7 @@ export const sendSwiftOrder = ({
 	takerAuthority,
 	signingAuthority,
 	slotsTillAuctionEnd,
+	slotDuration,
 	confirmationMultiplier,
 	confirmationConnection,
 }: SendSwiftOrderParams): SwiftOrderObservable => {
@@ -464,7 +518,11 @@ export const sendSwiftOrder = ({
 		takerAuthority,
 		signedMsgUserOrdersAccountPubkey,
 		signedMsgOrderUuid,
-		getSwiftConfirmationTimeoutMs(slotsTillAuctionEnd, confirmationMultiplier),
+		getSwiftConfirmationTimeoutMs(
+			slotsTillAuctionEnd,
+			confirmationMultiplier,
+			slotDuration
+		),
 		signingAuthority
 	);
 
@@ -472,37 +530,76 @@ export const sendSwiftOrder = ({
 };
 
 /**
+ * The signing window for a prepared order. `signingDeadlineSlot` is the
+ * authoritative bound: `expirationTimeMs` is the same window converted at the
+ * live duration, a backstop for when the slot feed is dead. Consumers showing
+ * a countdown should use these rather than recomputing the window, which would
+ * drift from the guard the moment the formula changes.
+ */
+export type SwiftOrderTiming = {
+	slotsTillAuctionEnd: number;
+	signingDeadlineSlot: number;
+	expirationTimeMs: number;
+};
+
+/**
  * Computes the timing parameters for a SWIFT order:
  * - slotsTillAuctionEnd: how many slots until the auction is considered ended
- * - expirationTimeMs: how long (in ms) the user has to sign before the window expires
+ * - signingDeadlineSlot: the absolute slot the signature must land before
+ * - expirationTimeMs: the same window in ms, a backstop for a dead slot feed
  *
- * For market orders, auction duration + signing buffer is used directly.
- * For non-market orders, a minimum is enforced because limit auctions can have
- * very small durations but the order is still valid after the auction ends.
+ * For market orders, auction duration + signing buffer is used directly. For
+ * non-market orders a minimum is enforced, because a limit auction can be very
+ * short and the wallet prompt still needs a usable budget. That minimum governs
+ * the confirmation timeout only; it is not a placement deadline, since the
+ * program stops placing the order once the auction window has passed.
+ *
+ * The deadline is anchored on the prep `currentSlot`, not on the order's own
+ * slot, because both windows here are measured from prep time.
  */
 const computeSwiftOrderTiming = (
 	mainOrderParams: OptionalOrderParams,
-	userSigningSlotBuffer: number
-): { slotsTillAuctionEnd: number; expirationTimeMs: number } => {
+	userSigningSlotBuffer: number,
+	currentSlot: number,
+	slotDuration: SlotDurationMs
+): SwiftOrderTiming => {
 	const isMarketOrder =
 		ENUM_UTILS.match(mainOrderParams.orderType, OrderType.ORACLE) ||
 		ENUM_UTILS.match(mainOrderParams.orderType, OrderType.MARKET);
+	const minimumNonAuctionSlots = msToSlotsCeilNum(
+		MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
+		slotDuration
+	);
 	const slotsTillAuctionEnd = mainOrderParams.auctionDuration
 		? isMarketOrder
 			? userSigningSlotBuffer + mainOrderParams.auctionDuration
 			: Math.max(
-					MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS,
+					minimumNonAuctionSlots,
 					userSigningSlotBuffer + mainOrderParams.auctionDuration
 				)
-		: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS;
+		: minimumNonAuctionSlots;
 
-	const expirationTimeMs =
+	// The program stops placing the order once `order_slot + auction_duration`
+	// has passed, and `order_slot` is the auction start, i.e. the prep slot plus
+	// the signing buffer. `slotsTillAuctionEnd` carries a floor that can exceed
+	// that bound, so clamping against it would leave the deadline past the point
+	// the order can still be placed. Clamp against the chain's bound instead.
+	const onChainMaxSlotOffset =
+		userSigningSlotBuffer + (mainOrderParams.auctionDuration ?? 0);
+
+	const signingWindowSlots = Math.min(
 		Math.max(
 			slotsTillAuctionEnd - SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS,
 			MINIMUM_SWIFT_ORDER_SIGNING_EXPIRATION_BUFFER_SLOTS
-		) * SLOT_TIME_ESTIMATE_MS;
+		),
+		onChainMaxSlotOffset - 1
+	);
 
-	return { slotsTillAuctionEnd, expirationTimeMs };
+	return {
+		slotsTillAuctionEnd,
+		signingDeadlineSlot: currentSlot + signingWindowSlots,
+		expirationTimeMs: slotsToMsNum(signingWindowSlots, slotDuration),
+	};
 };
 
 type PrepSwiftOrderMessageParams = {
@@ -511,6 +608,7 @@ type PrepSwiftOrderMessageParams = {
 	userAccountPubKey: PublicKey;
 	marketIndex: number;
 	userSigningSlotBuffer: number;
+	slotDuration: SlotDurationMs;
 	isDelegate?: boolean;
 	orderParams: {
 		main: OptionalOrderParams;
@@ -538,6 +636,7 @@ export const prepSwiftOrderMessage = async ({
 	userAccountPubKey,
 	marketIndex,
 	userSigningSlotBuffer,
+	slotDuration,
 	isDelegate = false,
 	orderParams,
 	builderParams,
@@ -557,16 +656,20 @@ export const prepSwiftOrderMessage = async ({
 			subAccountId,
 		},
 		currentSlot,
+		slotDuration,
 		isDelegate,
 		orderParams,
 		userSigningSlotBuffer,
 		builderParams,
 	});
 
-	const { slotsTillAuctionEnd, expirationTimeMs } = computeSwiftOrderTiming(
-		orderParams.main,
-		resolvedUserSigningSlotBuffer
-	);
+	const { slotsTillAuctionEnd, signingDeadlineSlot, expirationTimeMs } =
+		computeSwiftOrderTiming(
+			orderParams.main,
+			resolvedUserSigningSlotBuffer,
+			currentSlot,
+			slotDuration
+		);
 
 	return {
 		hexEncodedSwiftOrderMessage,
@@ -575,6 +678,7 @@ export const prepSwiftOrderMessage = async ({
 		signedMsgOrderUuid,
 		marketIndex,
 		slotsTillAuctionEnd,
+		signingDeadlineSlot,
 		expirationTimeMs,
 	};
 };
@@ -585,6 +689,7 @@ type PrepSignAndSendSwiftOrderParams = {
 	userAccountPubKey: PublicKey;
 	marketIndex: number;
 	userSigningSlotBuffer: number;
+	slotDuration: SlotDurationMs;
 	swiftOptions: SwiftOrderOptions;
 	/** Multiplier for the SWIFT confirmation timeout (after sending SWIFT order). Default is 1.
 	 *
@@ -646,6 +751,7 @@ export const prepSignAndSendSwiftOrder = async ({
 	userAccountPubKey,
 	marketIndex,
 	userSigningSlotBuffer,
+	slotDuration,
 	swiftOptions,
 	orderParams,
 	builderParams,
@@ -656,6 +762,7 @@ export const prepSignAndSendSwiftOrder = async ({
 		signedMsgOrderUuid,
 		signedMsgOrderParamsMessage,
 		slotsTillAuctionEnd,
+		signingDeadlineSlot,
 		expirationTimeMs,
 	} = await prepSwiftOrderMessage({
 		velocityClient,
@@ -663,20 +770,24 @@ export const prepSignAndSendSwiftOrder = async ({
 		userAccountPubKey,
 		marketIndex,
 		userSigningSlotBuffer,
+		slotDuration,
 		isDelegate: swiftOptions.isDelegate || false,
 		orderParams,
 		builderParams,
 	});
 
 	swiftOptions.callbacks?.onOrderParamsMessagePrepped?.(
-		signedMsgOrderParamsMessage
+		signedMsgOrderParamsMessage,
+		{ slotsTillAuctionEnd, signingDeadlineSlot, expirationTimeMs }
 	);
 
 	// Ensure that the user signs the message before the expiration time
 	const signedMessage = await signSwiftOrderMsg({
 		wallet: swiftOptions.wallet,
 		hexEncodedSwiftOrderMessage: hexEncodedSwiftOrderMessage.uInt8Array,
+		signingDeadlineSlot,
 		expirationTimeMs,
+		slotSource: swiftOptions.slotSource,
 		onExpired: () =>
 			swiftOptions.callbacks?.onSigningExpiry?.(signedMsgOrderParamsMessage),
 	});
@@ -702,6 +813,7 @@ export const prepSignAndSendSwiftOrder = async ({
 			swiftOptions.wallet.signingAuthority ??
 			swiftOptions.wallet.takerAuthority,
 		slotsTillAuctionEnd,
+		slotDuration,
 		confirmationMultiplier,
 		confirmationConnection: new Connection(
 			velocityClient.connection.rpcEndpoint,

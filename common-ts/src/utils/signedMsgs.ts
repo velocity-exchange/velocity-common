@@ -1,9 +1,18 @@
-import { SLOT_TIME_ESTIMATE_MS } from '@velocity-exchange/sdk';
+import { SlotDurationMs, slotsToMsNum } from '@velocity-exchange/sdk';
+
+/**
+ * Allowance on top of the auction window for the send + websocket confirmation
+ * round trip. A wall-clock network budget, not a slot count.
+ */
+export const SWIFT_CONFIRMATION_ROUND_TRIP_MS = 6_000;
 
 export function getSwiftConfirmationTimeoutMs(
 	slotsTillAuctionEnd: number,
-	multiplier?: number
+	multiplier: number | undefined,
+	slotDuration: SlotDurationMs
 ): number {
-	const baseMs = ((slotsTillAuctionEnd ?? 0) + 15) * SLOT_TIME_ESTIMATE_MS;
+	const baseMs =
+		slotsToMsNum(slotsTillAuctionEnd, slotDuration) +
+		SWIFT_CONFIRMATION_ROUND_TRIP_MS;
 	return baseMs * (multiplier ?? 1);
 }
