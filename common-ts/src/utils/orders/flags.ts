@@ -8,12 +8,10 @@ import {
 	PERCENTAGE_PRECISION,
 	SlotDurationMs,
 } from '@velocity-exchange/sdk';
+import { MAX_AUCTION_DURATION_SLOTS } from '../../drift/base/constants/auction';
 
 const MIN_AUCTION_DURATION_STEPS = new BN(1);
 const MAX_AUCTION_DURATION_STEPS = new BN(180);
-
-/** `Order.auctionDuration` is a u8, so an inflated ramp clamps here. */
-const MAX_AUCTION_DURATION_SLOTS = 255;
 
 /**
  * Mirrors the program's `get_auction_duration`. The ramp is granted in steps of

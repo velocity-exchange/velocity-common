@@ -1,7 +1,7 @@
 import { msToSlotsCeilNum, SlotDurationMs } from '@velocity-exchange/sdk';
 
 /** `Order.auctionDuration` is a u8, so an inflated ramp clamps here. */
-const MAX_AUCTION_DURATION_SLOTS = 255;
+export const MAX_AUCTION_DURATION_SLOTS = 255;
 
 /** Default limit-auction ramp. */
 export const DEFAULT_LIMIT_AUCTION_DURATION_MS = 24_000;
