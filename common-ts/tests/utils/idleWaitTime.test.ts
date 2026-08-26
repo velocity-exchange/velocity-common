@@ -89,6 +89,26 @@ describe('getIdleWaitTimeMinutes', () => {
 		});
 	});
 
+	it('nets liabilities off assets when reading the equity cut', () => {
+		// $1200 of assets against $300 of borrows is $900 of equity, under the
+		// cut, so the accelerated hour applies despite the gross asset value.
+		const user = {
+			getUserAccountOrThrow: () => ({ lastActiveSlot: new BN(1_000_000) }),
+			getSpotMarketAssetAndLiabilityValue: () => ({
+				totalAssetValue: QUOTE_PRECISION.muln(1200),
+				totalLiabilityValue: QUOTE_PRECISION.muln(300),
+			}),
+		} as unknown as User;
+
+		expect(
+			ACCOUNT_DELETION_HELPERS.getIdleWaitTimeMinutes(
+				user,
+				1_000_000,
+				400 as SlotDurationMs
+			)
+		).to.equal(60);
+	});
+
 	it('uses the week-long window at or above the $1000 equity cut', () => {
 		// `validate_user_is_idle` only grants the accelerated hour below $1000 of
 		// equity. Reading the hour unconditionally under-states a funded

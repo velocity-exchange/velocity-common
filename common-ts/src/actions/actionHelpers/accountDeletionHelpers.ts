@@ -243,9 +243,15 @@ const tryDeleteUserAccount = async (
  * converted at the live duration rather than assumed; the remaining time is
  * rounded up so the estimate never under-states the wait.
  *
- * The threshold itself is equity-dependent, mirroring `validate_user_is_idle`:
- * an hour below $1000 of equity, a week at or above it. Reading the hour
- * unconditionally under-states the wait by a week for a funded account.
+ * The threshold is equity-dependent: `handle_update_user_idle` accelerates to
+ * an hour below $1000 of equity and holds a week at or above it, so reading the
+ * hour unconditionally under-states a funded account's wait.
+ *
+ * The equity here is spot-only, where the program's `calculate_user_equity`
+ * also carries a perp term. They agree wherever this estimate is meaningful,
+ * because `PerpPosition::is_available` gates both the program's equity walk and
+ * its idle validation: any perp position that would move the equity also blocks
+ * idleness outright, so the wait is not a question that has an answer yet.
  */
 export const getIdleWaitTimeMinutes = (
 	user: User,
