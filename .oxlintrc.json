@@ -49,6 +49,24 @@
 	},
 	"overrides": [
 		{
+			// format/core is import-free by rule so it can ship standalone or feed
+			// a Rust port. Only sibling files inside the folder may be imported.
+			"files": ["common-ts/src/format/core/**"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["**", "!./*"],
+								"message": "format/core must have zero imports outside its own folder"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
 			"files": ["**/tests/**"],
 			"rules": {
 				// chai assertions (`expect(x).to.be.true`) are bare member expressions
