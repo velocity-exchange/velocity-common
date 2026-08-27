@@ -1,4 +1,16 @@
-export * from './core/index';
+// The exact-decimal engine lives on ./format/core. Only the types that appear
+// in this layer's own signatures are re-exported here.
+export {
+	BigNumLike,
+	BnLike,
+	Decimal,
+	DecimalStatus,
+	NumericInput,
+	ParseResult,
+	RawWithScale,
+	RoundingMode,
+	StepMode,
+} from './core/index';
 export {
 	EN_US,
 	LocaleConfig,
@@ -26,14 +38,7 @@ export {
 	absBelowThreshold,
 	belowThreshold,
 } from './sentinels';
-export { AbbreviateResult, abbreviateValue, unitTable } from './abbreviate';
-export {
-	SmallResult,
-	applySmallNumber,
-	leadingZeroCount,
-	toSubscript,
-} from './small';
-export { ResolvedDigits, applyDigitSpec } from './resolveDigits';
+export { toSubscript } from './small';
 export { formatText, formatValue } from './formatValue';
 export { PRESETS, optionsForLegacyType } from './presets';
 export {

@@ -1,22 +1,24 @@
 import { expect } from 'chai';
 import {
-	Decimal,
 	EN_US,
 	PRESETS,
-	abs,
-	capFractionDigits,
 	capStringFractionDigits,
-	compare,
 	formatText,
-	fromParts,
 	groupInteger,
-	isStepMultiple,
 	parseInput,
 	snapValueToStep,
-	toDecimal,
-	toPlainString,
 	ungroup,
 } from '../../src/format/index';
+import {
+	Decimal,
+	abs,
+	capFractionDigits,
+	compare,
+	fromParts,
+	isStepMultiple,
+	toDecimal,
+	toPlainString,
+} from '../../src/format/core/index';
 
 // Deterministic LCG, so a failure is always reproducible from the seed.
 function makeRandom(seed: number) {
