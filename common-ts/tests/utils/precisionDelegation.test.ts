@@ -6,17 +6,17 @@ import {
 } from '../../src/utils/math/bignum';
 import {
 	dividesExactly,
-	isExactMultiple,
 	numbersFitEvenly,
 	roundToStepSize,
 	roundToStepSizeIfLargeEnough,
 	truncateInputToPrecision,
 } from '../../src/utils/math/precision';
+import { isExactMultiple } from '../../src/format/index';
 import { getDecimalsFromSize } from '../../src/utils/markets/precisions';
 import { trimTrailingZeros } from '../../src/utils/strings/format';
 
 /**
- * Characterization corpus for the Step 2 precision delegates. Each `legacy*`
+ * Characterization corpus for the precision delegates. Each `legacy*`
  * function below is the implementation as it stood before the delegation, kept
  * here as the oracle: the delegate must reproduce it over the whole corpus
  * except at the cases listed in that function's diff table, and every entry in
@@ -236,9 +236,23 @@ describe('roundBigNumToDecimalPlace delegates to roundToDecimals half-up', () =>
 		);
 	});
 
-	it('rejects a negative decimal place count instead of returning float noise', () => {
-		const value = BigNum.fromPrint('15', new BN(6));
-		expect(() => roundBigNumToDecimalPlace(value, -1)).to.throw();
+	it('still rounds to tens and hundreds on a negative decimal place count', () => {
+		expect(
+			roundBigNumToDecimalPlace(BigNum.fromPrint('15', new BN(6)), -1).print()
+		).to.equal('20.000000');
+		expect(
+			roundBigNumToDecimalPlace(
+				BigNum.fromPrint('123.456', new BN(3)),
+				-1
+			).print()
+		).to.equal('120.000');
+	});
+
+	it('rejects a non-integer decimal place count instead of returning float noise', () => {
+		const value = BigNum.fromPrint('1.5', new BN(6));
+		expect(() => roundBigNumToDecimalPlace(value, 1.5)).to.throw(
+			/must be an integer/
+		);
 	});
 });
 
@@ -344,6 +358,8 @@ const INPUT_CORPUS = [
 	'1e-7',
 	'1,234.5678',
 	'1.2.3',
+	'1.2.345',
+	'.1.23456',
 	'123456789012345.123456789',
 ];
 
@@ -367,7 +383,15 @@ const STEP_CORPUS: Array<number | undefined> = [
 ];
 
 const MULTI_SEPARATOR =
-	'malformed multi-separator input counts digits after the last separator, not the first';
+	'malformed multi-separator input counts its digits after the last separator, not the first';
+const NON_STRING =
+	'a non-string input passes through instead of throwing on .split';
+
+const separatorFix = (old: string, next: string): Divergence => ({
+	behaviour: MULTI_SEPARATOR,
+	old,
+	next,
+});
 
 describe('truncateInputToPrecision delegates to capStringFractionDigits', () => {
 	const cases: CorpusCase[] = [];
@@ -380,13 +404,28 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 			});
 		}
 	}
+	cases.push({
+		key: 'non-string 5 exp 6',
+		legacy: () =>
+			legacyTruncateInputToPrecision(5 as unknown as string, new BN(6)),
+		next: () =>
+			String(truncateInputToPrecision(5 as unknown as string, new BN(6))),
+	});
 
-	it('reproduces the slice implementation except at the annotated divergence', () => {
+	it('reproduces the slice implementation except at the annotated divergences', () => {
 		runCorpus(cases, {
-			'"1.2.3" exp 0': {
-				behaviour: MULTI_SEPARATOR,
-				old: '1.2.',
-				next: '1.',
+			// A single trailing separator is back to the old shape: the head now
+			// comes from the last separator, the same one the core split on.
+			'"1.2.345" exp 0': separatorFix('1.2.34', '1.2.'),
+			'"1.2.345" exp 1': separatorFix('1.2.345', '1.2.3'),
+			'"1.2.345" exp 2': separatorFix('1.2.345', '1.2.34'),
+			'".1.23456" exp 0': separatorFix('.1.2345', '.1.'),
+			'".1.23456" exp 1': separatorFix('.1.23456', '.1.2'),
+			'".1.23456" exp 2': separatorFix('.1.23456', '.1.23'),
+			'non-string 5 exp 6': {
+				behaviour: NON_STRING,
+				old: 'THROWS: input.split is not a function',
+				next: '5',
 			},
 		});
 	});
@@ -397,7 +436,96 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 		expect(truncateInputToPrecision('.12345', new BN(2))).to.equal('.12');
 		expect(truncateInputToPrecision('1.23', new BN(0))).to.equal('1.');
 	});
+
+	it(`${MULTI_SEPARATOR}, but keeps the old head`, () => {
+		expect(legacyTruncateInputToPrecision('1.2.3', new BN(0))).to.equal('1.2.');
+		expect(truncateInputToPrecision('1.2.3', new BN(0))).to.equal('1.2.');
+	});
 });
+
+// The whole point of the delegation: `(1e-7).toString()` is '1e-7', which has
+// no '.', so the old digit count was 0 and every fraction digit was cut.
+const EXPONENTIAL_STEP =
+	'a step that stringifies exponentially no longer reports zero decimals';
+
+const exponentialFix = (old: string, next: string): Divergence => ({
+	behaviour: EXPONENTIAL_STEP,
+	old,
+	next,
+});
+
+const STEP_SIZE_DIVERGENCES: Record<string, Divergence> = {
+	'"0.0" step 1e-7': exponentialFix('0', '0.0'),
+	'"0.0" step 1e-9': exponentialFix('0', '0.0'),
+	'"1.0" step 1e-7': exponentialFix('1', '1.0'),
+	'"1.0" step 1e-9': exponentialFix('1', '1.0'),
+	'".5" step 1e-7': exponentialFix('', '.5'),
+	'".5" step 1e-9': exponentialFix('', '.5'),
+	'"-.5" step 1e-7': exponentialFix('-', '-.5'),
+	'"-.5" step 1e-9': exponentialFix('-', '-.5'),
+	'".12345" step 1e-7': exponentialFix('', '.12345'),
+	'".12345" step 1e-9': exponentialFix('', '.12345'),
+	'".12345" step 1.5e-7': exponentialFix('.1234', '.12345'),
+	'"00.1230" step 1e-7': exponentialFix('00', '00.1230'),
+	'"00.1230" step 1e-9': exponentialFix('00', '00.1230'),
+	'"1.2345678" step 1e-7': exponentialFix('1', '1.2345678'),
+	'"1.2345678" step 1e-9': exponentialFix('1', '1.2345678'),
+	'"1.2345678" step 1.5e-7': exponentialFix('1.2345', '1.2345678'),
+	'"-1.2345678" step 1e-7': exponentialFix('-1', '-1.2345678'),
+	'"-1.2345678" step 1e-9': exponentialFix('-1', '-1.2345678'),
+	'"-1.2345678" step 1.5e-7': exponentialFix('-1.2345', '-1.2345678'),
+	'"0.0000001" step 1e-7': exponentialFix('0', '0.0000001'),
+	'"0.0000001" step 1e-9': exponentialFix('0', '0.0000001'),
+	'"0.0000001" step 1.5e-7': exponentialFix('0.0000', '0.0000001'),
+	'"-0.0000001" step 1e-7': exponentialFix('-0', '-0.0000001'),
+	'"-0.0000001" step 1e-9': exponentialFix('-0', '-0.0000001'),
+	'"-0.0000001" step 1.5e-7': exponentialFix('-0.0000', '-0.0000001'),
+	'"1,234.5678" step 1e-7': exponentialFix('1,234', '1,234.5678'),
+	'"1,234.5678" step 1e-9': exponentialFix('1,234', '1,234.5678'),
+	// Multi-separator input at an exponential step: the digit count, not the
+	// head, is what moved, so these belong to the same fix.
+	'"1.2.3" step 1e-7': exponentialFix('1.2', '1.2.3'),
+	'"1.2.3" step 1e-9': exponentialFix('1.2', '1.2.3'),
+	'"1.2.345" step 1e-7': exponentialFix('1.2.34', '1.2.345'),
+	'"1.2.345" step 1e-9': exponentialFix('1.2.34', '1.2.345'),
+	'".1.23456" step 1e-7': exponentialFix('.1.2345', '.1.23456'),
+	'".1.23456" step 1e-9': exponentialFix('.1.2345', '.1.23456'),
+	'"123456789012345.123456789" step 1e-7': exponentialFix(
+		'123456789012345',
+		'123456789012345.1234567'
+	),
+	'"123456789012345.123456789" step 1e-9': exponentialFix(
+		'123456789012345',
+		'123456789012345.123456789'
+	),
+	'"123456789012345.123456789" step 1.5e-7': exponentialFix(
+		'123456789012345.1234',
+		'123456789012345.12345678'
+	),
+	// '1.2.3' is absent from here on: at every plainly stringified step it now
+	// reproduces the old output exactly.
+	'"1.2.345" step undefined': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 0': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 1': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 2': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 10': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 100': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 1e+21': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 0.5': separatorFix('1.2.345', '1.2.3'),
+	'"1.2.345" step 0.1': separatorFix('1.2.345', '1.2.3'),
+	'"1.2.345" step 0.01': separatorFix('1.2.345', '1.2.34'),
+	'".1.23456" step undefined': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 0': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 1': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 2': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 10': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 100': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 1e+21': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 0.5': separatorFix('.1.23456', '.1.2'),
+	'".1.23456" step 0.1': separatorFix('.1.23456', '.1.2'),
+	'".1.23456" step 0.01': separatorFix('.1.23456', '.1.23'),
+	'".1.23456" step 0.001': separatorFix('.1.23456', '.1.234'),
+};
 
 describe('roundToStepSize delegates to capStringFractionDigits with an exact step', () => {
 	const cases: CorpusCase[] = [];
@@ -411,84 +539,8 @@ describe('roundToStepSize delegates to capStringFractionDigits with an exact ste
 		}
 	}
 
-	// The whole point of the delegation: `(1e-7).toString()` is '1e-7', which
-	// has no '.', so the old digit count was 0 and every fraction digit was cut.
-	const EXPONENTIAL_STEP =
-		'a step that stringifies exponentially no longer reports zero decimals';
-
-	const exponentialFix = (old: string, next: string) => ({
-		behaviour: EXPONENTIAL_STEP,
-		old,
-		next,
-	});
-
 	it('reproduces the slice implementation except at the annotated fixes', () => {
-		runCorpus(cases, {
-			'"1.2345678" step 1e-7': exponentialFix('1', '1.2345678'),
-			'"1.2345678" step 1e-9': exponentialFix('1', '1.2345678'),
-			'"1.2345678" step 1.5e-7': exponentialFix('1.2345', '1.2345678'),
-			'"-1.2345678" step 1e-7': exponentialFix('-1', '-1.2345678'),
-			'"-1.2345678" step 1e-9': exponentialFix('-1', '-1.2345678'),
-			'"-1.2345678" step 1.5e-7': exponentialFix('-1.2345', '-1.2345678'),
-			'"0.0000001" step 1e-7': exponentialFix('0', '0.0000001'),
-			'"0.0000001" step 1e-9': exponentialFix('0', '0.0000001'),
-			'"0.0000001" step 1.5e-7': exponentialFix('0.0000', '0.0000001'),
-			'"-0.0000001" step 1e-7': exponentialFix('-0', '-0.0000001'),
-			'"-0.0000001" step 1e-9': exponentialFix('-0', '-0.0000001'),
-			'"-0.0000001" step 1.5e-7': exponentialFix('-0.0000', '-0.0000001'),
-			'"0.0" step 1e-7': exponentialFix('0', '0.0'),
-			'"0.0" step 1e-9': exponentialFix('0', '0.0'),
-			'"1.0" step 1e-7': exponentialFix('1', '1.0'),
-			'"1.0" step 1e-9': exponentialFix('1', '1.0'),
-			'".5" step 1e-7': exponentialFix('', '.5'),
-			'".5" step 1e-9': exponentialFix('', '.5'),
-			'"-.5" step 1e-7': exponentialFix('-', '-.5'),
-			'"-.5" step 1e-9': exponentialFix('-', '-.5'),
-			'".12345" step 1e-7': exponentialFix('', '.12345'),
-			'".12345" step 1e-9': exponentialFix('', '.12345'),
-			'".12345" step 1.5e-7': exponentialFix('.1234', '.12345'),
-			'"00.1230" step 1e-7': exponentialFix('00', '00.1230'),
-			'"00.1230" step 1e-9': exponentialFix('00', '00.1230'),
-			'"1,234.5678" step 1e-7': exponentialFix('1,234', '1,234.5678'),
-			'"1,234.5678" step 1e-9': exponentialFix('1,234', '1,234.5678'),
-			'"123456789012345.123456789" step 1e-7': exponentialFix(
-				'123456789012345',
-				'123456789012345.1234567'
-			),
-			'"123456789012345.123456789" step 1e-9': exponentialFix(
-				'123456789012345',
-				'123456789012345.123456789'
-			),
-			'"123456789012345.123456789" step 1.5e-7': exponentialFix(
-				'123456789012345.1234',
-				'123456789012345.12345678'
-			),
-			'"1.2.3" step undefined': {
-				behaviour: MULTI_SEPARATOR,
-				old: '1.2',
-				next: '1',
-			},
-			'"1.2.3" step 0': { behaviour: MULTI_SEPARATOR, old: '1.2', next: '1' },
-			'"1.2.3" step 1': { behaviour: MULTI_SEPARATOR, old: '1.2', next: '1' },
-			'"1.2.3" step 2': { behaviour: MULTI_SEPARATOR, old: '1.2', next: '1' },
-			'"1.2.3" step 10': { behaviour: MULTI_SEPARATOR, old: '1.2', next: '1' },
-			'"1.2.3" step 100': { behaviour: MULTI_SEPARATOR, old: '1.2', next: '1' },
-			'"1.2.3" step 1e+21': {
-				behaviour: MULTI_SEPARATOR,
-				old: '1.2',
-				next: '1',
-			},
-			'"1.2.3" step 1e-7': {
-				behaviour: MULTI_SEPARATOR,
-				old: '1.2',
-				next: '1.2.3',
-			},
-			'"1.2.3" step 1e-9': {
-				behaviour: MULTI_SEPARATOR,
-				old: '1.2',
-				next: '1.2.3',
-			},
-		});
+		runCorpus(cases, STEP_SIZE_DIVERGENCES);
 	});
 
 	it(EXPONENTIAL_STEP, () => {
@@ -518,73 +570,26 @@ describe('roundToStepSizeIfLargeEnough keeps its guard and inherits the step fix
 		}
 	}
 
+	// '0' and '0.0' short-circuit on the parsedValue === 0 guard, '' on the
+	// falsy-value guard and 'abc' on the NaN guard, and a zero step returns the
+	// value untouched, so none of those reach roundToStepSize at all.
+	const GUARDED_INPUTS = ['', 'abc', '0', '0.0'];
+	const divergences: Record<string, Divergence> = {};
+	for (const [key, divergence] of Object.entries(STEP_SIZE_DIVERGENCES)) {
+		const [rawInput, rawStep] = key.split('" step ');
+		if (GUARDED_INPUTS.includes(rawInput.slice(1))) continue;
+		if (Number(rawStep) === 0) continue;
+		divergences[key] = divergence;
+	}
+
 	it('reproduces the guard exactly and only differs where roundToStepSize does', () => {
-		const stepFixes = [
-			'"1.2345678" step 1e-7',
-			'"1.2345678" step 1e-9',
-			'"1.2345678" step 1.5e-7',
-			'"-1.2345678" step 1e-7',
-			'"-1.2345678" step 1e-9',
-			'"-1.2345678" step 1.5e-7',
-			'"0.0000001" step 1e-7',
-			'"0.0000001" step 1e-9',
-			'"0.0000001" step 1.5e-7',
-			'"-0.0000001" step 1e-7',
-			'"-0.0000001" step 1e-9',
-			'"-0.0000001" step 1.5e-7',
-			'".5" step 1e-7',
-			'".5" step 1e-9',
-			'"-.5" step 1e-7',
-			'"-.5" step 1e-9',
-			'".12345" step 1e-7',
-			'".12345" step 1e-9',
-			'".12345" step 1.5e-7',
-			'"1.0" step 1e-7',
-			'"1.0" step 1e-9',
-			'"00.1230" step 1e-7',
-			'"00.1230" step 1e-9',
-			'"1,234.5678" step 1e-7',
-			'"1,234.5678" step 1e-9',
-			'"123456789012345.123456789" step 1e-7',
-			'"123456789012345.123456789" step 1e-9',
-			'"123456789012345.123456789" step 1.5e-7',
-		];
-		// '0' and '0.0' short-circuit on the parsedValue === 0 guard and 'abc' on
-		// the NaN guard, so those never reach the step at all.
-		const divergences: Record<string, Divergence> = {};
-		for (const key of stepFixes) {
-			const [rawInput, rawStep] = key.split('" step ');
-			const input = rawInput.slice(1);
-			const step = rawStep === 'undefined' ? undefined : Number(rawStep);
-			divergences[key] = {
-				behaviour:
-					'a step that stringifies exponentially no longer reports zero decimals',
-				old: legacyRoundToStepSize(input, step),
-				next: roundToStepSize(input, step),
-			};
-		}
-		for (const key of [
-			'"1.2.3" step undefined',
-			'"1.2.3" step 0',
-			'"1.2.3" step 1',
-			'"1.2.3" step 2',
-			'"1.2.3" step 10',
-			'"1.2.3" step 100',
-			'"1.2.3" step 1e+21',
-			'"1.2.3" step 1e-7',
-			'"1.2.3" step 1e-9',
-		]) {
-			const [, rawStep] = key.split('" step ');
-			const step = rawStep === 'undefined' ? undefined : Number(rawStep);
-			// The 0 step short-circuits before roundToStepSize is reached.
-			if (step === 0) continue;
-			divergences[key] = {
-				behaviour: MULTI_SEPARATOR,
-				old: legacyRoundToStepSize('1.2.3', step),
-				next: roundToStepSize('1.2.3', step),
-			};
-		}
 		runCorpus(cases, divergences);
+	});
+
+	it('returns the value untouched wherever the guard fires', () => {
+		expect(roundToStepSizeIfLargeEnough('0.0', 1e-7)).to.equal('0.0');
+		expect(roundToStepSizeIfLargeEnough('1.2.345', 0)).to.equal('1.2.345');
+		expect(roundToStepSizeIfLargeEnough('abc', 1e-7)).to.equal('abc');
 	});
 });
 
@@ -627,7 +632,19 @@ describe('getDecimalsFromSize delegates to stepFractionDigits', () => {
 				});
 			}
 		}
-		runCorpus(cases, {});
+		cases.push({
+			key: '1000 exp -2',
+			legacy: () => String(legacyGetDecimalsFromSize(new BN(1000), new BN(-2))),
+			next: () => String(getDecimalsFromSize(new BN(1000), new BN(-2))),
+		});
+		runCorpus(cases, {
+			'1000 exp -2': {
+				behaviour:
+					'a negative precision exponent yields zero decimals instead of throwing inside prettyPrint',
+				old: 'THROWS: Tried to print a BN with precision lower than zero',
+				next: '0',
+			},
+		});
 	});
 
 	it('no longer depends on the module-global BigNum.delim', () => {
@@ -689,7 +706,19 @@ describe('trimTrailingZeros delegates to the core trimmer', () => {
 				});
 			}
 		}
-		runCorpus(cases, {});
+		cases.push({
+			key: '"1.000" z1.5',
+			legacy: () => legacyTrimTrailingZeros('1.000', 1.5),
+			next: () => trimTrailingZeros('1.000', 1.5),
+		});
+		runCorpus(cases, {
+			'"1.000" z1.5': {
+				behaviour:
+					'a fractional zerosToShow pads down to the whole number of zeros instead of throwing on Array(1.5)',
+				old: 'THROWS: Invalid array length',
+				next: '1.0',
+			},
+		});
 	});
 
 	it('keeps the default of one surviving zero', () => {
@@ -717,32 +746,12 @@ describe('the tolerant multiple checks keep their tolerance', () => {
 		expect(dividesExactly(5, 2)).to.equal(false);
 	});
 
-	it('isExactMultiple is exact and disagrees where the tolerance was doing work', () => {
-		expect(isExactMultiple('5.1', '0.1')).to.equal(true);
-		expect(isExactMultiple('0.3', '0.1')).to.equal(true);
-		expect(isExactMultiple('5', '2')).to.equal(false);
-		expect(isExactMultiple('1.0000001', '0.0000001')).to.equal(true);
-		expect(isExactMultiple('1.00000015', '0.0000001')).to.equal(false);
-		// Where the tolerant versions differ: a zero divisor, and a quotient the
-		// tolerance rounded onto the lattice.
+	// isExactMultiple itself is covered in tests/format/market.test.ts, beside
+	// the rest of the format layer. This only pins where it disagrees.
+	it('the exact replacement disagrees where the tolerance was doing work', () => {
 		expect(numbersFitEvenly(7, 0)).to.equal(true);
 		expect(isExactMultiple(7, 0)).to.equal(false);
 		expect(dividesExactly(0.9999999, 1)).to.equal(true);
 		expect(isExactMultiple('0.9999999', '1')).to.equal(false);
-	});
-
-	it('reads BigNum and raw-unit inputs without a float hop', () => {
-		expect(
-			isExactMultiple(BigNum.fromPrint('1.5', new BN(9)), {
-				raw: new BN(500000000),
-				scale: 9,
-			})
-		).to.equal(true);
-		expect(
-			isExactMultiple(BigNum.fromPrint('1.5', new BN(9)), {
-				raw: new BN(700000000),
-				scale: 9,
-			})
-		).to.equal(false);
 	});
 });

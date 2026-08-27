@@ -1,10 +1,5 @@
 import { SpotMarketConfig } from '@velocity-exchange/sdk';
 import {
-	NumericInput,
-	isStepMultiple,
-	toDecimal,
-} from '../../format/core/index';
-import {
 	capStringFractionDigits,
 	stepFractionDigits,
 } from '../../format/market';
@@ -18,17 +13,21 @@ export const TRADE_PRECISION = 6;
  * and at zero fraction digits the separator survives ('1.23' -> '1.'), which is
  * what `roundToStepSize` then strips.
  *
- * Malformed multi-separator input ('1.2.3') is the one shape that moved: the
- * old code counted digits after the FIRST separator, the core counts after the
- * last.
+ * The head is taken from the LAST separator, the same one the core split on, so
+ * malformed multi-separator input keeps its leading text ('1.2.3' at zero digits
+ * is still '1.2.'). What did move is how many digits such input is allowed:
+ * the old code counted them after the FIRST separator, so '.1.23456' looked
+ * like one fraction digit and survived a two-digit cap; the core counts the five
+ * after the last and caps them to '.1.23'.
  */
 const capToFractionDigits = (input: string, maxFractionDigits: number) => {
 	const capped = capStringFractionDigits(input, { maxFractionDigits });
 	if (capped === input) return input;
 
-	const head = input.slice(0, input.indexOf('.'));
+	const sep = input.lastIndexOf('.');
+	const head = input.slice(0, sep);
 	if (maxFractionDigits === 0) return `${head}.`;
-	return head === '' ? capped.slice(1) : capped;
+	return sep === 0 ? capped.slice(1) : capped;
 };
 
 /**
@@ -87,27 +86,8 @@ export const valueIsBelowStepSize = (value: string, stepSize: number) => {
 };
 
 /**
- * Exact multiple check, with no float tolerance anywhere: 5.1 is a multiple of
- * 0.1 because the decimal digits divide, not because a remainder came in under
- * an epsilon. Prefer this over `numbersFitEvenly` and `dividesExactly`.
- *
- * Returns false when either side is missing or unparseable, and when the step
- * is zero.
- */
-export const isExactMultiple = (
-	value: NumericInput,
-	step: NumericInput
-): boolean => {
-	const parsedValue = toDecimal(value);
-	const parsedStep = toDecimal(step);
-	if (parsedValue.status !== 'ok' || !parsedValue.value) return false;
-	if (parsedStep.status !== 'ok' || !parsedStep.value) return false;
-	if (parsedStep.value.sign === 0) return false;
-	return isStepMultiple(parsedValue.value, parsedStep.value);
-};
-
-/**
- * @deprecated Prefer `isExactMultiple`, but read the tolerance note first: this
+ * @deprecated Prefer `isExactMultiple` from
+ * `@velocity-exchange/common/format`, but read the tolerance note first: this
  * is NOT an exact check and swapping it is a behaviour change.
  *
  * `5.1 / 0.1` is `50.99999999999999` in floats, so the modulo alone reports 5.1
@@ -129,7 +109,8 @@ export const numbersFitEvenly = (
 };
 
 /**
- * @deprecated Prefer `isExactMultiple`, but read the tolerance note first: this
+ * @deprecated Prefer `isExactMultiple` from
+ * `@velocity-exchange/common/format`, but read the tolerance note first: this
  * is NOT an exact check and swapping it is a behaviour change.
  *
  * The `|remainder - 1| < 1e-6` branch accepts a quotient that landed just under
