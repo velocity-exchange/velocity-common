@@ -43,6 +43,7 @@ export { formatText, formatValue } from './formatValue';
 export { PRESETS, optionsForLegacyType } from './presets';
 export {
 	capStringFractionDigits,
+	isExactMultiple,
 	marketPrecisionFromSizes,
 	sizeDecimalsFromPrice,
 	snapValueToStep,
