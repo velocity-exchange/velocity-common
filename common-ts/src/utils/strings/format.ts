@@ -13,9 +13,13 @@ export const abbreviateAddress = (address: string | PublicKey, length = 4) => {
  * @param str - numerical string to format
  * @param zerosToShow - max number of zeros to show after the decimal. Similar to number.toFixed() but won't trim non-zero values. Optional, default value is 1
  *
- * @deprecated Use `formatText` with `DigitSpec.minDecimals` from
- * `@velocity-exchange/common/format`, which trims through the same core
- * trimmer this now delegates to.
+ * @deprecated The string-to-string form has no drop-in replacement.
+ * `minDecimals` on its own does not trim, it only pads: the equivalent is
+ * `formatText(value, { trimTrailingZeros: true, digits: { kind: 'decimals',
+ * decimals: N, minDecimals: Z } })` from `@velocity-exchange/common/format`,
+ * which trims through the same core trimmer this now delegates to. That takes a
+ * value, not an already formatted string, so a caller holding a formatted string
+ * should format from the value instead of trimming the string afterwards.
  */
 export const trimTrailingZeros = (str: string, zerosToShow = 1) => {
 	// Ignore strings with no decimal point

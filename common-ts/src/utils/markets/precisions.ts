@@ -26,8 +26,14 @@ export const getPerpMarketSizes = (perpMarketAccount: PerpMarketAccount) => {
 	const tickSize = perpMarketAccount.orderTickSize;
 
 	return {
-		stepSizeDecimals: getDecimalsFromSize(stepSize, BASE_PRECISION_EXP),
-		tickSizeDecimals: getDecimalsFromSize(tickSize, QUOTE_PRECISION_EXP),
+		stepSizeDecimals: stepFractionDigits({
+			raw: stepSize,
+			scale: BASE_PRECISION_EXP,
+		}),
+		tickSizeDecimals: stepFractionDigits({
+			raw: tickSize,
+			scale: QUOTE_PRECISION_EXP,
+		}),
 	};
 };
 
@@ -36,7 +42,13 @@ export const getSpotMarketSizes = (spotMarketAccount: SpotMarketAccount) => {
 	const tickSize = spotMarketAccount.orderTickSize;
 
 	return {
-		stepSizeDecimals: getDecimalsFromSize(stepSize, BASE_PRECISION_EXP),
-		tickSizeDecimals: getDecimalsFromSize(tickSize, QUOTE_PRECISION_EXP),
+		stepSizeDecimals: stepFractionDigits({
+			raw: stepSize,
+			scale: BASE_PRECISION_EXP,
+		}),
+		tickSizeDecimals: stepFractionDigits({
+			raw: tickSize,
+			scale: QUOTE_PRECISION_EXP,
+		}),
 	};
 };
