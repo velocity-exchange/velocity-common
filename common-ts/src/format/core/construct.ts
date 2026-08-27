@@ -11,6 +11,13 @@ import {
 const DECIMAL_STRING =
 	/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
 
+/**
+ * Largest decimal-point shift a string may ask for. Past it the expansion is
+ * both unrenderable and inexact, because the exponent itself stops fitting in
+ * a number, so two different exponents would collapse to the same scale.
+ */
+export const MAX_EXPONENT_SHIFT = 10_000;
+
 export const ZERO: Decimal = Object.freeze({
 	sign: 0 as const,
 	digits: '0',
@@ -68,7 +75,16 @@ function fromSignedUnits(units: string, scale: number): ParseResult {
 	if (scale >= 0) {
 		return ok(fromParts(negative ? -1 : 1, bare, scale));
 	}
+	if (scale < -MAX_EXPONENT_SHIFT) return invalid();
 	return ok(fromParts(negative ? -1 : 1, bare + zeros(-scale), 0));
+}
+
+/** null for an exponent past the shift bound, which is a parse failure, not a throw. */
+function parseExponent(raw: string): number | null {
+	const negative = raw.startsWith('-');
+	const magnitude = Number(stripLeadingZeros(raw.replace(/^[+-]/, '')));
+	if (magnitude > MAX_EXPONENT_SHIFT) return null;
+	return negative ? -magnitude : magnitude;
 }
 
 export function fromString(s: string): ParseResult {
@@ -83,7 +99,8 @@ export function fromString(s: string): ParseResult {
 	const negative = trimmed.startsWith('-');
 	const unsigned = trimmed.replace(/^[+-]/, '');
 	const [mantissa, exponentPart] = unsigned.split(/[eE]/);
-	const exponent = exponentPart === undefined ? 0 : Number(exponentPart);
+	const exponent = exponentPart === undefined ? 0 : parseExponent(exponentPart);
+	if (exponent === null) return invalid();
 	const [intPart, fracPart = ''] = mantissa.split('.');
 	const allDigits = `${intPart}${fracPart}`;
 	const scale = fracPart.length - exponent;

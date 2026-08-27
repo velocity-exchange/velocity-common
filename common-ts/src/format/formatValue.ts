@@ -172,6 +172,8 @@ export function formatValue(
 		integer = small.integer;
 		fraction = small.fraction;
 		rounded = small.value;
+		wasRounded = small.wasRounded;
+		roundingApplied = small.roundingApplied;
 		minDecimals = 0;
 		trimTrailingZeros = false;
 	} else {

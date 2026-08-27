@@ -443,6 +443,28 @@ describe('format/small numbers', () => {
 		expect(toSubscript(12)).to.equal('₁₂');
 	});
 
+	it('reports the truncation the small form applied', () => {
+		const dropped = formatValue('0.000012345', {
+			small: { mode: 'subscript' },
+		});
+		expect(dropped.text).to.equal('0.0₄123');
+		expect(dropped.wasRounded).to.equal(true);
+		expect(dropped.roundingApplied).to.equal('truncate');
+		const kept = formatValue('0.0000123', { small: { mode: 'subscript' } });
+		expect(kept.wasRounded).to.equal(false);
+		expect(kept.roundingApplied).to.equal(null);
+		const significant = formatValue('0.000012345', {
+			small: { mode: 'significant' },
+		});
+		expect(significant.wasRounded).to.equal(true);
+		expect(significant.roundingApplied).to.equal('truncate');
+		const sentinel = formatValue('0.000001', {
+			small: { mode: 'sentinel', sentinelAt: '0.00001' },
+		});
+		expect(sentinel.wasRounded).to.equal(false);
+		expect(sentinel.roundingApplied).to.equal(null);
+	});
+
 	it('sentinel mode uses abs, so negatives are not mislabelled', () => {
 		const small = { mode: 'sentinel' as const, sentinelAt: '0.00001' };
 		expect(formatText('0.000001', { small })).to.equal('<0.00001');
@@ -562,12 +584,33 @@ describe('format/presets', () => {
 		expect(formatText('0.5', PRESETS.leverage)).to.equal('1x');
 	});
 
-	it('orderSize is exact with the entire-position sentinel', () => {
-		expect(formatText('1.25000', PRESETS.orderSize)).to.equal('1.25');
+	it('orderSize truncates to the market step, with the entire-position sentinel', () => {
+		const market = {
+			priceDecimals: 2,
+			sizeDecimals: 3,
+			tick: d('0.01'),
+			step: d('0.001'),
+			source: 'onchain' as const,
+		};
+		expect(formatText('1.23456', { ...PRESETS.orderSize, market })).to.equal(
+			'1.234'
+		);
+		expect(formatText('1.23456', PRESETS.orderSize)).to.equal('?');
 		expect(
 			formatText(
 				{ raw: { toString: () => '18446744073709551615' }, scale: 9 },
 				PRESETS.orderSize
+			)
+		).to.equal('Entire Position');
+	});
+
+	it('orderSizeExact keeps the exact prettyPrint shape', () => {
+		expect(formatText('1.23456', PRESETS.orderSizeExact)).to.equal('1.23456');
+		expect(formatText('1.25000', PRESETS.orderSizeExact)).to.equal('1.25');
+		expect(
+			formatText(
+				{ raw: { toString: () => '18446744073709551615' }, scale: 9 },
+				PRESETS.orderSizeExact
 			)
 		).to.equal('Entire Position');
 	});

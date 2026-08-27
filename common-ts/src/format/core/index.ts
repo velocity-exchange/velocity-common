@@ -11,6 +11,7 @@ export {
 	StepMode,
 } from './types';
 export {
+	MAX_EXPONENT_SHIFT,
 	ZERO,
 	fromNumber,
 	fromParts,
