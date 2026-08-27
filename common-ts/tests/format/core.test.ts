@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import {
+	MAX_EXPONENT_SHIFT,
 	ZERO,
 	abs,
 	capFractionDigits,
@@ -66,6 +67,21 @@ describe('format/core construction', () => {
 		expect(toPlainString(d('1.5E3'))).to.equal('1500');
 	});
 
+	it('fromString rejects an exponent past the shift bound', () => {
+		expect(fromString('1e999999999999999999999').status).to.equal('invalid');
+		expect(fromString('1e-9007199254740992').status).to.equal('invalid');
+		expect(fromString('1e-9007199254740993').status).to.equal('invalid');
+		expect(fromString(`1e${MAX_EXPONENT_SHIFT + 1}`).status).to.equal(
+			'invalid'
+		);
+		expect(fromString(`1e-${MAX_EXPONENT_SHIFT + 1}`).status).to.equal(
+			'invalid'
+		);
+		expect(fromString(`1e${MAX_EXPONENT_SHIFT}`).status).to.equal('ok');
+		expect(toPlainString(d('1e21'))).to.equal('1000000000000000000000');
+		expect(toPlainString(d('1e-7'))).to.equal('0.0000001');
+	});
+
 	it('fromString rejects grouped and malformed strings', () => {
 		expect(fromString('1,234.5').status).to.equal('invalid');
 		expect(fromString('').status).to.equal('invalid');
@@ -94,6 +110,7 @@ describe('format/core construction', () => {
 			digits: '0',
 			scale: 0,
 		});
+		expect(fromNumber(5e-324).value!).to.include({ sign: 1, scale: 324 });
 		expect(fromNumber(NaN).status).to.equal('invalid');
 		expect(fromNumber(Infinity)).to.include({
 			status: 'non-finite',

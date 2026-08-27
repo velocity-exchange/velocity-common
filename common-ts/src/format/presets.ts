@@ -90,8 +90,14 @@ export const PRESETS = Object.freeze({
 		digits: { kind: 'step' as const },
 		rounding: 'truncate' as const,
 	}),
-	/** formatOrderSize's default formatter is bare prettyPrint(), so this is exact. */
+	/** Step digits from market.sizeDecimals, truncated so a size never rounds up. */
 	orderSize: freeze({
+		digits: { kind: 'step' as const },
+		rounding: 'truncate' as const,
+		sentinels: [ENTIRE_POSITION],
+	}),
+	/** The bare prettyPrint() shape formatOrderSize renders today, for call sites without a market. */
+	orderSizeExact: freeze({
 		digits: { kind: 'exact' as const },
 		trimTrailingZeros: true,
 		sentinels: [ENTIRE_POSITION],

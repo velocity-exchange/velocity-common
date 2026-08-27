@@ -1,5 +1,6 @@
 import {
 	Decimal,
+	RoundingMode,
 	abs,
 	compare,
 	roundToSignificant,
@@ -9,6 +10,9 @@ import {
 import { SmallNumberOptions } from './types';
 
 const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
+
+/** The small form keeps the leading significant digits and drops the rest. */
+const SMALL_ROUNDING: RoundingMode = 'truncate';
 
 export function toSubscript(n: number): string {
 	return String(n)
@@ -21,6 +25,8 @@ export type SmallResult = {
 	integer: string;
 	fraction: string;
 	value: Decimal;
+	wasRounded: boolean;
+	roundingApplied: RoundingMode | null;
 	/** '<' or '>-' for sentinel mode. Rendered outside the sign and currency. */
 	prefix?: string;
 } | null;
@@ -49,6 +55,8 @@ export function applySmallNumber(
 			integer: bound.integer,
 			fraction: bound.fraction,
 			value: parsed.value,
+			wasRounded: false,
+			roundingApplied: null,
 			prefix: value.sign === -1 ? '>-' : '<',
 		};
 	}
@@ -56,13 +64,17 @@ export function applySmallNumber(
 	const leadingZeros = leadingZeroCount(value);
 	if (leadingZeros <= maxLeadingZeros) return null;
 
-	const reduced = roundToSignificant(value, minSignificant, 'truncate');
+	const reduced = roundToSignificant(value, minSignificant, SMALL_ROUNDING);
+	const wasRounded = reduced.digits.length < value.digits.length;
+	const roundingApplied = wasRounded ? SMALL_ROUNDING : null;
 	if (options.mode === 'significant') {
 		const split = toDigitStrings(reduced);
 		return {
 			integer: split.integer,
 			fraction: split.fraction,
 			value: reduced,
+			wasRounded,
+			roundingApplied,
 		};
 	}
 
@@ -70,5 +82,7 @@ export function applySmallNumber(
 		integer: '0',
 		fraction: `0${toSubscript(leadingZeros)}${reduced.digits}`,
 		value: reduced,
+		wasRounded,
+		roundingApplied,
 	};
 }
