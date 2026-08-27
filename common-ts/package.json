@@ -108,17 +108,14 @@
 		},
 		"./format": {
 			"types": "./lib/format/index.d.ts",
-			"require": "./lib/format/index.js",
 			"default": "./lib/format/index.js"
 		},
 		"./format/core": {
 			"types": "./lib/format/core/index.d.ts",
-			"require": "./lib/format/core/index.js",
 			"default": "./lib/format/core/index.js"
 		},
 		"./format/intl": {
 			"types": "./lib/format/intl.d.ts",
-			"require": "./lib/format/intl.js",
 			"default": "./lib/format/intl.js"
 		}
 	},
