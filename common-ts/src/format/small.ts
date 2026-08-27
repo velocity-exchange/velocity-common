@@ -5,7 +5,6 @@ import {
 	roundToSignificant,
 	toDecimal,
 	toDigitStrings,
-	toPlainString,
 } from './core/index';
 import { SmallNumberOptions } from './types';
 
@@ -18,10 +17,13 @@ export function toSubscript(n: number): string {
 		.join('');
 }
 
-export type SmallResult =
-	| { kind: 'digits'; integer: string; fraction: string; value: Decimal }
-	| { kind: 'text'; text: string }
-	| null;
+export type SmallResult = {
+	integer: string;
+	fraction: string;
+	value: Decimal;
+	/** '<' or '>-' for sentinel mode. Rendered outside the sign and currency. */
+	prefix?: string;
+} | null;
 
 /** Zeros between the decimal point and the first significant digit. */
 export function leadingZeroCount(d: Decimal): number {
@@ -42,10 +44,12 @@ export function applySmallNumber(
 		const parsed = toDecimal(options.sentinelAt);
 		if (parsed.status !== 'ok' || !parsed.value) return null;
 		if (compare(magnitude, parsed.value) >= 0) return null;
-		const bound = toPlainString(parsed.value);
+		const bound = toDigitStrings(parsed.value);
 		return {
-			kind: 'text',
-			text: value.sign === -1 ? `>-${bound}` : `<${bound}`,
+			integer: bound.integer,
+			fraction: bound.fraction,
+			value: parsed.value,
+			prefix: value.sign === -1 ? '>-' : '<',
 		};
 	}
 
@@ -56,7 +60,6 @@ export function applySmallNumber(
 	if (options.mode === 'significant') {
 		const split = toDigitStrings(reduced);
 		return {
-			kind: 'digits',
 			integer: split.integer,
 			fraction: split.fraction,
 			value: reduced,
@@ -64,7 +67,6 @@ export function applySmallNumber(
 	}
 
 	return {
-		kind: 'digits',
 		integer: '0',
 		fraction: `0${toSubscript(leadingZeros)}${reduced.digits}`,
 		value: reduced,

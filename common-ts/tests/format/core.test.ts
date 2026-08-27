@@ -128,6 +128,24 @@ describe('format/core construction', () => {
 		expect(toPlainString(parsed.value!)).to.equal('1500');
 	});
 
+	it('toDecimal reports a Decimal-shaped input with a bad sign as invalid', () => {
+		const bad = [
+			{ sign: 0, digits: '5', scale: 0 },
+			{ sign: 2, digits: '5', scale: 0 },
+			{ sign: 0.5, digits: '5', scale: 0 },
+			{ sign: NaN, digits: '5', scale: 0 },
+		];
+		for (const input of bad) {
+			expect(() => toDecimal(input as never)).to.not.throw();
+			expect(toDecimal(input as never).status, JSON.stringify(input)).to.equal(
+				'invalid'
+			);
+		}
+		expect(
+			toDecimal({ sign: 0, digits: '000', scale: 2 } as never).status
+		).to.equal('ok');
+	});
+
 	it('toDecimal is a no-op on an existing Decimal', () => {
 		const value = d('-1.25');
 		expect(toDecimal(value).value).to.deep.equal(value);
@@ -151,6 +169,24 @@ describe('format/core exact operations', () => {
 		expect(rescale(d('1.500'), 1)).to.deep.equal(d('1.5'));
 		expect(() => rescale(d('1.55'), 1)).to.throw();
 		expect(() => rescale(d('1.5'), -1)).to.throw();
+	});
+
+	it('rescale downward on an exact zero keeps the target scale', () => {
+		expect(rescale(fromParts(0, '0', 3), 0)).to.deep.equal({
+			sign: 0,
+			digits: '0',
+			scale: 0,
+		});
+		expect(rescale(fromParts(0, '0', 3), 1)).to.deep.equal({
+			sign: 0,
+			digits: '0',
+			scale: 1,
+		});
+		expect(rescale(ZERO, 6)).to.deep.equal({
+			sign: 0,
+			digits: '0',
+			scale: 6,
+		});
 	});
 
 	it('shiftPoint multiplies by a power of ten exactly', () => {

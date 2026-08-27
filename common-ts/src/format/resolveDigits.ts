@@ -8,9 +8,12 @@ import {
 	toDigitStrings,
 } from './core/index';
 import { sizeDecimalsFromPrice } from './market';
+import { trimFractionZeros } from './trim';
 import { DigitSpec, MarketPrecision } from './types';
 
 export interface ResolvedDigits {
+	/** 'invalid' when the spec needs data the caller did not supply. */
+	status: 'ok' | 'invalid';
 	value: Decimal;
 	integer: string;
 	fraction: string;
@@ -26,18 +29,18 @@ function requireMode(spec: DigitSpec, rounding?: RoundingMode): RoundingMode {
 	);
 }
 
+/**
+ * null means the spec cannot be resolved from what the caller supplied, which
+ * is a display-time condition and never a throw.
+ */
 function decimalsFor(spec: DigitSpec, market?: MarketPrecision): number | null {
 	switch (spec.kind) {
 		case 'decimals':
 			return spec.decimals;
 		case 'tick':
-			if (!market)
-				throw new Error("digits.kind 'tick' requires options.market");
-			return market.priceDecimals;
+			return market ? market.priceDecimals : null;
 		case 'step':
-			if (!market)
-				throw new Error("digits.kind 'step' requires options.market");
-			return market.sizeDecimals;
+			return market ? market.sizeDecimals : null;
 		case 'magnitude':
 			return sizeDecimalsFromPrice(spec.assetPrice, { max: spec.maxDecimals });
 		default:
@@ -48,21 +51,34 @@ function decimalsFor(spec: DigitSpec, market?: MarketPrecision): number | null {
 /**
  * Matches BigNum.toPrecision(n, true): pad to N significant digits above one,
  * leave the digit count alone below one, and render zero at N-1 decimals.
+ * `maxDecimals` caps the padding target, so it can never reintroduce digits the
+ * cap just removed.
  */
 function padToSignificant(
 	value: Decimal,
 	integer: string,
 	fraction: string,
 	significant: number,
-	trailingZeros: 'keep' | 'trim'
+	trailingZeros: 'keep' | 'trim',
+	maxDecimals?: number
 ): string {
-	if (value.sign === 0) return '0'.repeat(Math.max(0, significant - 1));
-	if (integer === '0') {
-		return trailingZeros === 'trim' ? fraction.replace(/0+$/, '') : fraction;
+	if (value.sign === 0) {
+		const zeroDecimals =
+			maxDecimals === undefined
+				? significant - 1
+				: Math.min(significant - 1, maxDecimals);
+		return '0'.repeat(Math.max(0, zeroDecimals));
 	}
+	if (integer === '0') {
+		return trailingZeros === 'trim' ? trimFractionZeros(fraction) : fraction;
+	}
+	const target =
+		maxDecimals === undefined
+			? significant
+			: Math.min(significant, integer.length + maxDecimals);
 	const rendered = integer.length + fraction.length;
-	if (rendered >= significant) return fraction;
-	return fraction + '0'.repeat(significant - rendered);
+	if (rendered >= target) return fraction;
+	return fraction + '0'.repeat(target - rendered);
 }
 
 export function applyDigitSpec(
@@ -82,7 +98,17 @@ export function applyDigitSpec(
 		}
 	} else if (spec.kind !== 'exact') {
 		const decimals = decimalsFor(spec, market);
-		if (decimals === null) throw new Error(`Unhandled digit spec ${spec.kind}`);
+		if (decimals === null) {
+			return {
+				status: 'invalid',
+				value: input,
+				integer: '',
+				fraction: '',
+				wasRounded: false,
+				roundedAway: false,
+				roundingApplied: null,
+			};
+		}
 		mode = requireMode(spec, rounding);
 		value = roundToDecimals(input, decimals, mode);
 	}
@@ -95,11 +121,13 @@ export function applyDigitSpec(
 			split.integer,
 			fraction,
 			spec.significant,
-			spec.trailingZeros ?? 'keep'
+			spec.trailingZeros ?? 'keep',
+			spec.maxDecimals
 		);
 	}
 
 	return {
+		status: 'ok',
 		value,
 		integer: split.integer,
 		fraction,

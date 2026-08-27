@@ -1,17 +1,22 @@
 import { expect } from 'chai';
-import { BN, PerpMarketAccount } from '@velocity-exchange/sdk';
+import {
+	BASE_PRECISION_EXP,
+	BN,
+	PerpMarketAccount,
+	QUOTE_PRECISION_EXP,
+} from '@velocity-exchange/sdk';
 import {
 	DIGIT_CAPS,
 	capStringFractionDigits,
-	fromString,
+	formatText,
 	inputFieldConfig,
 	marketPrecisionFromSizes,
 	parseInput,
 	sizeDecimalsFromPrice,
 	snapValueToStep,
 	stepFractionDigits,
-	toPlainString,
 } from '../../src/format/index';
+import { fromString, toPlainString } from '../../src/format/core/index';
 import { marketPrecisionFromAccount } from '../../src/format/adapters/sdk';
 import { EN_US, setDefaultLocale } from '../../src/format/locale';
 import { localeFromTag, setNumberLocale } from '../../src/format/intl';
@@ -54,6 +59,11 @@ describe('format/market precision', () => {
 		});
 		expect(precision.sizeDecimals).to.equal(7);
 		expect(stepFractionDigits(precision.step)).to.equal(7);
+	});
+
+	it('pins the precision exponents the type-only adapter hardcodes', () => {
+		expect(BASE_PRECISION_EXP.toNumber()).to.equal(9);
+		expect(QUOTE_PRECISION_EXP.toNumber()).to.equal(6);
 	});
 
 	it('reads a market account through the type-only adapter', () => {
@@ -110,6 +120,24 @@ describe('format/step helpers', () => {
 		);
 	});
 
+	it('capStringFractionDigits keeps the integer when the head is empty', () => {
+		expect(capStringFractionDigits('.5', { maxFractionDigits: 0 })).to.equal(
+			'0'
+		);
+		expect(capStringFractionDigits('.567', { maxFractionDigits: 2 })).to.equal(
+			'0.56'
+		);
+	});
+
+	it('capStringFractionDigits drops the separator at zero fraction digits', () => {
+		expect(capStringFractionDigits('5.', { maxFractionDigits: 0 })).to.equal(
+			'5'
+		);
+		expect(capStringFractionDigits('5.7', { maxFractionDigits: 0 })).to.equal(
+			'5'
+		);
+	});
+
 	it('a 1e-7 step keeps every digit the user typed', () => {
 		const step = d('0.0000001');
 		expect(
@@ -162,6 +190,47 @@ describe('format/input configuration', () => {
 		).to.deep.equal({ maxIntegerDigits: 12, maxFractionDigits: 2 });
 	});
 
+	it('precisionExp follows a clamped market rather than the raw step', () => {
+		const market = marketPrecisionFromSizes({
+			tickSize: new BN(100),
+			tickPrecisionExp: 6,
+			stepSize: new BN(1000000),
+			stepPrecisionExp: 9,
+			maxPriceDecimals: 2,
+		});
+		const price = inputFieldConfig('price', { market });
+		expect(price.caps.maxFractionDigits).to.equal(2);
+		expect(price.precisionExp).to.equal(2);
+		const parsed = parseInput('1.23456', price.precisionExp!).value!;
+		expect(toPlainString(parsed)).to.equal('1.23');
+		expect(parsed.scale).to.be.at.most(price.caps.maxFractionDigits);
+	});
+
+	it('precisionExp follows an override rather than the raw step', () => {
+		const market = marketPrecisionFromSizes({
+			tickSize: new BN(100),
+			tickPrecisionExp: 6,
+			stepSize: new BN(1000000),
+			stepPrecisionExp: 9,
+		});
+		const size = inputFieldConfig('size', {
+			market,
+			overrides: { maxFractionDigits: 1 },
+		});
+		expect(size.precisionExp).to.equal(1);
+		expect(parseInput('1.9876', size.precisionExp!).value!.scale).to.be.at.most(
+			size.caps.maxFractionDigits
+		);
+
+		const plain = inputFieldConfig('default', {
+			overrides: { maxFractionDigits: 1 },
+		});
+		expect(plain.precisionExp).to.equal(1);
+		expect(
+			toPlainString(parseInput('1.9876', plain.precisionExp!).value!)
+		).to.equal('1.9');
+	});
+
 	it('price and size need a market', () => {
 		expect(() => inputFieldConfig('price')).to.throw(/requires a market/);
 		expect(() => inputFieldConfig('size')).to.throw(/requires a market/);
@@ -184,6 +253,16 @@ describe('format/input configuration', () => {
 			groupSizes: [3],
 		} as const;
 		expect(toPlainString(parseInput('1.234,5', 6, deDe).value!)).to.equal(
+			'1234.5'
+		);
+	});
+
+	it('parseInput round-trips a non-EN locale without being told', () => {
+		setNumberLocale('de-DE');
+		const cfg = inputFieldConfig('default');
+		const text = formatText('1234.5');
+		expect(text).to.not.equal('1,234.5');
+		expect(toPlainString(parseInput(text, cfg.precisionExp!).value!)).to.equal(
 			'1234.5'
 		);
 	});
