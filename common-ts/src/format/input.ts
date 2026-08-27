@@ -5,7 +5,7 @@ import {
 	fromString,
 } from './core/index';
 import { ungroup } from './grouping';
-import { EN_US, LocaleConfig, getDefaultLocale } from './locale';
+import { LocaleConfig, getDefaultLocale } from './locale';
 import { stepFractionDigits } from './market';
 import { MarketPrecision } from './types';
 
@@ -57,7 +57,6 @@ export function inputFieldConfig(
 
 	let caps: DigitCaps;
 	let step: Decimal | undefined;
-	let precisionExp: number | undefined;
 
 	if (kind === 'price') {
 		if (!market) throw new Error("inputFieldConfig('price') requires a market");
@@ -66,7 +65,6 @@ export function inputFieldConfig(
 			maxFractionDigits: market.priceDecimals,
 		};
 		step = market.tick;
-		precisionExp = market.priceDecimals;
 	} else if (kind === 'size') {
 		if (!market) throw new Error("inputFieldConfig('size') requires a market");
 		caps = {
@@ -74,14 +72,17 @@ export function inputFieldConfig(
 			maxFractionDigits: market.sizeDecimals,
 		};
 		step = market.step;
-		precisionExp = market.sizeDecimals;
 	} else {
 		caps = { ...DIGIT_CAPS[kind] };
-		precisionExp = caps.maxFractionDigits;
 	}
 
 	if (o?.overrides) caps = { ...caps, ...o.overrides };
-	if (step) precisionExp = stepFractionDigits(step);
+
+	// Derived last, from the final caps, so the mask and the outbound parse can
+	// never disagree on how many fraction digits survive.
+	const precisionExp = step
+		? Math.min(caps.maxFractionDigits, stepFractionDigits(step))
+		: caps.maxFractionDigits;
 
 	return { localeTag: locale.tag, locale, caps, step, precisionExp };
 }
@@ -95,7 +96,7 @@ export function inputFieldConfig(
 export function parseInput(
 	input: string,
 	precisionExp: number,
-	locale: LocaleConfig = EN_US
+	locale: LocaleConfig = getDefaultLocale()
 ): ParseResult {
 	if (typeof input !== 'string') return { status: 'invalid', value: null };
 	const bare = ungroup(input.trim(), locale);

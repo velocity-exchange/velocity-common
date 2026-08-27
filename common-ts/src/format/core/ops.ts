@@ -22,6 +22,7 @@ export function rescale(d: Decimal, scale: number): Decimal {
 		);
 	}
 	if (scale === d.scale) return d;
+	if (d.sign === 0) return fromParts(0, '0', scale);
 	if (scale > d.scale) {
 		return fromParts(d.sign, d.digits + zeros(scale - d.scale), scale);
 	}

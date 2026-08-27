@@ -125,6 +125,12 @@ export function toDecimal(input: NumericInput): ParseResult {
 	if (isDecimal(input)) {
 		if (!DIGITS_ONLY.test(input.digits)) return invalid();
 		if (!Number.isInteger(input.scale) || input.scale < 0) return invalid();
+		if (input.sign !== -1 && input.sign !== 0 && input.sign !== 1) {
+			return invalid();
+		}
+		if (input.sign === 0 && stripLeadingZeros(input.digits) !== '0') {
+			return invalid();
+		}
 		return ok(fromParts(input.sign, input.digits, input.scale));
 	}
 

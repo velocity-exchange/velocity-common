@@ -11,6 +11,7 @@ import { groupInteger } from './grouping';
 import { getDefaultLocale } from './locale';
 import { applyDigitSpec, minDecimalsOf } from './resolveDigits';
 import { applySmallNumber } from './small';
+import { trimFractionZeros } from './trim';
 import {
 	DigitSpec,
 	DisplayString,
@@ -73,19 +74,12 @@ function normaliseSuffix(suffix?: string): string {
 	return trimmed === '' ? '' : ` ${trimmed}`;
 }
 
-function trimFraction(fraction: string, minDecimals: number): string {
-	const trimmed = fraction.replace(/0+$/, '');
-	if (trimmed.length >= minDecimals) return trimmed;
-	return trimmed + '0'.repeat(minDecimals - trimmed.length);
-}
-
 function textResult(
 	text: string,
 	status: DecimalStatus,
 	sign: ValueSign,
 	exact: Decimal | null,
-	isSentinel: boolean,
-	usedSmallForm = false
+	isSentinel: boolean
 ): FormatResult {
 	const parts = emptyParts();
 	parts.integer = text;
@@ -101,7 +95,7 @@ function textResult(
 		abbreviation: null,
 		wasRounded: false,
 		roundedAway: false,
-		usedSmallForm,
+		usedSmallForm: false,
 		roundingApplied: null,
 		exact,
 	};
@@ -171,10 +165,7 @@ export function formatValue(
 	let minDecimals = minDecimalsOf(digits);
 
 	const small = options.small ? applySmallNumber(working, options.small) : null;
-
-	if (small && small.kind === 'text') {
-		return textResult(small.text, 'ok', signOf(working), exact, false, true);
-	}
+	const smallPrefix = small?.prefix ?? '';
 
 	if (small) {
 		usedSmallForm = true;
@@ -205,16 +196,25 @@ export function formatValue(
 			trimTrailingZeros =
 				abbreviateOptions?.trimTrailingZeros ?? trimTrailingZeros;
 		} else {
-			const fellThrough =
+			const keptAbbreviateDigits =
 				abbreviateOptions !== undefined &&
 				abbreviateOptions.fallThrough === false;
-			const spec = fellThrough
+			const spec = keptAbbreviateDigits
 				? (abbreviateOptions.digits ?? { kind: 'significant', significant: 3 })
 				: digits;
-			const mode = fellThrough
+			const mode = keptAbbreviateDigits
 				? (abbreviateOptions.rounding ?? 'truncate')
 				: options.rounding;
 			const resolved = applyDigitSpec(working, spec, mode, options.market);
+			if (resolved.status !== 'ok') {
+				return textResult(
+					options.invalidText ?? '?',
+					'invalid',
+					'none',
+					exact,
+					false
+				);
+			}
 			integer = resolved.integer;
 			fraction = resolved.fraction;
 			rounded = resolved.value;
@@ -225,32 +225,40 @@ export function formatValue(
 		}
 	}
 
-	if (trimTrailingZeros) fraction = trimFraction(fraction, minDecimals);
+	if (trimTrailingZeros) fraction = trimFractionZeros(fraction, minDecimals);
 	if (options.grouping !== false) integer = groupInteger(integer, locale);
 
 	const postRoundSign = signOf(rounded);
 	const exactSign = signOf(exact);
-	const displaySign =
-		postRoundSign === 'zero' &&
-		(options.negativeZero ?? 'preserve') === 'preserve'
+	// A small-number sentinel renders a positive bound, so its reported sign has
+	// to come from the input rather than from the digits on screen.
+	const displaySign = smallPrefix
+		? exactSign
+		: postRoundSign === 'zero' &&
+			  (options.negativeZero ?? 'preserve') === 'preserve'
 			? exactSign
 			: postRoundSign;
 
 	const parts = emptyParts();
-	parts.sign = signChar(displaySign, options.signDisplay ?? 'auto');
+	// The small-number sentinel already carries the comparison in its prefix, so
+	// the bound it renders never takes a sign of its own.
+	parts.sign = smallPrefix
+		? ''
+		: signChar(displaySign, options.signDisplay ?? 'auto');
 	parts.currency =
 		options.style === 'currency' ? (options.currencySymbol ?? '$') : '';
 	parts.integer = integer;
 	parts.decimalSeparator = fraction === '' ? '' : locale.decimal;
 	parts.fraction = fraction;
-	parts.unit = unit || (options.unit ?? '');
+	parts.unit = `${unit}${options.unit ?? ''}`;
 	parts.percent = options.style === 'percent' ? '%' : '';
 	parts.suffix = normaliseSuffix(options.suffix);
+	parts.surroundStart = smallPrefix;
 	if (
 		options.surround === 'parens' ||
 		(options.surround === 'parensIfNegative' && displaySign === 'negative')
 	) {
-		parts.surroundStart = '(';
+		parts.surroundStart = `(${smallPrefix}`;
 		parts.surroundEnd = ')';
 	}
 

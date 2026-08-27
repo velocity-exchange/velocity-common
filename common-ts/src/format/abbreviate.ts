@@ -36,8 +36,12 @@ function passesThreshold(value: Decimal, options: AbbreviateOptions): boolean {
 	const threshold = options.threshold ?? DEFAULT_THRESHOLD;
 	if (threshold === 'always') return true;
 	const parsed = toDecimal(threshold);
-	if (parsed.status !== 'ok' || !parsed.value) return true;
-	return compare(abs(value), parsed.value) >= 0;
+	// An unusable threshold falls back to the default, never to 'always'.
+	const bound =
+		parsed.status === 'ok' && parsed.value
+			? parsed.value
+			: toDecimal(DEFAULT_THRESHOLD).value!;
+	return compare(abs(value), bound) >= 0;
 }
 
 /**
@@ -81,6 +85,7 @@ export function abbreviateValue(
 		index += 1;
 		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, rounding);
 	}
+	if (resolved.status !== 'ok') return notApplied;
 
 	return {
 		applied: true,

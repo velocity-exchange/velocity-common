@@ -3,18 +3,18 @@ import {
 	EN_US,
 	ENTIRE_POSITION,
 	PRESETS,
-	abbreviateValue,
 	absBelowThreshold,
 	belowThreshold,
 	formatText,
 	formatValue,
-	fromString,
 	groupInteger,
-	leadingZeroCount,
 	optionsForLegacyType,
 	toSubscript,
 	ungroup,
 } from '../../src/format/index';
+import { abbreviateValue } from '../../src/format/abbreviate';
+import { fromString } from '../../src/format/core/index';
+import { leadingZeroCount } from '../../src/format/small';
 
 const d = (s: string) => fromString(s).value!;
 const EN_IN = {
@@ -126,6 +126,30 @@ describe('format/formatValue digits and rounding', () => {
 		);
 	});
 
+	it('maxDecimals caps the significant padding', () => {
+		const digits = {
+			kind: 'significant' as const,
+			significant: 6,
+			maxDecimals: 2,
+		};
+		expect(formatText('1.9', { digits, rounding: 'truncate' })).to.equal(
+			'1.90'
+		);
+		expect(formatText('10', { digits, rounding: 'truncate' })).to.equal(
+			'10.00'
+		);
+		expect(formatText('1.23456', { digits, rounding: 'truncate' })).to.equal(
+			'1.23'
+		);
+		expect(formatText('0', { digits, rounding: 'truncate' })).to.equal('0.00');
+		expect(
+			formatText('1.9', {
+				digits: { kind: 'significant', significant: 6 },
+				rounding: 'truncate',
+			})
+		).to.equal('1.90000');
+	});
+
 	it('tick and step read the market precision', () => {
 		const market = {
 			priceDecimals: 2,
@@ -148,9 +172,25 @@ describe('format/formatValue digits and rounding', () => {
 				market,
 			})
 		).to.equal('1.234');
-		expect(() =>
+	});
+
+	it('tick and step without a market fall back instead of throwing', () => {
+		expect(
 			formatText('1', { digits: { kind: 'tick' }, rounding: 'half-up' })
-		).to.throw(/requires options.market/);
+		).to.equal('?');
+		expect(
+			formatText('1', {
+				digits: { kind: 'step' },
+				rounding: 'half-up',
+				invalidText: 'n/a',
+			})
+		).to.equal('n/a');
+		expect(
+			formatValue('1', { digits: { kind: 'tick' }, rounding: 'half-up' }).status
+		).to.equal('invalid');
+		expect(() =>
+			formatText('1', { digits: { kind: 'decimals', decimals: 2 } })
+		).to.throw(/rounding mode is required/);
 	});
 
 	it('the magnitude heuristic scales decimals by asset price', () => {
@@ -336,6 +376,47 @@ describe('format/abbreviate', () => {
 		).to.equal('1.23M');
 	});
 
+	it('an unusable threshold falls back to the default, not to always', () => {
+		expect(formatText('1234', { abbreviate: { threshold: 'nope' } })).to.equal(
+			'1,234'
+		);
+		expect(formatText('12345', { abbreviate: { threshold: 'nope' } })).to.equal(
+			'12.3K'
+		);
+	});
+
+	it('an abbreviation unit and options.unit both survive', () => {
+		expect(
+			formatText('12345', { unit: 'x', abbreviate: { threshold: 'always' } })
+		).to.equal('12.3Kx');
+		expect(
+			formatValue('12345', {
+				unit: 'x',
+				abbreviate: { threshold: 'always' },
+			}).parts.unit
+		).to.equal('Kx');
+		expect(formatText('12', { unit: 'x' })).to.equal('12x');
+	});
+
+	it('fallThrough false keeps the abbreviate digits below the threshold', () => {
+		const abbreviate = {
+			threshold: '10000' as const,
+			digits: { kind: 'significant' as const, significant: 3 },
+			rounding: 'truncate' as const,
+		};
+		expect(
+			formatText('1234.5678', {
+				abbreviate: { ...abbreviate, fallThrough: false },
+			})
+		).to.equal('1,230');
+		expect(
+			formatText('1234.5678', {
+				abbreviate: { ...abbreviate, fallThrough: true },
+			})
+		).to.equal('1,234.5678');
+		expect(formatText('1234.5678', { abbreviate })).to.equal('1,234.5678');
+	});
+
 	it('abbreviateValue is callable on its own', () => {
 		const result = abbreviateValue(d('4582930'), { threshold: 'always' });
 		expect(result).to.include({ applied: true, unit: 'M', exponent: 6 });
@@ -368,6 +449,40 @@ describe('format/small numbers', () => {
 		expect(formatText('-0.000001', { small })).to.equal('>-0.00001');
 		expect(formatText('-1.5', { small })).to.equal('-1.5');
 		expect(formatValue('0.000001', { small }).usedSmallForm).to.equal(true);
+		expect(formatValue('-0.000001', { small }).sign).to.equal('negative');
+	});
+
+	it('the small sentinel keeps the currency, percent and suffix affixes', () => {
+		expect(
+			formatText('0.005', {
+				style: 'currency',
+				small: { mode: 'sentinel', sentinelAt: '0.01' },
+			})
+		).to.equal('<$0.01');
+		expect(
+			formatText('-0.005', {
+				style: 'currency',
+				small: { mode: 'sentinel', sentinelAt: '0.01' },
+			})
+		).to.equal('>-$0.01');
+		expect(
+			formatText('0.5', {
+				style: 'percent',
+				small: { mode: 'sentinel', sentinelAt: '1' },
+			})
+		).to.equal('<1%');
+		expect(
+			formatText('0.5', {
+				suffix: 'SOL',
+				small: { mode: 'sentinel', sentinelAt: '1' },
+			})
+		).to.equal('<1 SOL');
+		expect(
+			formatText('0.005', {
+				...PRESETS.usdSigned,
+				small: { mode: 'sentinel', sentinelAt: '0.01' },
+			})
+		).to.equal('<$0.01');
 	});
 });
 
@@ -375,7 +490,46 @@ describe('format/presets', () => {
 	it('usd reproduces today truncate-at-the-cent semantics', () => {
 		expect(formatText('123.456789', PRESETS.usd)).to.equal('$123.45');
 		expect(formatText('123.456789', PRESETS.usdHalfUp)).to.equal('$123.46');
-		expect(PRESETS.usd).to.equal(PRESETS.usdLegacy);
+		expect(formatText('123.456789', PRESETS.usdLegacy)).to.equal('$123.45');
+		expect(formatText('-123.456789', PRESETS.usd)).to.equal(
+			formatText('-123.456789', PRESETS.usdLegacy)
+		);
+		expect(PRESETS.usd).to.not.equal(PRESETS.usdLegacy);
+	});
+
+	it('every preset is frozen all the way down', () => {
+		expect(Object.isFrozen(PRESETS.usd.digits)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.pnl.digits)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.usdCompact.abbreviate)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.orderSize.sentinels)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.orderSize.sentinels![0])).to.equal(true);
+
+		const before = formatText('123.456789', PRESETS.usd);
+		try {
+			(PRESETS.pnl.digits as { decimals: number }).decimals = 8;
+		} catch {
+			// A frozen write throws under strict mode, which is the point.
+		}
+		expect((PRESETS.usd.digits as { decimals: number }).decimals).to.equal(2);
+		expect(formatText('123.456789', PRESETS.usd)).to.equal(before);
+	});
+
+	it('compact abbreviates past ten thousand and stays exact below it', () => {
+		expect(formatText('4582930', PRESETS.compact)).to.equal('4.58M');
+		expect(formatText('10000', PRESETS.compact)).to.equal('10K');
+		expect(formatText('9999.5000', PRESETS.compact)).to.equal('9,999.5');
+	});
+
+	it('chartTick abbreviates past a thousand at three significant figures', () => {
+		expect(formatText('12345', PRESETS.chartTick)).to.equal('12.3K');
+		expect(formatText('1000', PRESETS.chartTick)).to.equal('1K');
+		expect(formatText('64.2891', PRESETS.chartTick)).to.equal('64.2');
+	});
+
+	it('printShort, prettyPrint and millifyLegacy carry the legacy shapes', () => {
+		expect(formatText('1234.5000', PRESETS.printShort)).to.equal('1234.5');
+		expect(formatText('1234.5000', PRESETS.prettyPrint)).to.equal('1,234.5');
+		expect(formatText('1234', PRESETS.millifyLegacy)).to.equal('1.23K');
 	});
 
 	it('balance floors on both signs', () => {

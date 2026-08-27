@@ -98,9 +98,10 @@ export function snapValueToStep(
 
 /**
  * The typing path. Truncates to `maxFractionDigits`, preserving an in-progress
- * trailing separator so it is safe on every keystroke. The digit count comes
- * from the caller (an on-chain step Decimal), not from a JS literal's
- * stringification, which turns 1e-7 into zero decimals today.
+ * trailing separator so it is safe on every keystroke, except at zero fraction
+ * digits where no separator is ever valid. The digit count comes from the
+ * caller (an on-chain step Decimal), not from a JS literal's stringification,
+ * which turns 1e-7 into zero decimals today.
  */
 export function capStringFractionDigits(
 	input: string,
@@ -111,10 +112,12 @@ export function capStringFractionDigits(
 	const separatorIndex = input.lastIndexOf(locale.decimal);
 	if (separatorIndex === -1) return input;
 
-	const head = input.slice(0, separatorIndex);
+	const head = input.slice(0, separatorIndex) || '0';
 	const fraction = input.slice(separatorIndex + locale.decimal.length);
-	if (fraction.length <= cfg.maxFractionDigits) return input;
+	// At zero fraction digits the separator itself is never valid, so it goes on
+	// both an in-progress '5.' and a complete '5.7'.
 	if (cfg.maxFractionDigits === 0) return head;
+	if (fraction.length <= cfg.maxFractionDigits) return input;
 	return `${head}${locale.decimal}${fraction.slice(0, cfg.maxFractionDigits)}`;
 }
 

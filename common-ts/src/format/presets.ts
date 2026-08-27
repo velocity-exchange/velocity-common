@@ -1,14 +1,31 @@
 import { ENTIRE_POSITION, belowThreshold } from './sentinels';
 import { FormatOptions, LegacyNumberType } from './types';
 
-const freeze = (o: FormatOptions): FormatOptions => Object.freeze(o);
+/** Recursive, because every nested digits/abbreviate/sentinel object is shared. */
+function deepFreeze<T>(value: T): T {
+	if (value === null || typeof value !== 'object') return value;
+	Object.freeze(value);
+	for (const key of Object.getOwnPropertyNames(value)) {
+		deepFreeze((value as Record<string, unknown>)[key]);
+	}
+	return value;
+}
+
+const freeze = (o: FormatOptions): FormatOptions => deepFreeze(o);
 
 /**
- * `usd` reproduces today's truncate-toward-zero cent, which is what every
- * BigNum.toNotional call site renders. `usdHalfUp` is the flip target; adopting
- * it is a separate, product-signed-off step.
+ * `usdLegacy` reproduces today's truncate-toward-zero cent, which is what every
+ * BigNum.toNotional call site renders. `usd` carries the same semantics but is
+ * its own object, so flipping it to half-up leaves the deliberate legacy call
+ * sites alone. `usdHalfUp` is the flip target.
  */
 const usdLegacy = freeze({
+	style: 'currency' as const,
+	digits: { kind: 'decimals' as const, decimals: 2 },
+	rounding: 'truncate' as const,
+});
+
+const usd = freeze({
 	style: 'currency' as const,
 	digits: { kind: 'decimals' as const, decimals: 2 },
 	rounding: 'truncate' as const,
@@ -22,11 +39,11 @@ const usdHalfUp = freeze({
 
 export const PRESETS = Object.freeze({
 	usdLegacy,
-	usd: usdLegacy,
+	usd,
 	usdHalfUp,
-	usdSigned: freeze({ ...usdLegacy, signDisplay: 'exceptZero' as const }),
+	usdSigned: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	usdCompact: freeze({
-		...usdLegacy,
+		...usd,
 		abbreviate: { threshold: '10000' },
 	}),
 	/** Never show more liability than held, on BOTH signs. */
@@ -35,7 +52,7 @@ export const PRESETS = Object.freeze({
 		digits: { kind: 'decimals' as const, decimals: 2 },
 		rounding: 'floor' as const,
 	}),
-	pnl: freeze({ ...usdLegacy, signDisplay: 'exceptZero' as const }),
+	pnl: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	percent: freeze({
 		style: 'percent' as const,
 		percentScale: 'none' as const,
@@ -101,10 +118,35 @@ export const PRESETS = Object.freeze({
 		trimTrailingZeros: true,
 	}),
 	plain: freeze({ digits: { kind: 'exact' as const }, grouping: false }),
+	/** Ungrouped, trailing zeros dropped. What BigNum.printShort renders. */
+	printShort: freeze({
+		digits: { kind: 'exact' as const },
+		trimTrailingZeros: true,
+		grouping: false,
+	}),
+	/** Grouped, trailing zeros dropped. What BigNum.prettyPrint renders. */
+	prettyPrint: freeze({
+		digits: { kind: 'exact' as const },
+		trimTrailingZeros: true,
+	}),
+	/** Always abbreviates at 3 significant figures. What BigNum.toMillified renders. */
+	millifyLegacy: freeze({
+		grouping: false,
+		abbreviate: {
+			threshold: 'always' as const,
+			fallThrough: false,
+			digits: {
+				kind: 'significant' as const,
+				significant: 3,
+				trailingZeros: 'trim' as const,
+			},
+			rounding: 'truncate' as const,
+		},
+	}),
 });
 
-const NUMBER = Object.freeze({ digits: { kind: 'exact' as const } });
-const NUMBER_SIGNED = Object.freeze({
+const NUMBER = freeze({ digits: { kind: 'exact' as const } });
+const NUMBER_SIGNED = freeze({
 	digits: { kind: 'exact' as const },
 	signDisplay: 'exceptZero' as const,
 });

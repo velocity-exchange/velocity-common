@@ -4,8 +4,8 @@ import { FormatOptions, PRESETS, formatText } from '../../src/format/index';
 
 /**
  * Pins the new presets against the real BigNum output they replace. A case
- * listed in KNOWN_DIFFS is a bug the decision doc declares as fixed; every
- * other case must match byte for byte.
+ * listed in KNOWN_DIFFS is a BigNum bug the new path deliberately does not
+ * reproduce; every other case must match byte for byte.
  */
 
 interface Case {
@@ -53,32 +53,10 @@ const CORPUS: Case[] = [
 	{ label: 'negative base @9', units: '-1500000000', scale: 9 },
 ];
 
-const NO_GROUP_EXACT: FormatOptions = {
-	digits: { kind: 'exact' },
-	grouping: false,
-};
-const TRIMMED: FormatOptions = {
-	digits: { kind: 'exact' },
-	trimTrailingZeros: true,
-	grouping: false,
-};
-const GROUPED_TRIMMED: FormatOptions = {
-	digits: { kind: 'exact' },
-	trimTrailingZeros: true,
-};
 const FIXED_2: FormatOptions = {
 	digits: { kind: 'decimals', decimals: 2 },
 	rounding: 'truncate',
 	grouping: false,
-};
-const MILLIFIED: FormatOptions = {
-	grouping: false,
-	abbreviate: {
-		threshold: 'always',
-		fallThrough: false,
-		digits: { kind: 'significant', significant: 3, trailingZeros: 'trim' },
-		rounding: 'truncate',
-	},
 };
 const TRADE_PRECISION: FormatOptions = {
 	...PRESETS.tradePrecision,
@@ -90,12 +68,16 @@ const METHODS: {
 	legacy: (b: BigNum) => string;
 	options: FormatOptions;
 }[] = [
-	{ name: 'print', legacy: (b) => b.print(), options: NO_GROUP_EXACT },
-	{ name: 'printShort', legacy: (b) => b.printShort(), options: TRIMMED },
+	{ name: 'print', legacy: (b) => b.print(), options: PRESETS.plain },
+	{
+		name: 'printShort',
+		legacy: (b) => b.printShort(),
+		options: PRESETS.printShort,
+	},
 	{
 		name: 'prettyPrint',
 		legacy: (b) => b.prettyPrint(),
-		options: GROUPED_TRIMMED,
+		options: PRESETS.prettyPrint,
 	},
 	{ name: 'toFixed(2)', legacy: (b) => b.toFixed(2), options: FIXED_2 },
 	{
@@ -103,7 +85,11 @@ const METHODS: {
 		legacy: (b) => b.toNotional(),
 		options: PRESETS.usdLegacy,
 	},
-	{ name: 'toMillified', legacy: (b) => b.toMillified(), options: MILLIFIED },
+	{
+		name: 'toMillified',
+		legacy: (b) => b.toMillified(),
+		options: PRESETS.millifyLegacy,
+	},
 	{
 		name: 'toTradePrecision',
 		legacy: (b) => b.toTradePrecision(),
@@ -112,8 +98,8 @@ const METHODS: {
 ];
 
 /**
- * key -> [bug name, what the new presets render instead]. The old output is
- * pinned by the doc, not by this file, so only the replacement is asserted.
+ * key -> [bug name, what the new presets render instead]. Only the replacement
+ * is asserted, because the point is the new output, not the old one.
  */
 const KNOWN_DIFFS: Record<string, [string, string]> = {
 	'toTradePrecision|1e6 @0': [
@@ -163,12 +149,8 @@ describe('format/BigNum parity', () => {
 						new BN(testCase.units),
 						new BN(testCase.scale)
 					);
-					const input = {
-						raw: { toString: () => testCase.units },
-						scale: testCase.scale,
-					};
 					const legacy = method.legacy(bigNum);
-					const next = formatText(input, method.options);
+					const next = formatText(bigNum, method.options);
 
 					if (annotation) {
 						exercised.add(key);
@@ -200,6 +182,17 @@ describe('format/BigNum parity', () => {
 				{ digits: { kind: 'decimals', decimals: 0 }, rounding: 'truncate' }
 			)
 		).to.equal('1');
+	});
+
+	it('a raw+scale duck object renders the same as the real BigNum', () => {
+		const bigNum = new BigNum(new BN('-123456789'), new BN(6));
+		const duck = { raw: { toString: () => '-123456789' }, scale: 6 };
+		expect(formatText(duck, PRESETS.prettyPrint)).to.equal(
+			formatText(bigNum, PRESETS.prettyPrint)
+		);
+		expect(formatText(duck, PRESETS.prettyPrint)).to.equal(
+			bigNum.prettyPrint()
+		);
 	});
 
 	it('a BigNum with negative precision still parses exactly', () => {
