@@ -54,8 +54,11 @@ const CORPUS: Case[] = [
 ];
 
 const FIXED_2: FormatOptions = {
-	digits: { kind: 'decimals', decimals: 2 },
-	rounding: 'truncate',
+	digits: { kind: 'decimals', decimals: 2, rounding: 'truncate' },
+	grouping: false,
+};
+const FIXED_0: FormatOptions = {
+	digits: { kind: 'decimals', decimals: 0, rounding: 'truncate' },
 	grouping: false,
 };
 const TRADE_PRECISION: FormatOptions = {
@@ -80,6 +83,7 @@ const METHODS: {
 		options: PRESETS.prettyPrint,
 	},
 	{ name: 'toFixed(2)', legacy: (b) => b.toFixed(2), options: FIXED_2 },
+	{ name: 'toFixed(0)', legacy: (b) => b.toFixed(0), options: FIXED_0 },
 	{
 		name: 'toNotional',
 		legacy: (b) => b.toNotional(),
@@ -132,17 +136,32 @@ const KNOWN_DIFFS: Record<string, [string, string]> = {
 	],
 };
 
+/**
+ * A method whose every case diverges, so a per-case annotation would just
+ * restate the corpus. The rule is asserted against both outputs instead of a
+ * fixed string, which covers the whole corpus rather than one picked value.
+ */
+const KNOWN_METHOD_DIFFS: Record<string, string> = {
+	'toFixed(0)':
+		'uc-fixed0: at zero decimals toFixed leaves a dangling separator, as in "1."',
+};
+
 const exercised = new Set<string>();
+const exercisedMethods = new Set<string>();
 
 describe('format/BigNum parity', () => {
 	for (const method of METHODS) {
+		const methodDiff = KNOWN_METHOD_DIFFS[method.name];
+
 		describe(method.name, () => {
 			for (const testCase of CORPUS) {
 				const key = `${method.name}|${testCase.label}`;
 				const annotation = KNOWN_DIFFS[key];
-				const title = annotation
-					? `${testCase.label} differs by design (${annotation[0]})`
-					: testCase.label;
+				const title = methodDiff
+					? `${testCase.label} differs by design (${methodDiff})`
+					: annotation
+						? `${testCase.label} differs by design (${annotation[0]})`
+						: testCase.label;
 
 				it(title, () => {
 					const bigNum = new BigNum(
@@ -151,6 +170,20 @@ describe('format/BigNum parity', () => {
 					);
 					const legacy = method.legacy(bigNum);
 					const next = formatText(bigNum, method.options);
+
+					if (methodDiff) {
+						exercisedMethods.add(method.name);
+						expect(legacy, 'the legacy bug must still be present').to.match(
+							/\.$/
+						);
+						expect(next, 'the new path never dangles a separator').to.not.match(
+							/\.$/
+						);
+						expect(next, 'a declared diff must actually differ').to.not.equal(
+							legacy
+						);
+						return;
+					}
 
 					if (annotation) {
 						exercised.add(key);
@@ -171,17 +204,10 @@ describe('format/BigNum parity', () => {
 			[...exercised].sort(),
 			'a declared diff annotation no longer matches any case'
 		).to.deep.equal(Object.keys(KNOWN_DIFFS).sort());
-	});
-
-	it('toFixed(0) leaves a dangling separator that the new path never emits', () => {
-		const bigNum = new BigNum(new BN('15'), new BN(1));
-		expect(bigNum.toFixed(0)).to.equal('1.');
 		expect(
-			formatText(
-				{ raw: { toString: () => '15' }, scale: 1 },
-				{ digits: { kind: 'decimals', decimals: 0 }, rounding: 'truncate' }
-			)
-		).to.equal('1');
+			[...exercisedMethods].sort(),
+			'a declared method-wide diff no longer matches any method'
+		).to.deep.equal(Object.keys(KNOWN_METHOD_DIFFS).sort());
 	});
 
 	it('a raw+scale duck object renders the same as the real BigNum', () => {

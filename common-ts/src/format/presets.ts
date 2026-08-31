@@ -21,20 +21,29 @@ const freeze = (o: FormatOptions): FormatOptions => deepFreeze(o);
  */
 const usdLegacy = freeze({
 	style: 'currency' as const,
-	digits: { kind: 'decimals' as const, decimals: 2 },
-	rounding: 'truncate' as const,
+	digits: {
+		kind: 'decimals' as const,
+		decimals: 2,
+		rounding: 'truncate' as const,
+	},
 });
 
 const usd = freeze({
 	style: 'currency' as const,
-	digits: { kind: 'decimals' as const, decimals: 2 },
-	rounding: 'truncate' as const,
+	digits: {
+		kind: 'decimals' as const,
+		decimals: 2,
+		rounding: 'truncate' as const,
+	},
 });
 
 const usdHalfUp = freeze({
 	style: 'currency' as const,
-	digits: { kind: 'decimals' as const, decimals: 2 },
-	rounding: 'half-up' as const,
+	digits: {
+		kind: 'decimals' as const,
+		decimals: 2,
+		rounding: 'half-up' as const,
+	},
 });
 
 export const PRESETS = Object.freeze({
@@ -49,51 +58,68 @@ export const PRESETS = Object.freeze({
 	/** Never show more liability than held, on BOTH signs. */
 	balance: freeze({
 		style: 'currency' as const,
-		digits: { kind: 'decimals' as const, decimals: 2 },
-		rounding: 'floor' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 2,
+			rounding: 'floor' as const,
+		},
 	}),
 	pnl: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	percent: freeze({
 		style: 'percent' as const,
 		percentScale: 'none' as const,
-		digits: { kind: 'decimals' as const, decimals: 2 },
-		rounding: 'half-up' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 2,
+			rounding: 'half-up' as const,
+		},
 	}),
 	percentSigned: freeze({
 		style: 'percent' as const,
 		percentScale: 'none' as const,
-		digits: { kind: 'decimals' as const, decimals: 2 },
-		rounding: 'half-up' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 2,
+			rounding: 'half-up' as const,
+		},
 		signDisplay: 'exceptZero' as const,
 	}),
 	fundingHourly: freeze({
 		style: 'percent' as const,
 		percentScale: 'none' as const,
-		digits: { kind: 'decimals' as const, decimals: 5 },
-		rounding: 'half-up' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 5,
+			rounding: 'half-up' as const,
+		},
 	}),
 	funding24h: freeze({
 		style: 'percent' as const,
 		percentScale: 'none' as const,
-		digits: { kind: 'decimals' as const, decimals: 2 },
-		rounding: 'half-up' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 2,
+			rounding: 'half-up' as const,
+		},
 	}),
+	/** Requires options.market. Without one the value renders as invalidText. */
 	price: freeze({
-		digits: { kind: 'tick' as const },
-		rounding: 'half-up' as const,
+		digits: { kind: 'tick' as const, rounding: 'half-up' as const },
 	}),
+	/** Requires options.market. Without one the value renders as invalidText. */
 	priceForOrder: freeze({
-		digits: { kind: 'tick' as const },
-		rounding: 'truncate' as const,
+		digits: { kind: 'tick' as const, rounding: 'truncate' as const },
 	}),
+	/** Requires options.market. Without one the value renders as invalidText. */
 	size: freeze({
-		digits: { kind: 'step' as const },
-		rounding: 'truncate' as const,
+		digits: { kind: 'step' as const, rounding: 'truncate' as const },
 	}),
-	/** Step digits from market.sizeDecimals, truncated so a size never rounds up. */
+	/**
+	 * Step digits from market.sizeDecimals, truncated so a size never rounds up.
+	 * Requires options.market; without one the value renders as invalidText.
+	 */
 	orderSize: freeze({
-		digits: { kind: 'step' as const },
-		rounding: 'truncate' as const,
+		digits: { kind: 'step' as const, rounding: 'truncate' as const },
 		sentinels: [ENTIRE_POSITION],
 	}),
 	/** The bare prettyPrint() shape formatOrderSize renders today, for call sites without a market. */
@@ -103,12 +129,18 @@ export const PRESETS = Object.freeze({
 		sentinels: [ENTIRE_POSITION],
 	}),
 	tradePrecision: freeze({
-		digits: { kind: 'significant' as const, significant: 6 },
-		rounding: 'truncate' as const,
+		digits: {
+			kind: 'significant' as const,
+			significant: 6,
+			rounding: 'truncate' as const,
+		},
 	}),
 	leverage: freeze({
-		digits: { kind: 'decimals' as const, decimals: 0 },
-		rounding: 'truncate' as const,
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 0,
+			rounding: 'truncate' as const,
+		},
 		unit: 'x',
 		sentinels: [belowThreshold('1', '1x')],
 	}),
@@ -118,8 +150,11 @@ export const PRESETS = Object.freeze({
 		trimTrailingZeros: true,
 	}),
 	chartTick: freeze({
-		digits: { kind: 'significant' as const, significant: 3 },
-		rounding: 'truncate' as const,
+		digits: {
+			kind: 'significant' as const,
+			significant: 3,
+			rounding: 'truncate' as const,
+		},
 		abbreviate: { threshold: '1000' },
 		trimTrailingZeros: true,
 	}),
@@ -145,8 +180,8 @@ export const PRESETS = Object.freeze({
 				kind: 'significant' as const,
 				significant: 3,
 				trailingZeros: 'trim' as const,
+				rounding: 'truncate' as const,
 			},
-			rounding: 'truncate' as const,
 		},
 	}),
 });

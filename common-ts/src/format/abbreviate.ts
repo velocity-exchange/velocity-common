@@ -1,5 +1,6 @@
 import {
 	Decimal,
+	RoundingMode,
 	abs,
 	compare,
 	integerDigitCount,
@@ -13,7 +14,11 @@ const FINANCIAL_UNITS = ['', 'K', 'M', 'B', 'T', 'Q'];
 const SI_UNITS = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
 
 const DEFAULT_THRESHOLD = '10000';
-const DEFAULT_DIGITS: DigitSpec = { kind: 'significant', significant: 3 };
+const DEFAULT_DIGITS: DigitSpec = {
+	kind: 'significant',
+	significant: 3,
+	rounding: 'truncate',
+};
 
 export interface AbbreviateResult {
 	applied: boolean;
@@ -23,6 +28,7 @@ export interface AbbreviateResult {
 	fraction: string;
 	value: Decimal;
 	wasRounded: boolean;
+	roundingApplied: RoundingMode | null;
 }
 
 export function unitTable(units: AbbreviateUnits = 'financial'): string[] {
@@ -55,7 +61,6 @@ export function abbreviateValue(
 	const units = unitTable(options.units);
 	const maxIndex = units.length - 1;
 	const digits = options.digits ?? DEFAULT_DIGITS;
-	const rounding = options.rounding ?? 'truncate';
 
 	const notApplied: AbbreviateResult = {
 		applied: false,
@@ -65,6 +70,7 @@ export function abbreviateValue(
 		fraction: '',
 		value,
 		wasRounded: false,
+		roundingApplied: null,
 	};
 
 	if (value.sign === 0 || !passesThreshold(value, options)) return notApplied;
@@ -76,14 +82,10 @@ export function abbreviateValue(
 		index = maxIndex;
 	}
 
-	let resolved = applyDigitSpec(
-		shiftPoint(value, -3 * index),
-		digits,
-		rounding
-	);
+	let resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits);
 	if (resolved.integer.length > 3 && index < maxIndex) {
 		index += 1;
-		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, rounding);
+		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits);
 	}
 	if (resolved.status !== 'ok') return notApplied;
 
@@ -95,5 +97,6 @@ export function abbreviateValue(
 		fraction: resolved.fraction,
 		value: resolved.value,
 		wasRounded: resolved.wasRounded,
+		roundingApplied: resolved.roundingApplied,
 	};
 }

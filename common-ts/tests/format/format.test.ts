@@ -100,30 +100,33 @@ describe('format/formatValue digits and rounding', () => {
 		expect(formatText('0.000000001')).to.equal('0.000000001');
 	});
 
-	it('decimals require an explicit rounding mode', () => {
+	it('a rounding mode is required, and the type says so', () => {
+		// Unrepresentable in TypeScript; the cast is what an untyped caller does.
 		expect(() =>
-			formatText('1.5', { digits: { kind: 'decimals', decimals: 0 } })
+			formatText('1.5', {
+				digits: { kind: 'decimals', decimals: 0 } as never,
+			})
 		).to.throw(/rounding mode is required/);
 	});
 
 	it('truncate and half-up differ at the last cent', () => {
 		const digits = { kind: 'decimals' as const, decimals: 2 };
-		expect(formatText('1.999', { digits, rounding: 'truncate' })).to.equal(
-			'1.99'
-		);
-		expect(formatText('1.999', { digits, rounding: 'half-up' })).to.equal(
-			'2.00'
-		);
+		expect(
+			formatText('1.999', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('1.99');
+		expect(
+			formatText('1.999', { digits: { ...digits, rounding: 'half-up' } })
+		).to.equal('2.00');
 	});
 
 	it('significant digits pad above one and do not below', () => {
 		const digits = { kind: 'significant' as const, significant: 6 };
-		expect(formatText('1.5', { digits, rounding: 'truncate' })).to.equal(
-			'1.50000'
-		);
-		expect(formatText('0.00012345', { digits, rounding: 'truncate' })).to.equal(
-			'0.00012345'
-		);
+		expect(
+			formatText('1.5', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('1.50000');
+		expect(
+			formatText('0.00012345', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('0.00012345');
 	});
 
 	it('maxDecimals caps the significant padding', () => {
@@ -132,20 +135,21 @@ describe('format/formatValue digits and rounding', () => {
 			significant: 6,
 			maxDecimals: 2,
 		};
-		expect(formatText('1.9', { digits, rounding: 'truncate' })).to.equal(
-			'1.90'
-		);
-		expect(formatText('10', { digits, rounding: 'truncate' })).to.equal(
-			'10.00'
-		);
-		expect(formatText('1.23456', { digits, rounding: 'truncate' })).to.equal(
-			'1.23'
-		);
-		expect(formatText('0', { digits, rounding: 'truncate' })).to.equal('0.00');
+		expect(
+			formatText('1.9', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('1.90');
+		expect(
+			formatText('10', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('10.00');
+		expect(
+			formatText('1.23456', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('1.23');
+		expect(
+			formatText('0', { digits: { ...digits, rounding: 'truncate' } })
+		).to.equal('0.00');
 		expect(
 			formatText('1.9', {
-				digits: { kind: 'significant', significant: 6 },
-				rounding: 'truncate',
+				digits: { kind: 'significant', significant: 6, rounding: 'truncate' },
 			})
 		).to.equal('1.90000');
 	});
@@ -160,15 +164,13 @@ describe('format/formatValue digits and rounding', () => {
 		};
 		expect(
 			formatText('64231.4567', {
-				digits: { kind: 'tick' },
-				rounding: 'half-up',
+				digits: { kind: 'tick', rounding: 'half-up' },
 				market,
 			})
 		).to.equal('64,231.46');
 		expect(
 			formatText('1.23456', {
-				digits: { kind: 'step' },
-				rounding: 'truncate',
+				digits: { kind: 'step', rounding: 'truncate' },
 				market,
 			})
 		).to.equal('1.234');
@@ -176,50 +178,49 @@ describe('format/formatValue digits and rounding', () => {
 
 	it('tick and step without a market fall back instead of throwing', () => {
 		expect(
-			formatText('1', { digits: { kind: 'tick' }, rounding: 'half-up' })
+			formatText('1', { digits: { kind: 'tick', rounding: 'half-up' } })
 		).to.equal('?');
 		expect(
 			formatText('1', {
-				digits: { kind: 'step' },
-				rounding: 'half-up',
+				digits: { kind: 'step', rounding: 'half-up' },
 				invalidText: 'n/a',
 			})
 		).to.equal('n/a');
 		expect(
-			formatValue('1', { digits: { kind: 'tick' }, rounding: 'half-up' }).status
+			formatValue('1', { digits: { kind: 'tick', rounding: 'half-up' } }).status
 		).to.equal('invalid');
 		expect(() =>
-			formatText('1', { digits: { kind: 'decimals', decimals: 2 } })
+			formatText('1', { digits: { kind: 'decimals', decimals: 2 } as never })
 		).to.throw(/rounding mode is required/);
 	});
 
 	it('the magnitude heuristic scales decimals by asset price', () => {
 		expect(
 			formatText('0.123456789', {
-				digits: { kind: 'magnitude', assetPrice: '30000' },
-				rounding: 'truncate',
+				digits: {
+					kind: 'magnitude',
+					assetPrice: '30000',
+					rounding: 'truncate',
+				},
 			})
 		).to.equal('0.123456');
 		expect(
 			formatText('0.123456789', {
-				digits: { kind: 'magnitude', assetPrice: '5' },
-				rounding: 'truncate',
+				digits: { kind: 'magnitude', assetPrice: '5', rounding: 'truncate' },
 			})
 		).to.equal('0.12');
 	});
 
 	it('reports what the rounding did', () => {
 		const result = formatValue('1.999', {
-			digits: { kind: 'decimals', decimals: 2 },
-			rounding: 'truncate',
+			digits: { kind: 'decimals', decimals: 2, rounding: 'truncate' },
 		});
 		expect(result.wasRounded).to.equal(true);
 		expect(result.roundedAway).to.equal(false);
 		expect(result.roundingApplied).to.equal('truncate');
 
 		const away = formatValue('0.001', {
-			digits: { kind: 'decimals', decimals: 2 },
-			rounding: 'truncate',
+			digits: { kind: 'decimals', decimals: 2, rounding: 'truncate' },
 		});
 		expect(away.roundedAway).to.equal(true);
 		expect(away.isZero).to.equal(true);
@@ -300,8 +301,12 @@ describe('format/formatValue affixes and sign', () => {
 		).to.equal('1,234');
 		expect(
 			formatText('1.2000', {
-				digits: { kind: 'decimals', decimals: 4, minDecimals: 2 },
-				rounding: 'truncate',
+				digits: {
+					kind: 'decimals',
+					decimals: 4,
+					minDecimals: 2,
+					rounding: 'truncate',
+				},
 				trimTrailingZeros: true,
 			})
 		).to.equal('1.20');
@@ -324,7 +329,12 @@ describe('format/abbreviate', () => {
 
 	it('re-derives the unit after a carry', () => {
 		expect(
-			formatText('999999', { abbreviate: { ...always, rounding: 'half-up' } })
+			formatText('999999', {
+				abbreviate: {
+					...always,
+					digits: { kind: 'significant', significant: 3, rounding: 'half-up' },
+				},
+			})
 		).to.equal('1.00M');
 		expect(formatText('999999', { abbreviate: always })).to.equal('999K');
 	});
@@ -401,8 +411,11 @@ describe('format/abbreviate', () => {
 	it('fallThrough false keeps the abbreviate digits below the threshold', () => {
 		const abbreviate = {
 			threshold: '10000' as const,
-			digits: { kind: 'significant' as const, significant: 3 },
-			rounding: 'truncate' as const,
+			digits: {
+				kind: 'significant' as const,
+				significant: 3,
+				rounding: 'truncate' as const,
+			},
 		};
 		expect(
 			formatText('1234.5678', {
@@ -523,8 +536,10 @@ describe('format/presets', () => {
 		expect(Object.isFrozen(PRESETS.usd.digits)).to.equal(true);
 		expect(Object.isFrozen(PRESETS.pnl.digits)).to.equal(true);
 		expect(Object.isFrozen(PRESETS.usdCompact.abbreviate)).to.equal(true);
-		expect(Object.isFrozen(PRESETS.orderSize.sentinels)).to.equal(true);
-		expect(Object.isFrozen(PRESETS.orderSize.sentinels![0])).to.equal(true);
+		expect(Object.isFrozen(PRESETS.orderSizeExact.sentinels)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.orderSizeExact.sentinels![0])).to.equal(
+			true
+		);
 
 		const before = formatText('123.456789', PRESETS.usd);
 		try {
@@ -604,6 +619,19 @@ describe('format/presets', () => {
 		).to.equal('Entire Position');
 	});
 
+	it('the abbreviate path reports the mode its digit spec actually used', () => {
+		const half = formatValue('999999', {
+			abbreviate: {
+				threshold: 'always',
+				digits: { kind: 'significant', significant: 3, rounding: 'half-up' },
+			},
+		});
+		expect(half.wasAbbreviated).to.equal(true);
+		expect(half.roundingApplied).to.equal('half-up');
+		const truncated = formatValue('999999', PRESETS.millifyLegacy);
+		expect(truncated.roundingApplied).to.equal('truncate');
+	});
+
 	it('orderSizeExact keeps the exact prettyPrint shape', () => {
 		expect(formatText('1.23456', PRESETS.orderSizeExact)).to.equal('1.23456');
 		expect(formatText('1.25000', PRESETS.orderSizeExact)).to.equal('1.25');
@@ -670,8 +698,7 @@ describe('format/formatValue parts', () => {
 
 	it('keeps the untouched input available for maths', () => {
 		const result = formatValue('1.999', {
-			digits: { kind: 'decimals', decimals: 2 },
-			rounding: 'truncate',
+			digits: { kind: 'decimals', decimals: 2, rounding: 'truncate' },
 		});
 		expect(result.exact).to.deep.equal(d('1.999'));
 	});

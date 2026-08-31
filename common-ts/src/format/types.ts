@@ -10,21 +10,35 @@ import { LocaleConfig } from './locale';
  * Digit control. Mutually exclusive by construction, so "precision beats
  * decimals" cannot be expressed. `exact` is the DEFAULT and covers the
  * plurality of today's call sites (the bare print()/printShort() path).
+ *
+ * Every kind that drops digits carries its own `rounding`, so a spec that
+ * rounds without saying how is unrepresentable rather than a render-time throw.
  */
 export type DigitSpec =
 	| { kind: 'exact' }
-	| { kind: 'decimals'; decimals: number; minDecimals?: number }
+	| {
+			kind: 'decimals';
+			decimals: number;
+			rounding: RoundingMode;
+			minDecimals?: number;
+	  }
 	| {
 			kind: 'significant';
 			significant: number;
+			rounding: RoundingMode;
 			maxDecimals?: number;
 			/** Below one only: 'trim' drops padding zeros the source scale carried. */
 			trailingZeros?: 'keep' | 'trim';
 	  }
-	| { kind: 'tick' }
-	| { kind: 'step' }
+	| { kind: 'tick'; rounding: RoundingMode }
+	| { kind: 'step'; rounding: RoundingMode }
 	/** The NumLib price-magnitude heuristic. Opt-in only, never a default. */
-	| { kind: 'magnitude'; assetPrice: NumericInput; maxDecimals?: number };
+	| {
+			kind: 'magnitude';
+			assetPrice: NumericInput;
+			rounding: RoundingMode;
+			maxDecimals?: number;
+	  };
 
 export type AbbreviateUnits = 'financial' | 'si';
 
@@ -33,7 +47,6 @@ export interface AbbreviateOptions {
 	threshold?: NumericInput | 'always';
 	units?: AbbreviateUnits;
 	digits?: DigitSpec;
-	rounding?: RoundingMode;
 	trimTrailingZeros?: boolean;
 	/**
 	 * Reproduces formatNumber's isAbbreviatedMillifiedValue behaviour: if the
@@ -43,7 +56,10 @@ export interface AbbreviateOptions {
 	fallThrough?: boolean;
 	/** Past the largest unit. 'clamp' lets the mantissa grow (1,234Q). Default 'clamp'. */
 	overflow?: 'clamp' | 'full';
-	/** handleSpecialRendering's 'large' branch: abbreviate above N integer digits. */
+	/**
+	 * handleSpecialRendering's 'large' branch: abbreviate above N integer digits.
+	 * Supersedes `threshold` entirely when set; the two are never combined.
+	 */
 	minIntegerDigits?: number;
 }
 
@@ -85,7 +101,6 @@ export interface FormatOptions {
 	percentScale?: 'none' | 'ratio';
 	signDisplay?: SignDisplay;
 	digits?: DigitSpec;
-	rounding?: RoundingMode;
 	/**
 	 * 'preserve' renders -$0.00 for a small negative, matching today.
 	 * 'suppress' renders $0.00 and reports sign 'zero'.
@@ -142,6 +157,11 @@ export interface FormatResult {
 	readonly wasAbbreviated: boolean;
 	readonly abbreviation: { unit: string; exponent: number } | null;
 	readonly wasRounded: boolean;
+	/**
+	 * A nonzero input that digit rounding collapsed to a literal zero. The small
+	 * forms never do this by construction, so they report false and signal their
+	 * precision loss through wasRounded instead.
+	 */
 	readonly roundedAway: boolean;
 	readonly usedSmallForm: boolean;
 	readonly roundingApplied: RoundingMode | null;

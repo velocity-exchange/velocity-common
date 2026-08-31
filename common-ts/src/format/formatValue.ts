@@ -23,6 +23,12 @@ import {
 } from './types';
 
 const EXACT: DigitSpec = { kind: 'exact' };
+/** Matches abbreviate's own default, for a fallThrough:false spec with no digits. */
+const ABBREVIATE_FALLBACK: DigitSpec = {
+	kind: 'significant',
+	significant: 3,
+	rounding: 'truncate',
+};
 const DEFAULT_NON_FINITE = { positive: '∞', negative: '-∞' };
 
 function emptyParts(): FormatParts {
@@ -193,7 +199,7 @@ export function formatValue(
 			unit = abbreviated.unit;
 			rounded = abbreviated.value;
 			wasRounded = abbreviated.wasRounded;
-			roundingApplied = abbreviateOptions?.rounding ?? 'truncate';
+			roundingApplied = abbreviated.roundingApplied;
 			minDecimals = 0;
 			trimTrailingZeros =
 				abbreviateOptions?.trimTrailingZeros ?? trimTrailingZeros;
@@ -202,12 +208,9 @@ export function formatValue(
 				abbreviateOptions !== undefined &&
 				abbreviateOptions.fallThrough === false;
 			const spec = keptAbbreviateDigits
-				? (abbreviateOptions.digits ?? { kind: 'significant', significant: 3 })
+				? (abbreviateOptions.digits ?? ABBREVIATE_FALLBACK)
 				: digits;
-			const mode = keptAbbreviateDigits
-				? (abbreviateOptions.rounding ?? 'truncate')
-				: options.rounding;
-			const resolved = applyDigitSpec(working, spec, mode, options.market);
+			const resolved = applyDigitSpec(working, spec, options.market);
 			if (resolved.status !== 'ok') {
 				return textResult(
 					options.invalidText ?? '?',

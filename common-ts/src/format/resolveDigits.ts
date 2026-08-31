@@ -22,8 +22,11 @@ export interface ResolvedDigits {
 	roundingApplied: RoundingMode | null;
 }
 
-function requireMode(spec: DigitSpec, rounding?: RoundingMode): RoundingMode {
-	if (rounding) return rounding;
+/** The type makes this unreachable from TypeScript; it still guards JS callers. */
+function requireMode(
+	spec: Exclude<DigitSpec, { kind: 'exact' }>
+): RoundingMode {
+	if (spec.rounding) return spec.rounding;
 	throw new Error(
 		`A rounding mode is required for digits.kind '${spec.kind}'; there is no default at this layer`
 	);
@@ -84,14 +87,13 @@ function padToSignificant(
 export function applyDigitSpec(
 	input: Decimal,
 	spec: DigitSpec,
-	rounding?: RoundingMode,
 	market?: MarketPrecision
 ): ResolvedDigits {
 	let value = input;
 	let mode: RoundingMode | null = null;
 
 	if (spec.kind === 'significant') {
-		mode = requireMode(spec, rounding);
+		mode = requireMode(spec);
 		value = roundToSignificant(input, spec.significant, mode);
 		if (spec.maxDecimals !== undefined && value.scale > spec.maxDecimals) {
 			value = roundToDecimals(value, spec.maxDecimals, mode);
@@ -109,7 +111,7 @@ export function applyDigitSpec(
 				roundingApplied: null,
 			};
 		}
-		mode = requireMode(spec, rounding);
+		mode = requireMode(spec);
 		value = roundToDecimals(input, decimals, mode);
 	}
 
