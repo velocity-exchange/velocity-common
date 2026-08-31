@@ -99,7 +99,17 @@ export function parseInput(
 	locale: LocaleConfig = getDefaultLocale()
 ): ParseResult {
 	if (typeof input !== 'string') return { status: 'invalid', value: null };
-	const bare = ungroup(input.trim(), locale);
+	const trimmed = input.trim();
+	// A group separator after the decimal one means the text follows a different
+	// locale's convention. Stripping it would rescale the value instead of
+	// failing, so "1,234.56" read as de-DE is rejected, not parsed as 1.23.
+	if (locale.group !== '' && locale.decimal !== '') {
+		const decimalAt = trimmed.indexOf(locale.decimal);
+		if (decimalAt !== -1 && trimmed.indexOf(locale.group, decimalAt) !== -1) {
+			return { status: 'invalid', value: null };
+		}
+	}
+	const bare = ungroup(trimmed, locale);
 	const normalised =
 		locale.decimal === '.' ? bare : bare.split(locale.decimal).join('.');
 	const parsed = fromString(normalised);
