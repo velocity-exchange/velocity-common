@@ -100,6 +100,9 @@ describe('format/step helpers', () => {
 		expect(snapValueToStep(null, '0.01')).to.equal(null);
 		expect(snapValueToStep('1', '0')).to.equal(null);
 		expect(snapValueToStep('1', 'nope')).to.equal(null);
+		// A negative step used to snap to the same lattice as its magnitude.
+		expect(snapValueToStep('1', '-0.1')).to.equal(null);
+		expect(snapValueToStep('1', '-0.1', 'nearest')).to.equal(null);
 	});
 
 	it('capStringFractionDigits truncates and keeps an in-progress separator', () => {
@@ -254,6 +257,22 @@ describe('format/input configuration', () => {
 		} as const;
 		expect(toPlainString(parseInput('1.234,5', 6, deDe).value!)).to.equal(
 			'1234.5'
+		);
+	});
+
+	it('parseInput rejects text written in the other locale convention', () => {
+		const deDe = {
+			tag: 'de-DE',
+			decimal: ',',
+			group: '.',
+			groupSizes: [3],
+		} as const;
+		// Stripping the trailing group separator would read 1234.56 as 1.23.
+		expect(parseInput('1,234.56', 6, deDe).status).to.equal('invalid');
+		expect(parseInput('1.234,56', 6).status).to.equal('invalid');
+		expect(toPlainString(parseInput('1,234.56', 6).value!)).to.equal('1234.56');
+		expect(toPlainString(parseInput('1.234,56', 6, deDe).value!)).to.equal(
+			'1234.56'
 		);
 	});
 

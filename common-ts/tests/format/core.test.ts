@@ -82,6 +82,29 @@ describe('format/core construction', () => {
 		expect(toPlainString(d('1e-7'))).to.equal('0.0000001');
 	});
 
+	it('toDecimal bounds a positive scale on every object ingress', () => {
+		// The padding these ask for is unrenderable, and used to throw a RangeError.
+		const huge = [
+			{ raw: { toString: () => '1' }, scale: 1e9 },
+			{ val: { toString: () => '1' }, precision: { toString: () => '1e9' } },
+			{ sign: 1, digits: '1', scale: 1e9 },
+			{ raw: { toString: () => '1' }, scale: MAX_EXPONENT_SHIFT + 1 },
+		];
+		for (const input of huge) {
+			expect(() => toDecimal(input as never)).to.not.throw();
+			expect(toDecimal(input as never).status, JSON.stringify(input)).to.equal(
+				'invalid'
+			);
+		}
+		// The bound itself is symmetric with the negative side, and inclusive.
+		expect(
+			toDecimal({
+				raw: { toString: () => '1' },
+				scale: MAX_EXPONENT_SHIFT,
+			} as never).status
+		).to.equal('ok');
+	});
+
 	it('fromString rejects grouped and malformed strings', () => {
 		expect(fromString('1,234.5').status).to.equal('invalid');
 		expect(fromString('').status).to.equal('invalid');
@@ -357,6 +380,27 @@ describe('format/core step maths', () => {
 		);
 		expect(toPlainString(snapToStep(d('1.234'), step, 'nearest'))).to.equal(
 			'1.23'
+		);
+	});
+
+	it('snapToStep breaks a nearest tie away from zero, both signs', () => {
+		const step = d('1');
+		expect(toPlainString(snapToStep(d('1.5'), step, 'nearest'))).to.equal('2');
+		expect(toPlainString(snapToStep(d('-1.5'), step, 'nearest'))).to.equal(
+			'-2'
+		);
+		expect(toPlainString(snapToStep(d('2.5'), step, 'nearest'))).to.equal('3');
+		expect(toPlainString(snapToStep(d('-2.5'), step, 'nearest'))).to.equal(
+			'-3'
+		);
+	});
+
+	it('snapToStep rejects a non-positive step', () => {
+		expect(() => snapToStep(d('1'), d('0'), 'nearest')).to.throw(
+			'Step size must be positive'
+		);
+		expect(() => snapToStep(d('1'), d('-0.1'), 'nearest')).to.throw(
+			'Step size must be positive'
 		);
 	});
 
