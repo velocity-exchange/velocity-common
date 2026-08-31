@@ -102,7 +102,9 @@ const getAccountCanBeDeletedInstantly = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
 	currentSlot: number,
-	slotDuration: SlotDurationMs
+	// Retained for call-site compatibility; idleness now reads the live slot
+	// duration off the State account instead of a caller-supplied scalar.
+	_slotDuration: SlotDurationMs
 ): CanBeDeletedState => {
 	const statsAccountIsPastDeletionCutoff =
 		getStatsAccountIsPastDeletionCutoff(userStatsAccount);
@@ -111,7 +113,7 @@ const getAccountCanBeDeletedInstantly = (
 
 	const userCanBeMarkedIdle = user.canMakeIdle(
 		new BN(currentSlot),
-		slotDuration
+		user.velocityClient.getStateAccount()
 	);
 
 	const accountHasOpenPerpSpotOrOrders = accountHasOpenPositionsOrOrders(user);
@@ -146,7 +148,8 @@ const getAccountDeletionStepsToTake = (
 	user: User,
 	userStatsAccount: UserStatsAccount,
 	currentSlot: number,
-	slotDuration: SlotDurationMs
+	// Retained for call-site compatibility; see getAccountCanBeDeletedInstantly.
+	_slotDuration: SlotDurationMs
 ): AccountDeletionStep[] => {
 	const userAccount = user.getUserAccountOrThrow();
 	const statsAccountIsPastDeletionCutoff =
@@ -172,7 +175,10 @@ const getAccountDeletionStepsToTake = (
 	}
 
 	// Account can be marked idle and then deleted
-	const canBeMarkedIdle = user.canMakeIdle(new BN(currentSlot), slotDuration);
+	const canBeMarkedIdle = user.canMakeIdle(
+		new BN(currentSlot),
+		user.velocityClient.getStateAccount()
+	);
 
 	if (canBeMarkedIdle) {
 		return ['sendTriggerAccountIdleIx', 'sendAccountDeletionIx'];

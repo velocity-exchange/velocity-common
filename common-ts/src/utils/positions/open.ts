@@ -32,7 +32,8 @@ const getOpenPositionData = (
 	slotDuration: SlotDurationMs,
 	markPriceCallback?: (marketIndex: number) => BN
 ): OpenPosition[] => {
-	const oracleGuardRails = velocityClient.getStateAccount().oracleGuardRails;
+	const stateAccount = velocityClient.getStateAccount();
+	const oracleGuardRails = stateAccount.oracleGuardRails;
 
 	const newResult: OpenPosition[] = userPositions
 		.filter(
@@ -174,7 +175,7 @@ const getOpenPositionData = (
 					oraclePriceData,
 					oracleGuardRails,
 					perpMarket.amm.lastUpdateSlot?.toNumber(),
-					slotDuration
+					stateAccount
 				),
 				maxMarginRatio: position.maxMarginRatio,
 			};

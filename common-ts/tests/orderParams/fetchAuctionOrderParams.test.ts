@@ -438,6 +438,8 @@ describe('fetchAuctionOrderParams', () => {
 			getPerpMarketAccount: (_i: number) => mockPerpMarket,
 			getMMOracleDataForPerpMarket: (_i: number) => mmOracle,
 			getOracleDataForPerpMarket: (_i: number) => oracle,
+			// Empty state resolves to the 400ms baseline slot duration.
+			getStateAccount: () => ({}),
 		} as any;
 	};
 

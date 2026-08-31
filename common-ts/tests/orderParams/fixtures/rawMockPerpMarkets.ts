@@ -223,6 +223,7 @@ function mockPerpMarketCommon(): Omit<
 		takerFeeAddonTenthBps: 0,
 		bankruptcyIfFloorPct: 0,
 		pendingBankruptcyClaims: 0,
+		paddingFuture: [],
 	};
 }
 
