@@ -12,9 +12,10 @@ const DECIMAL_STRING =
 	/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
 
 /**
- * Largest decimal-point shift a string may ask for. Past it the expansion is
- * both unrenderable and inexact, because the exponent itself stops fitting in
- * a number, so two different exponents would collapse to the same scale.
+ * Largest decimal-point shift any ingress may ask for, in either direction. Past
+ * it the expansion is both unrenderable and inexact, because the exponent itself
+ * stops fitting in a number, so two different exponents would collapse to the
+ * same scale.
  */
 export const MAX_EXPONENT_SHIFT = 10_000;
 
@@ -73,6 +74,7 @@ function fromSignedUnits(units: string, scale: number): ParseResult {
 	const bare = units.replace(/^[+-]/, '');
 	if (!DIGITS_ONLY.test(bare)) return invalid();
 	if (scale >= 0) {
+		if (scale > MAX_EXPONENT_SHIFT) return invalid();
 		return ok(fromParts(negative ? -1 : 1, bare, scale));
 	}
 	if (scale < -MAX_EXPONENT_SHIFT) return invalid();
@@ -142,6 +144,7 @@ export function toDecimal(input: NumericInput): ParseResult {
 	if (isDecimal(input)) {
 		if (!DIGITS_ONLY.test(input.digits)) return invalid();
 		if (!Number.isInteger(input.scale) || input.scale < 0) return invalid();
+		if (input.scale > MAX_EXPONENT_SHIFT) return invalid();
 		if (input.sign !== -1 && input.sign !== 0 && input.sign !== 1) {
 			return invalid();
 		}
