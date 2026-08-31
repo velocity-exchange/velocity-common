@@ -92,7 +92,7 @@ export function snapValueToStep(
 	const parsedStep = toDecimal(step);
 	if (parsedValue.status !== 'ok' || !parsedValue.value) return null;
 	if (parsedStep.status !== 'ok' || !parsedStep.value) return null;
-	if (parsedStep.value.sign === 0) return null;
+	if (parsedStep.value.sign !== 1) return null;
 	return snapToStep(parsedValue.value, parsedStep.value, mode);
 }
 

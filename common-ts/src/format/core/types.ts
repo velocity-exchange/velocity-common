@@ -58,6 +58,7 @@ export interface ParseResult {
 	nonFiniteSign?: -1 | 1;
 }
 
+/** `nearest` breaks an exact tie away from zero, so -1.5 at step 1 snaps to -2. */
 export type StepMode = 'toward-zero' | 'floor' | 'nearest' | 'ceil';
 
 export interface FixedPointParts {

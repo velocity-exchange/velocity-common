@@ -24,7 +24,8 @@ function stepUnits(
 	value: Decimal,
 	step: Decimal
 ): { scale: number; value: bigint; step: bigint; stepScale: number } {
-	if (step.sign === 0) throw new Error('Step size must be non-zero');
+	// A negative step would otherwise snap to the same lattice as its magnitude.
+	if (step.sign !== 1) throw new Error('Step size must be positive');
 	const magnitude = fromParts(1, step.digits, step.scale);
 	const scale = Math.max(value.scale, magnitude.scale);
 	return {
