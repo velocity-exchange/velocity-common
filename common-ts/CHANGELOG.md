@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.2...common-ts-v0.5.0) (2026-08-31)
+
+
+### Features
+
+* **common-ts:** add wBTC and wETH spot markets ([#435](https://github.com/velocity-exchange/velocity-common/issues/435)) ([48cdd1b](https://github.com/velocity-exchange/velocity-common/commit/48cdd1bc97c9fe8370bcc8681e17e7e548a25cd5))
+
 ## [0.4.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.1...common-ts-v0.4.2) (2026-08-26)
 
 
