@@ -16,6 +16,7 @@ import {
 	compare,
 	fromParts,
 	isStepMultiple,
+	rescale,
 	toDecimal,
 	toPlainString,
 } from '../../src/format/core/index';
@@ -49,6 +50,13 @@ function randomStep(): Decimal {
 	const lead = 1 + Math.floor(random() * 9);
 	const trailing = Math.floor(random() * 3);
 	return fromParts(1, `${lead}${'0'.repeat(trailing)}`, scale);
+}
+
+/** Signed integer units at a common scale, so two Decimals subtract exactly. */
+function unitsAt(d: Decimal, scale: number): bigint {
+	const at = rescale(d, scale);
+	const magnitude = BigInt(at.digits);
+	return at.sign === -1 ? -magnitude : magnitude;
 }
 
 const CORPUS = [
@@ -206,6 +214,17 @@ describe('format properties: step snapping', () => {
 			const ceiled = snapValueToStep(value, step, 'ceil')!;
 			expect(
 				compare(snapped, floored) === 0 || compare(snapped, ceiled) === 0
+			).to.equal(true);
+
+			// The distance itself, so an always-floor regression cannot pass.
+			const scale = Math.max(value.scale, step.scale, snapped.scale);
+			const gap = unitsAt(snapped, scale) - unitsAt(value, scale);
+			const distance = gap < BigInt(0) ? -gap : gap;
+			expect(
+				distance * BigInt(2) <= unitsAt(abs(step), scale),
+				`${toPlainString(snapped)} is over half of ${toPlainString(
+					step
+				)} from ${toPlainString(value)}`
 			).to.equal(true);
 		}
 	});
