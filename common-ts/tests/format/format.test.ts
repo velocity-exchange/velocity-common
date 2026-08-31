@@ -536,10 +536,8 @@ describe('format/presets', () => {
 		expect(Object.isFrozen(PRESETS.usd.digits)).to.equal(true);
 		expect(Object.isFrozen(PRESETS.pnl.digits)).to.equal(true);
 		expect(Object.isFrozen(PRESETS.usdCompact.abbreviate)).to.equal(true);
-		expect(Object.isFrozen(PRESETS.orderSizeExact.sentinels)).to.equal(true);
-		expect(Object.isFrozen(PRESETS.orderSizeExact.sentinels![0])).to.equal(
-			true
-		);
+		expect(Object.isFrozen(PRESETS.orderSize.sentinels)).to.equal(true);
+		expect(Object.isFrozen(PRESETS.orderSize.sentinels![0])).to.equal(true);
 
 		const before = formatText('123.456789', PRESETS.usd);
 		try {
@@ -599,7 +597,7 @@ describe('format/presets', () => {
 		expect(formatText('0.5', PRESETS.leverage)).to.equal('1x');
 	});
 
-	it('orderSize truncates to the market step, with the entire-position sentinel', () => {
+	it('orderSizeStep truncates to the market step, with the entire-position sentinel', () => {
 		const market = {
 			priceDecimals: 2,
 			sizeDecimals: 3,
@@ -607,14 +605,14 @@ describe('format/presets', () => {
 			step: d('0.001'),
 			source: 'onchain' as const,
 		};
-		expect(formatText('1.23456', { ...PRESETS.orderSize, market })).to.equal(
-			'1.234'
-		);
-		expect(formatText('1.23456', PRESETS.orderSize)).to.equal('?');
+		expect(
+			formatText('1.23456', { ...PRESETS.orderSizeStep, market })
+		).to.equal('1.234');
+		expect(formatText('1.23456', PRESETS.orderSizeStep)).to.equal('?');
 		expect(
 			formatText(
 				{ raw: { toString: () => '18446744073709551615' }, scale: 9 },
-				PRESETS.orderSize
+				PRESETS.orderSizeStep
 			)
 		).to.equal('Entire Position');
 	});
@@ -632,13 +630,13 @@ describe('format/presets', () => {
 		expect(truncated.roundingApplied).to.equal('truncate');
 	});
 
-	it('orderSizeExact keeps the exact prettyPrint shape', () => {
-		expect(formatText('1.23456', PRESETS.orderSizeExact)).to.equal('1.23456');
-		expect(formatText('1.25000', PRESETS.orderSizeExact)).to.equal('1.25');
+	it('orderSize keeps the exact prettyPrint shape formatOrderSize renders', () => {
+		expect(formatText('1.23456', PRESETS.orderSize)).to.equal('1.23456');
+		expect(formatText('1.25000', PRESETS.orderSize)).to.equal('1.25');
 		expect(
 			formatText(
 				{ raw: { toString: () => '18446744073709551615' }, scale: 9 },
-				PRESETS.orderSizeExact
+				PRESETS.orderSize
 			)
 		).to.equal('Entire Position');
 	});
