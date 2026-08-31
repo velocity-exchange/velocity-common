@@ -572,7 +572,7 @@ export async function deriveAuctionParamsFromVamm({
 			marketIndex < 3
 				? MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS
 				: DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
-		slotDuration,
+		slotDurationState: velocityClient.getStateAccount(),
 	});
 	const l2Data: L2OrderBook = {
 		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),
