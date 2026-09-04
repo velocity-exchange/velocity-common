@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.5.0...common-ts-v0.6.0) (2026-09-04)
+
+
+### Features
+
+* **common-ts:** shorten the swift signing buffer for auto-signing wallets ([#438](https://github.com/velocity-exchange/velocity-common/issues/438)) ([724f79a](https://github.com/velocity-exchange/velocity-common/commit/724f79a93ae4ef5a7f8d3df0624badc47e07cd93))
+
 ## [0.5.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.4.2...common-ts-v0.5.0) (2026-08-31)
 
 
