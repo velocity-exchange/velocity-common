@@ -38,9 +38,9 @@ import { Connection } from '@solana/web3.js';
 export const USER_SIGNING_MESSAGE_BUFFER_MS = 2_800;
 
 /**
- * The same budget for a signer that needs no human approval, such as a delegated
- * embedded wallet. It covers the signature, the hop to the SWIFT server and the
- * filler picking the order up, with no prompt to wait on.
+ * The equivalent budget for a signer that needs no human approval, such as a
+ * delegated embedded wallet. It covers the signature, the hop to the SWIFT
+ * server and the filler picking the order up, with no prompt to wait on.
  *
  * This is not only an expiry: the stamped slot is the auction start, and the
  * program refuses to place an auction order before it arrives, so every slot of
@@ -56,6 +56,18 @@ export const DELEGATE_SIGNING_MESSAGE_BUFFER_MS = 800;
  * handling non-auction orders); enforced on chain, so it ceils.
  */
 export const MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS = 14_000;
+
+/**
+ * Ceiling on either signing budget.
+ *
+ * The buffer becomes the stamped message slot, and for a resting limit that slot
+ * is a placement deadline the program refuses beyond a 30s lead
+ * (`max_resting_limit_lead` in `place_signed_msg_taker_order`). A budget past
+ * that bound rejects every resting limit on chain, silently, so the tuning knob
+ * is clamped below it rather than trusted. Still leaves room above the 14s
+ * non-auction floor.
+ */
+export const MAXIMUM_SIGNING_MESSAGE_BUFFER_MS = 20_000;
 
 /**
  * The signing budget for this signer, in slots.
@@ -82,7 +94,10 @@ export const getUserSigningSlotBuffer = ({
 		? (budgetMsOverrides?.autoSigned ?? DELEGATE_SIGNING_MESSAGE_BUFFER_MS)
 		: (budgetMsOverrides?.prompted ?? USER_SIGNING_MESSAGE_BUFFER_MS);
 
-	return Math.max(1, msToSlotsCeilNum(budgetMs, slotDuration));
+	return Math.min(
+		Math.max(1, msToSlotsCeilNum(budgetMs, slotDuration)),
+		msToSlotsCeilNum(MAXIMUM_SIGNING_MESSAGE_BUFFER_MS, slotDuration)
+	);
 };
 
 /**

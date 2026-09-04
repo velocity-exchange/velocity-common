@@ -14,6 +14,7 @@ import { expect } from 'chai';
 import {
 	DELEGATE_SIGNING_MESSAGE_BUFFER_MS,
 	getUserSigningSlotBuffer,
+	MAXIMUM_SIGNING_MESSAGE_BUFFER_MS,
 	MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
 	prepSwiftOrderMessage,
 	USER_SIGNING_MESSAGE_BUFFER_MS,
@@ -284,5 +285,69 @@ describe('user signing slot buffer', () => {
 				budgetMsOverrides: { autoSigned: 2_000 },
 			})
 		).to.equal(5);
+
+		expect(
+			getUserSigningSlotBuffer({
+				autoSigned: false,
+				slotDuration: 400 as SlotDurationMs,
+				budgetMsOverrides: { prompted: 2_000 },
+			})
+		).to.equal(5);
+	});
+
+	it('reads only the override for the branch it took', () => {
+		expect(
+			getUserSigningSlotBuffer({
+				autoSigned: false,
+				slotDuration: 400 as SlotDurationMs,
+				budgetMsOverrides: { autoSigned: 400 },
+			})
+		).to.equal(7);
+
+		expect(
+			getUserSigningSlotBuffer({
+				autoSigned: true,
+				slotDuration: 400 as SlotDurationMs,
+				budgetMsOverrides: { prompted: 40_000 },
+			})
+		).to.equal(2);
+	});
+
+	// The stamped slot is a placement deadline for a resting limit, and the
+	// program refuses one led by more than 30s, so an oversized budget would
+	// reject every resting limit on chain.
+	it('clamps an oversized override below the program lead bound', () => {
+		GATES.forEach((slotDuration) => {
+			const clamped = getUserSigningSlotBuffer({
+				autoSigned: false,
+				slotDuration,
+				budgetMsOverrides: { prompted: 120_000 },
+			});
+
+			expect(clamped).to.equal(
+				Math.ceil(MAXIMUM_SIGNING_MESSAGE_BUFFER_MS / slotDuration)
+			);
+			expect(clamped * slotDuration).to.be.below(30_000);
+		});
+	});
+
+	// The delegate budget is far below the 14s non-auction floor, which
+	// prepSwiftOrder applies after the caller's buffer.
+	it('still floors a resting limit at the non-auction budget', async () => {
+		const restingLimit = await prepSwiftOrderMessage({
+			velocityClient: clientStub(),
+			subAccountId: 0,
+			userAccountPubKey: PublicKey.default,
+			marketIndex: 0,
+			userSigningSlotBuffer: getUserSigningSlotBuffer({
+				autoSigned: true,
+				slotDuration: 400 as SlotDurationMs,
+			}),
+			slotDuration: 400 as SlotDurationMs,
+			orderParams: { main: restingLimitOrder() },
+		});
+
+		expect(restingLimit.slotsTillAuctionEnd).to.equal(35);
+		expect(restingLimit.expirationTimeMs).to.equal(12_000);
 	});
 });
