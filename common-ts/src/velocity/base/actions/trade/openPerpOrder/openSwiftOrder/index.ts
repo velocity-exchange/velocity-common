@@ -38,10 +38,67 @@ import { Connection } from '@solana/web3.js';
 export const USER_SIGNING_MESSAGE_BUFFER_MS = 2_800;
 
 /**
+ * The equivalent budget for a signer that needs no human approval, such as a
+ * delegated embedded wallet. It covers the signature, the hop to the SWIFT
+ * server and the filler picking the order up, with no prompt to wait on.
+ *
+ * This is not only an expiry: the stamped slot is the auction start, and the
+ * program refuses to place an auction order before it arrives, so every slot of
+ * buffer is a slot the auction cannot begin. Under-sizing it is the softer
+ * failure (the auction has already advanced, so the taker starts partway up the
+ * curve) which is why this keeps a margin over the round trip rather than
+ * cutting to the minimum.
+ */
+export const DELEGATE_SIGNING_MESSAGE_BUFFER_MS = 800;
+
+/**
  * Whole approval budget for orders without an auction (kink of the SWIFT server
  * handling non-auction orders); enforced on chain, so it ceils.
  */
 export const MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS = 14_000;
+
+/**
+ * Ceiling on either signing budget.
+ *
+ * The buffer becomes the stamped message slot, and for a resting limit that slot
+ * is a placement deadline the program refuses beyond a 30s lead
+ * (`max_resting_limit_lead` in `place_signed_msg_taker_order`). A budget past
+ * that bound rejects every resting limit on chain, silently, so the tuning knob
+ * is clamped below it rather than trusted. Still leaves room above the 14s
+ * non-auction floor.
+ */
+export const MAXIMUM_SIGNING_MESSAGE_BUFFER_MS = 20_000;
+
+/**
+ * The signing budget for this signer, in slots.
+ *
+ * `autoSigned` must mean the signature needs no human approval (a delegated
+ * embedded wallet), not merely that the order is signed by a delegate: a
+ * delegate can still be a wallet that prompts.
+ *
+ * Never returns 0. Callers pass this down through `openPerp*Order`, which use 0
+ * as the "not supplied" sentinel that makes `prepSwiftOrder` fall back to its
+ * own default, so a 0 here would silently restore the full human budget.
+ */
+export const getUserSigningSlotBuffer = ({
+	autoSigned,
+	slotDuration,
+	budgetMsOverrides,
+}: {
+	autoSigned: boolean;
+	slotDuration: SlotDurationMs;
+	/** Per-signer tuning, so a deployment can move either budget without a release. */
+	budgetMsOverrides?: { autoSigned?: number; prompted?: number };
+}): number => {
+	const budgetMs = autoSigned
+		? (budgetMsOverrides?.autoSigned ?? DELEGATE_SIGNING_MESSAGE_BUFFER_MS)
+		: (budgetMsOverrides?.prompted ?? USER_SIGNING_MESSAGE_BUFFER_MS);
+
+	return Math.min(
+		Math.max(1, msToSlotsCeilNum(budgetMs, slotDuration)),
+		msToSlotsCeilNum(MAXIMUM_SIGNING_MESSAGE_BUFFER_MS, slotDuration)
+	);
+};
 
 /**
  * Buffer slots from the end of the auction to prevent the signing of the order message.
