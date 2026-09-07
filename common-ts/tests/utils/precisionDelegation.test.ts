@@ -83,6 +83,17 @@ describe('roundBigNumToDecimalPlace delegates to roundToDecimals half-ceil', () 
 		}
 	}
 
+	for (const decimalPlaces of [1.5, -0.5]) {
+		const key = `1.5 @${decimalPlaces}dp p6`;
+		const bigNum = () => BigNum.fromPrint('1.5', new BN(6));
+		cases.push({
+			key,
+			legacy: () =>
+				legacyRoundBigNumToDecimalPlace(bigNum(), decimalPlaces).print(),
+			next: () => roundBigNumToDecimalPlace(bigNum(), decimalPlaces).print(),
+		});
+	}
+
 	// Half-ceil keeps the tie rule `Math.round` had, so every remaining entry is
 	// an intended fix: the old implementation routed the value through
 	// `toNum()`, so it inherited the double's faults.
@@ -91,7 +102,20 @@ describe('roundBigNumToDecimalPlace delegates to roundToDecimals half-ceil', () 
 	const HIGH_PRECISION =
 		'digits beyond 2^53 survive instead of being re-rounded';
 
+	const FRACTIONAL_PLACES =
+		'a non-integer decimalPlaces throws instead of returning float noise, since Math.pow(10, 1.5) is not a power of ten';
+
 	const divergences: Record<string, Divergence> = {
+		'1.5 @1.5dp p6': {
+			behaviour: FRACTIONAL_PLACES,
+			old: '1.486270',
+			next: 'THROWS: decimalPlaces must be an integer, got 1.5',
+		},
+		'1.5 @-0.5dp p6': {
+			behaviour: FRACTIONAL_PLACES,
+			old: '0.000000',
+			next: 'THROWS: decimalPlaces must be an integer, got -0.5',
+		},
 		'1.005 @2dp p6': {
 			behaviour: REPRESENTATION,
 			old: '1.000000',
@@ -169,13 +193,6 @@ describe('roundBigNumToDecimalPlace delegates to roundToDecimals half-ceil', () 
 				-1
 			).print()
 		).to.equal('120.000');
-	});
-
-	it('rejects a non-integer decimal place count instead of returning float noise', () => {
-		const value = BigNum.fromPrint('1.5', new BN(6));
-		expect(() => roundBigNumToDecimalPlace(value, 1.5)).to.throw(
-			/must be an integer/
-		);
 	});
 });
 
