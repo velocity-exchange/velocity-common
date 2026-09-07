@@ -1,5 +1,10 @@
-import { ENTIRE_POSITION, belowThreshold } from './sentinels';
-import { FormatOptions, LegacyNumberType } from './types';
+import { ENTIRE_POSITION } from './sentinels';
+import { FormatOptions, LegacyNumberType, SentinelRule } from './types';
+
+const NON_POSITIVE_LEVERAGE: SentinelRule = {
+	matches: (v) => v.sign !== 1,
+	text: '1x',
+};
 
 /** Recursive, because every nested digits/abbreviate/sentinel object is shared. */
 function deepFreeze<T>(value: T): T {
@@ -135,14 +140,22 @@ export const PRESETS = Object.freeze({
 			rounding: 'truncate' as const,
 		},
 	}),
+	/**
+	 * Zero, a negative and unusable input all read as 1x, because there is no
+	 * such thing as less than one times your own equity. A positive value below
+	 * a half still rounds to 0x rather than being clamped up.
+	 */
 	leverage: freeze({
 		digits: {
 			kind: 'decimals' as const,
 			decimals: 0,
-			rounding: 'truncate' as const,
+			rounding: 'half-up' as const,
 		},
 		unit: 'x',
-		sentinels: [belowThreshold('1', '1x')],
+		sentinels: [NON_POSITIVE_LEVERAGE],
+		fallback: '1x',
+		invalidText: '1x',
+		nonFiniteText: { positive: '∞x', negative: '1x' },
 	}),
 	compact: freeze({
 		digits: { kind: 'exact' as const },

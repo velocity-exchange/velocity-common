@@ -577,10 +577,14 @@ describe('format/presets', () => {
 		);
 	});
 
-	it('leverage is a whole number with an x, clamped at one', () => {
+	it('leverage rounds to a whole number, with 1x for anything non-positive', () => {
 		expect(formatText('12.34', PRESETS.leverage)).to.equal('12x');
+		expect(formatText('1.6', PRESETS.leverage)).to.equal('2x');
+		expect(formatText('0.4', PRESETS.leverage)).to.equal('0x');
+		expect(formatText('0', PRESETS.leverage)).to.equal('1x');
 		expect(formatText('-5', PRESETS.leverage)).to.equal('1x');
-		expect(formatText('0.5', PRESETS.leverage)).to.equal('1x');
+		expect(formatText(null, PRESETS.leverage)).to.equal('1x');
+		expect(formatText('nope', PRESETS.leverage)).to.equal('1x');
 	});
 
 	it('orderSizeStep truncates to the market step, with the entire-position sentinel', () => {
