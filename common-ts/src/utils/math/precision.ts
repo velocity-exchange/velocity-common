@@ -13,13 +13,18 @@ export const TRADE_PRECISION = 6;
  * trailing separator at zero fraction digits that `roundToStepSize` strips.
  */
 const capToFractionDigits = (input: string, maxFractionDigits: number) => {
+	if (typeof input !== 'string' || input === '') return input;
+
 	const capped = capStringFractionDigits(input, { maxFractionDigits });
 	if (capped === input) return input;
 
 	const sep = input.lastIndexOf(DECIMAL_SEPARATOR);
-	const head = input.slice(0, sep);
-	if (maxFractionDigits === 0) return `${head}${DECIMAL_SEPARATOR}`;
-	return sep === 0 ? capped.slice(DECIMAL_SEPARATOR.length) : capped;
+	if (maxFractionDigits === 0) {
+		const head = input.slice(0, sep);
+		return `${head}${DECIMAL_SEPARATOR}`;
+	}
+	// slice(1) drops the '0' head the core injects ahead of a leading separator.
+	return sep === 0 ? capped.slice(1) : capped;
 };
 
 /**
@@ -45,7 +50,7 @@ export const roundToStepSize = (value: string, stepSize?: number) => {
 		stepFractionDigits(stepSize)
 	);
 
-	if (truncatedValue.charAt(truncatedValue.length - 1) === '.') {
+	if (truncatedValue.charAt(truncatedValue.length - 1) === DECIMAL_SEPARATOR) {
 		return truncatedValue.slice(0, -1);
 	}
 
