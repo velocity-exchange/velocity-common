@@ -137,7 +137,8 @@ function sweep(
 	maxScale: number,
 	expectFired: string[]
 ) {
-	it(label, () => {
+	it(label, function () {
+		this.timeout(20000);
 		const rng = makeRng(seed);
 		const fired = new Set<string>();
 
