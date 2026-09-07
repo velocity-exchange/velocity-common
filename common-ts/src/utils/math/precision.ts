@@ -1,24 +1,58 @@
-import { BN, SpotMarketConfig } from '@velocity-exchange/sdk';
+import { SpotMarketConfig } from '@velocity-exchange/sdk';
+import {
+	capStringFractionDigits,
+	stepFractionDigits,
+} from '../../format/market';
 
 export const TRADE_PRECISION = 6;
 
+/**
+ * Delegates the digit maths to `capStringFractionDigits`, then restores two
+ * shapes the old slice-based implementation produced and callers still read:
+ * a bare in-progress '.5' keeps its leading separator instead of gaining a '0',
+ * and at zero fraction digits the separator survives ('1.23' -> '1.'), which is
+ * what `roundToStepSize` then strips.
+ *
+ * The head is taken from the LAST separator, the same one the core split on, so
+ * malformed multi-separator input keeps its leading text ('1.2.3' at zero digits
+ * is still '1.2.'). What did move is how many digits such input is allowed:
+ * the old code counted them after the FIRST separator, so '.1.23456' looked
+ * like one fraction digit and survived a two-digit cap; the core counts the five
+ * after the last and caps them to '.1.23'.
+ */
+const capToFractionDigits = (input: string, maxFractionDigits: number) => {
+	const capped = capStringFractionDigits(input, { maxFractionDigits });
+	if (capped === input) return input;
+
+	const sep = input.lastIndexOf('.');
+	const head = input.slice(0, sep);
+	if (maxFractionDigits === 0) return `${head}.`;
+	return sep === 0 ? capped.slice(1) : capped;
+};
+
+/**
+ * @deprecated Use `capStringFractionDigits` from
+ * `@velocity-exchange/common/format`.
+ */
 export const truncateInputToPrecision = (
 	input: string,
 	marketPrecisionExp: SpotMarketConfig['precisionExp']
-) => {
-	const decimalPlaces = input.split('.')[1]?.length ?? 0;
-	const maxDecimals = marketPrecisionExp.toNumber();
+) => capToFractionDigits(input, marketPrecisionExp.toNumber());
 
-	if (decimalPlaces > maxDecimals) {
-		return input.slice(0, input.length - (decimalPlaces - maxDecimals));
-	}
-
-	return input;
-};
-
+/**
+ * @deprecated Use `capStringFractionDigits` with `stepFractionDigits(step)`
+ * from `@velocity-exchange/common/format`.
+ *
+ * The allowed digit count now comes from an exact decimal parse of the step
+ * rather than `Number.prototype.toString`, which stringifies steps below 1e-6
+ * exponentially ('1e-7') and so reported zero decimals: '1.2345678' at a 1e-7
+ * step collapsed to '1'.
+ */
 export const roundToStepSize = (value: string, stepSize?: number) => {
-	const stepSizeExp = stepSize?.toString().split('.')[1]?.length ?? 0;
-	const truncatedValue = truncateInputToPrecision(value, new BN(stepSizeExp));
+	const truncatedValue = capToFractionDigits(
+		value,
+		stepFractionDigits(stepSize)
+	);
 
 	if (truncatedValue.charAt(truncatedValue.length - 1) === '.') {
 		return truncatedValue.slice(0, -1);
@@ -27,6 +61,10 @@ export const roundToStepSize = (value: string, stepSize?: number) => {
 	return truncatedValue;
 };
 
+/**
+ * @deprecated Use `capStringFractionDigits` with `stepFractionDigits(step)`
+ * from `@velocity-exchange/common/format`.
+ */
 export const roundToStepSizeIfLargeEnough = (
 	value: string,
 	stepSize?: number
