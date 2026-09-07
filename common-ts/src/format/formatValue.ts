@@ -11,7 +11,7 @@ import { groupInteger } from './grouping';
 import { DECIMAL_SEPARATOR } from './locale';
 import { applyDigitSpec, minDecimalsOf } from './resolveDigits';
 import { applySmallNumber } from './small';
-import { trimFractionZeros } from './trim';
+import { trimDecimalZeros, trimFractionZeros } from './trim';
 import {
 	DigitSpec,
 	FormatOptions,
@@ -226,6 +226,12 @@ export function formatValue(
 		// An abbreviated value is far too large for the small forms, and the
 		// mantissa it leaves behind is not the value the check is about.
 		if (smallOptions && !smallFirst && !wasAbbreviated) {
+			// The trim runs before the check, so a trimmed value takes the small
+			// form its trimmed digits describe.
+			if (trimTrailingZeros) {
+				fraction = trimFractionZeros(fraction, minDecimals);
+				rounded = trimDecimalZeros(rounded, minDecimals);
+			}
 			small = applySmallNumber(rounded, smallOptions);
 		}
 	}

@@ -430,30 +430,68 @@ describe('format/small numbers', () => {
 	});
 
 	it('engages only past the configured leading-zero count', () => {
-		const small = { mode: 'significant' as const };
+		const small = { mode: 'significant' as const, minSignificant: 3 };
 		expect(formatText('0.00012345', { small })).to.equal('0.00012345');
 		expect(formatText('0.000012345', { small })).to.equal('0.0000123');
 	});
 
 	it('renders the unicode subscript form', () => {
 		expect(
-			formatText('0.000012345', { small: { mode: 'subscript' } })
+			formatText('0.000012345', {
+				small: { mode: 'subscript', minSignificant: 3 },
+			})
 		).to.equal('0.0₄123');
 		expect(toSubscript(12)).to.equal('₁₂');
 	});
 
+	it('keeps every digit past the leading zeros without a digit floor', () => {
+		const small = {
+			mode: 'subscript' as const,
+			order: 'after-digits' as const,
+		};
+		const digits = { kind: 'exact' as const };
+		expect(formatText('0.000012345678', { digits, small })).to.equal(
+			'0.0₄12345678'
+		);
+		expect(formatText('-0.000012345678', { digits, small })).to.equal(
+			'-0.0₄12345678'
+		);
+		expect(
+			formatValue('0.000012345678', { digits, small }).wasRounded
+		).to.equal(false);
+	});
+
+	it('trims before it decides on a small form', () => {
+		expect(
+			formatText('0.0000120', {
+				digits: { kind: 'exact' },
+				small: { mode: 'subscript', order: 'after-digits' },
+				trimTrailingZeros: true,
+			})
+		).to.equal('0.0₄12');
+		expect(
+			formatText('-0.0000120', {
+				digits: { kind: 'exact' },
+				small: { mode: 'subscript', order: 'after-digits' },
+				trimTrailingZeros: true,
+			})
+		).to.equal('-0.0₄12');
+	});
+
 	it('reports the truncation the small form applied', () => {
 		const dropped = formatValue('0.000012345', {
-			small: { mode: 'subscript' },
+			small: { mode: 'subscript', minSignificant: 3 },
 		});
 		expect(dropped.text).to.equal('0.0₄123');
 		expect(dropped.wasRounded).to.equal(true);
 		expect(dropped.roundingApplied).to.equal('truncate');
-		const kept = formatValue('0.0000123', { small: { mode: 'subscript' } });
+		const kept = formatValue('0.0000123', {
+			small: { mode: 'subscript', minSignificant: 3 },
+		});
 		expect(kept.wasRounded).to.equal(false);
 		expect(kept.roundingApplied).to.equal(null);
 		const significant = formatValue('0.000012345', {
-			small: { mode: 'significant' },
+			small: { mode: 'significant', minSignificant: 3 },
 		});
 		expect(significant.wasRounded).to.equal(true);
 		expect(significant.roundingApplied).to.equal('truncate');
@@ -462,6 +500,39 @@ describe('format/small numbers', () => {
 		});
 		expect(sentinel.wasRounded).to.equal(false);
 		expect(sentinel.roundingApplied).to.equal(null);
+	});
+
+	it('a minSignificant of 3 reproduces the three-digit small forms', () => {
+		const pinned: [string, string, string][] = [
+			['0.00012345', '0.00012345', '0.00012345'],
+			['0.000012345', '0.0₄123', '0.0000123'],
+			['0.0000123', '0.0₄123', '0.0000123'],
+			['0.000012345678', '0.0₄123', '0.0000123'],
+			['-0.000012345', '-0.0₄123', '-0.0000123'],
+			['0.0000000001234567', '0.0₉123', '0.000000000123'],
+			['0.0000120', '0.0₄120', '0.0000120'],
+			['0.00000100', '0.0₅100', '0.00000100'],
+			['1.5', '1.5', '1.5'],
+			['0', '0', '0'],
+			['-0.00000098765', '-0.0₆987', '-0.000000987'],
+		];
+		for (const [input, subscript, significant] of pinned) {
+			const digits = { kind: 'exact' as const };
+			expect(
+				formatText(input, {
+					digits,
+					small: { mode: 'subscript', minSignificant: 3 },
+				}),
+				`${input} subscript`
+			).to.equal(subscript);
+			expect(
+				formatText(input, {
+					digits,
+					small: { mode: 'significant', minSignificant: 3 },
+				}),
+				`${input} significant`
+			).to.equal(significant);
+		}
 	});
 
 	it('sentinel mode uses abs, so negatives are not mislabelled', () => {

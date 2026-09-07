@@ -64,6 +64,7 @@ export interface AbbreviateOptions {
 
 export interface SmallNumberOptions {
 	mode: 'subscript' | 'significant' | 'sentinel';
+	/** Digits kept past the leading zeros. Omitted keeps every remaining digit. */
 	minSignificant?: number;
 	/** Engage only past N leading zeros after the point. Default 3. */
 	maxLeadingZeros?: number;

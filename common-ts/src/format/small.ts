@@ -42,7 +42,7 @@ export function applySmallNumber(
 	options: SmallNumberOptions
 ): SmallResult {
 	if (value.sign === 0) return null;
-	const minSignificant = options.minSignificant ?? 3;
+	const minSignificant = options.minSignificant;
 	const maxLeadingZeros = options.maxLeadingZeros ?? 3;
 	const magnitude = abs(value);
 
@@ -64,7 +64,10 @@ export function applySmallNumber(
 	const leadingZeros = leadingZeroCount(value);
 	if (leadingZeros <= maxLeadingZeros) return null;
 
-	const reduced = roundToSignificant(value, minSignificant, SMALL_ROUNDING);
+	const reduced =
+		minSignificant === undefined
+			? value
+			: roundToSignificant(value, minSignificant, SMALL_ROUNDING);
 	const wasRounded = reduced.digits.length < value.digits.length;
 	const roundingApplied = wasRounded ? SMALL_ROUNDING : null;
 	if (options.mode === 'significant') {
