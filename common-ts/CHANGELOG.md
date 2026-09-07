@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.6.0...common-ts-v0.7.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **common-ts:** `rounding` moves from FormatOptions and AbbreviateOptions onto the non-exact DigitSpec variants. Nothing imports ./format yet.
+* **common-ts:** `rounding` moves from FormatOptions and AbbreviateOptions onto the non-exact DigitSpec variants. Nothing imports ./format yet.
+
+### Features
+
+* **common-ts:** add the exact-decimal number formatting core ([#431](https://github.com/velocity-exchange/velocity-common/issues/431)) ([674d964](https://github.com/velocity-exchange/velocity-common/commit/674d964b50c54a72b7c3e8e572878050b9ddb125))
+
+
+### Code Refactoring
+
+* **common-ts:** delegate precision helpers to the format core ([#432](https://github.com/velocity-exchange/velocity-common/issues/432)) ([d620d68](https://github.com/velocity-exchange/velocity-common/commit/d620d68523970d7739acf12b79f5aebba52b52ca))
+
 ## [0.6.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.5.0...common-ts-v0.6.0) (2026-09-04)
 
 
