@@ -16,7 +16,7 @@ const MARKERS = {
 	truncated: '18446744072000000000',
 };
 
-const PRECISIONS = [6, 9];
+const PRECISIONS = [6, 9, 13];
 
 const buildCases = (): CorpusCase[] => {
 	const cases: CorpusCase[] = [];
@@ -97,6 +97,16 @@ const DIVERGENCES: Record<string, Divergence> = {
 	'truncated +half printed pos p9': banded(TOLERANCE),
 	'truncated -half printed pos p9': banded(TOLERANCE),
 	'truncated +1 printed pos p9': banded(OVERLAP),
+	'u64Max +1 raw pos p13': banded(TOLERANCE),
+	'u64Max -1 raw pos p13': banded(TOLERANCE),
+	'u64Max +half printed pos p13': banded(TOLERANCE),
+	'u64Max -half printed pos p13': banded(TOLERANCE),
+	'u64Max -1 printed pos p13': banded(OVERLAP),
+	'truncated +1 raw pos p13': banded(TOLERANCE),
+	'truncated -1 raw pos p13': banded(TOLERANCE),
+	'truncated +half printed pos p13': banded(TOLERANCE),
+	'truncated -half printed pos p13': banded(TOLERANCE),
+	'truncated +1 printed pos p13': banded(OVERLAP),
 };
 
 describe('ENTIRE_POSITION matches the exact marker on a positive size', () => {
