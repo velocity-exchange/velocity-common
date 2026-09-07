@@ -169,19 +169,14 @@ export function formatValue(
 	let trimTrailingZeros = options.trimTrailingZeros ?? false;
 	let minDecimals = minDecimalsOf(digits);
 
-	const small = options.small ? applySmallNumber(working, options.small) : null;
-	const smallPrefix = small?.prefix ?? '';
+	const smallOptions = options.small || undefined;
+	const smallFirst =
+		smallOptions !== undefined &&
+		(smallOptions.order ?? 'before-digits') === 'before-digits';
 
-	if (small) {
-		usedSmallForm = true;
-		integer = small.integer;
-		fraction = small.fraction;
-		rounded = small.value;
-		wasRounded = small.wasRounded;
-		roundingApplied = small.roundingApplied;
-		minDecimals = 0;
-		trimTrailingZeros = false;
-	} else {
+	let small = smallFirst ? applySmallNumber(working, smallOptions!) : null;
+
+	if (!small) {
 		const abbreviateOptions = options.abbreviate || undefined;
 		const abbreviated = abbreviateOptions
 			? abbreviateValue(working, abbreviateOptions)
@@ -227,7 +222,26 @@ export function formatValue(
 			roundingApplied = resolved.roundingApplied;
 			minDecimals = minDecimalsOf(spec);
 		}
+
+		// An abbreviated value is far too large for the small forms, and the
+		// mantissa it leaves behind is not the value the check is about.
+		if (smallOptions && !smallFirst && !wasAbbreviated) {
+			small = applySmallNumber(rounded, smallOptions);
+		}
 	}
+
+	if (small) {
+		usedSmallForm = true;
+		integer = small.integer;
+		fraction = small.fraction;
+		rounded = small.value;
+		wasRounded = wasRounded || small.wasRounded;
+		roundingApplied = small.roundingApplied ?? roundingApplied;
+		roundedAway = false;
+		minDecimals = 0;
+		trimTrailingZeros = false;
+	}
+	const smallPrefix = small?.prefix ?? '';
 
 	if (trimTrailingZeros) fraction = trimFractionZeros(fraction, minDecimals);
 	if (options.grouping !== false) integer = groupInteger(integer);

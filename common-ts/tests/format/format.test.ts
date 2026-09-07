@@ -473,6 +473,32 @@ describe('format/small numbers', () => {
 		expect(formatValue('-0.000001', { small }).sign).to.equal('negative');
 	});
 
+	it('after-digits reads the rounded result, before-digits the input', () => {
+		const small = {
+			mode: 'subscript' as const,
+			order: 'after-digits' as const,
+		};
+		expect(formatText('0.0000123', { ...PRESETS.usdSigned, small })).to.equal(
+			'+$0.00'
+		);
+		expect(
+			formatText('0.0000123', { digits: { kind: 'exact' }, small })
+		).to.equal('0.0₄123');
+		expect(
+			formatText('0.0000123', {
+				...PRESETS.usdSigned,
+				small: { mode: 'subscript' },
+			})
+		).to.equal('+$0.0₄123');
+
+		const collapsed = formatValue('0.0000123', {
+			...PRESETS.usdSigned,
+			small,
+		});
+		expect(collapsed.usedSmallForm).to.equal(false);
+		expect(collapsed.roundedAway).to.equal(true);
+	});
+
 	it('the small sentinel keeps the currency, percent and suffix affixes', () => {
 		expect(
 			formatText('0.005', {

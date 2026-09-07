@@ -68,6 +68,13 @@ export interface SmallNumberOptions {
 	/** Engage only past N leading zeros after the point. Default 3. */
 	maxLeadingZeros?: number;
 	sentinelAt?: NumericInput;
+	/**
+	 * Which value the leading-zero check reads. 'before-digits' (the default)
+	 * reads the input, so a small value always takes a small form.
+	 * 'after-digits' reads the rounded result, so a value the digit spec rounds
+	 * to zero renders as a plain zero ('$0.00') instead.
+	 */
+	order?: 'before-digits' | 'after-digits';
 }
 
 export interface SentinelRule {
