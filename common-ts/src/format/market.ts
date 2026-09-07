@@ -102,7 +102,7 @@ export function snapValueToStep(
  * `dividesExactly` in `utils/math/precision`.
  *
  * Returns false when either side is missing or unparseable, and when the step
- * is zero.
+ * is zero or negative, matching `snapValueToStep`, which returns null for both.
  */
 export function isExactMultiple(
 	value: NumericInput,
@@ -112,7 +112,7 @@ export function isExactMultiple(
 	const parsedStep = toDecimal(step);
 	if (parsedValue.status !== 'ok' || !parsedValue.value) return false;
 	if (parsedStep.status !== 'ok' || !parsedStep.value) return false;
-	if (parsedStep.value.sign === 0) return false;
+	if (parsedStep.value.sign !== 1) return false;
 	return isStepMultiple(parsedValue.value, parsedStep.value);
 }
 

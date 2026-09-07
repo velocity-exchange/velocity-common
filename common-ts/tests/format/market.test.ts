@@ -162,6 +162,14 @@ describe('format/step helpers', () => {
 		expect(isExactMultiple(null, '1')).to.equal(false);
 	});
 
+	it('isExactMultiple returns false on a negative step, as snapValueToStep does', () => {
+		expect(isExactMultiple(10, -5)).to.equal(false);
+		expect(isExactMultiple('10', '-5')).to.equal(false);
+		expect(isExactMultiple(-10, -5)).to.equal(false);
+		expect(isExactMultiple(10, -0.1)).to.equal(false);
+		expect(snapValueToStep('10', '-5')).to.equal(null);
+	});
+
 	it('isExactMultiple reads BigNum and raw-unit inputs without a float hop', () => {
 		expect(
 			isExactMultiple(BigNum.fromPrint('1.5', new BN(9)), {
