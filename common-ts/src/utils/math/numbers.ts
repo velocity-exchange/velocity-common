@@ -62,6 +62,15 @@ export const getPctCompletion = (
 	return (currentProgressSize / totalProgressSize) * 100;
 };
 
+/**
+ * Float helper, and deliberately still one: it rounds a `number` with `Math.round`
+ * and is subject to every double fault that implies (ties on negatives go toward
+ * +Infinity, and `1.005` at 2dp gives `1`). Fine for a ratio or a chart tick,
+ * wrong for anything displayed as money or sent on chain.
+ *
+ * For an exact result use `roundToDecimals(decimal, decimals, mode)` from
+ * `@velocity-exchange/common/format/core`.
+ */
 export function roundToDecimal(
 	value: number,
 	decimals: number | undefined | null
