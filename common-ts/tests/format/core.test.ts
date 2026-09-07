@@ -24,6 +24,7 @@ import {
 	toLossyNumber,
 	toPlainString,
 } from '../../src/format/core/index';
+import { makeRandom } from './random';
 
 const d = (s: string) => {
 	const parsed = fromString(s);
@@ -409,11 +410,7 @@ describe('format/core half-ceil rounding', () => {
 	});
 
 	it('is indistinguishable from half-up on every non-negative value', () => {
-		let state = 20260907;
-		const random = () => {
-			state = (state * 1664525 + 1013904223) >>> 0;
-			return state / 4294967296;
-		};
+		const random = makeRandom(20260907);
 		for (let i = 0; i < 400; i++) {
 			let digits = String(1 + Math.floor(random() * 9));
 			const digitCount = 1 + Math.floor(random() * 18);

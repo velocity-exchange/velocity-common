@@ -174,7 +174,8 @@ export function formatValue(
 		smallOptions !== undefined &&
 		(smallOptions.order ?? 'before-digits') === 'before-digits';
 
-	let small = smallFirst ? applySmallNumber(working, smallOptions!) : null;
+	let small =
+		smallOptions && smallFirst ? applySmallNumber(working, smallOptions) : null;
 
 	if (!small) {
 		const abbreviateOptions = options.abbreviate || undefined;

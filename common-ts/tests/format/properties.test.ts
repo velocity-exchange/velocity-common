@@ -17,20 +17,16 @@ import {
 	toDecimal,
 	toPlainString,
 } from '../../src/format/core/index';
+import { makeRandom } from './random';
 
-// Deterministic LCG, so a failure is always reproducible from the seed.
-function makeRandom(seed: number) {
-	let state = seed >>> 0;
-	return () => {
-		state = (state * 1664525 + 1013904223) >>> 0;
-		return state / 4294967296;
-	};
-}
-
-const random = makeRandom(20260827);
+// Each test draws from its own generator, so one test cannot shift the corpus
+// another one sees.
+const SEED = 20260827;
 const CASES = 400;
 
-function randomDecimal(): Decimal {
+type Random = () => number;
+
+function randomDecimal(random: Random): Decimal {
 	const digitCount = 1 + Math.floor(random() * 24);
 	let digits = String(1 + Math.floor(random() * 9));
 	for (let i = 1; i < digitCount; i++) {
@@ -42,7 +38,7 @@ function randomDecimal(): Decimal {
 	return fromParts(sign, digits, scale);
 }
 
-function randomStep(): Decimal {
+function randomStep(random: Random): Decimal {
 	const scale = Math.floor(random() * 10);
 	const lead = 1 + Math.floor(random() * 9);
 	const trailing = Math.floor(random() * 3);
@@ -79,8 +75,9 @@ const CORPUS = [
 
 describe('format properties: parse and render round-trip', () => {
 	it('toDecimal(toPlainString(x)) reproduces x exactly', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
+			const value = randomDecimal(random);
 			const round = toDecimal(toPlainString(value));
 			expect(round.status, toPlainString(value)).to.equal('ok');
 			expect(round.value, toPlainString(value)).to.deep.equal(value);
@@ -98,6 +95,7 @@ describe('format properties: parse and render round-trip', () => {
 	// `plain` is exact digits with grouping off, so its text is exactly what
 	// toPlainString emits and nothing is lost on the way back in.
 	it('fromString(formatText(x, PRESETS.plain)) reproduces x', () => {
+		const random = makeRandom(SEED);
 		for (const raw of CORPUS) {
 			const value = toDecimal(raw).value!;
 			const text = formatText(value, PRESETS.plain);
@@ -105,7 +103,7 @@ describe('format properties: parse and render round-trip', () => {
 			expect(fromString(text).value, raw).to.deep.equal(value);
 		}
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
+			const value = randomDecimal(random);
 			const text = formatText(value, PRESETS.plain);
 			expect(fromString(text).value, text).to.deep.equal(value);
 		}
@@ -114,8 +112,9 @@ describe('format properties: parse and render round-trip', () => {
 
 describe('format properties: fraction caps', () => {
 	it('capFractionDigits is idempotent and never grows a value', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
+			const value = randomDecimal(random);
 			const max = Math.floor(random() * 12);
 			const once = capFractionDigits(value, max);
 			expect(capFractionDigits(once, max)).to.deep.equal(once);
@@ -125,16 +124,18 @@ describe('format properties: fraction caps', () => {
 	});
 
 	it('capFractionDigits leaves a value that already fits untouched', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
+			const value = randomDecimal(random);
 			expect(capFractionDigits(value, value.scale)).to.deep.equal(value);
 			expect(capFractionDigits(value, value.scale + 3)).to.deep.equal(value);
 		}
 	});
 
 	it('capStringFractionDigits is idempotent and never rewrites typed digits', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const typed = toPlainString(randomDecimal());
+			const typed = toPlainString(randomDecimal(random));
 			const max = Math.floor(random() * 12);
 			const once = capStringFractionDigits(typed, { maxFractionDigits: max });
 			expect(
@@ -145,8 +146,9 @@ describe('format properties: fraction caps', () => {
 	});
 
 	it('capStringFractionDigits never changes a value that already fits', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const typed = toPlainString(randomDecimal());
+			const typed = toPlainString(randomDecimal(random));
 			const fraction = typed.split('.')[1] ?? '';
 			expect(
 				capStringFractionDigits(typed, {
@@ -159,9 +161,10 @@ describe('format properties: fraction caps', () => {
 
 describe('format properties: step snapping', () => {
 	it('the output is always a step multiple', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
-			const step = randomStep();
+			const value = randomDecimal(random);
+			const step = randomStep(random);
 			for (const mode of ['toward-zero', 'floor', 'nearest', 'ceil'] as const) {
 				const snapped = snapValueToStep(value, step, mode)!;
 				expect(
@@ -173,9 +176,10 @@ describe('format properties: step snapping', () => {
 	});
 
 	it('toward-zero never exceeds the input and never flips the sign', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
-			const step = randomStep();
+			const value = randomDecimal(random);
+			const step = randomStep(random);
 			const snapped = snapValueToStep(value, step, 'toward-zero')!;
 			expect(
 				compare(abs(snapped), abs(value)),
@@ -186,9 +190,10 @@ describe('format properties: step snapping', () => {
 	});
 
 	it('floor never exceeds the input and ceil never falls below it', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
-			const step = randomStep();
+			const value = randomDecimal(random);
+			const step = randomStep(random);
 			expect(
 				compare(snapValueToStep(value, step, 'floor')!, value)
 			).to.not.equal(1);
@@ -199,9 +204,10 @@ describe('format properties: step snapping', () => {
 	});
 
 	it('nearest is never further from the input than half a step', () => {
+		const random = makeRandom(SEED);
 		for (let i = 0; i < CASES; i++) {
-			const value = randomDecimal();
-			const step = randomStep();
+			const value = randomDecimal(random);
+			const step = randomStep(random);
 			const snapped = snapValueToStep(value, step, 'nearest')!;
 			const floored = snapValueToStep(value, step, 'floor')!;
 			const ceiled = snapValueToStep(value, step, 'ceil')!;
