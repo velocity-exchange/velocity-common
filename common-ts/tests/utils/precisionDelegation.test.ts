@@ -11,6 +11,7 @@ import {
 import { isExactMultiple } from '../../src/format/index';
 import { getDecimalsFromSize } from '../../src/utils/markets/precisions';
 import { trimTrailingZeros } from '../../src/utils/strings/format';
+import { CorpusCase, Divergence, runCorpus } from '../format/divergence';
 
 /**
  * Characterization corpus for the precision delegates. Each `legacy*`
@@ -19,53 +20,6 @@ import { trimTrailingZeros } from '../../src/utils/strings/format';
  * except at the cases listed in that function's diff table, and every entry in
  * a diff table names the behaviour it is there for.
  */
-
-interface CorpusCase {
-	key: string;
-	legacy: () => string;
-	next: () => string;
-}
-
-interface Divergence {
-	behaviour: string;
-	old: string;
-	next: string;
-}
-
-const runCorpus = (
-	cases: CorpusCase[],
-	divergences: Record<string, Divergence>
-) => {
-	const unusedKeys = new Set(Object.keys(divergences));
-	for (const testCase of cases) {
-		const legacy = attempt(testCase.legacy);
-		const next = attempt(testCase.next);
-		const divergence = divergences[testCase.key];
-		if (divergence) {
-			unusedKeys.delete(testCase.key);
-			expect(legacy, `${testCase.key} old (${divergence.behaviour})`).to.equal(
-				divergence.old
-			);
-			expect(next, `${testCase.key} new (${divergence.behaviour})`).to.equal(
-				divergence.next
-			);
-		} else {
-			expect(next, `${testCase.key} must be unchanged`).to.equal(legacy);
-		}
-	}
-	expect(
-		[...unusedKeys],
-		'every annotated divergence must be reached'
-	).to.deep.equal([]);
-};
-
-const attempt = (fn: () => string) => {
-	try {
-		return fn();
-	} catch (e) {
-		return `THROWS: ${(e as Error).message}`;
-	}
-};
 
 // ---------------------------------------------------------------------------
 // roundBigNumToDecimalPlace

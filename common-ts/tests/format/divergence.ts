@@ -31,7 +31,14 @@ export const runCorpus = (
 	divergences: Record<string, Divergence>
 ) => {
 	const unusedKeys = new Set(Object.keys(divergences));
+	const seenKeys = new Set<string>();
 	for (const testCase of cases) {
+		// A repeated key silently drops a case from the annotation check, so the
+		// corpus builder has to keep them distinct.
+		if (seenKeys.has(testCase.key)) {
+			throw new Error(`duplicate corpus case key: ${testCase.key}`);
+		}
+		seenKeys.add(testCase.key);
 		const legacy = attempt(testCase.legacy);
 		const next = attempt(testCase.next);
 		const divergence = divergences[testCase.key];
