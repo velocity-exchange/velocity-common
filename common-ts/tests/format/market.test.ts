@@ -137,7 +137,7 @@ describe('format/step helpers', () => {
 		);
 	});
 
-	it('capStringFractionDigits returns the input unchanged on an invalid maxFractionDigits', () => {
+	it('capStringFractionDigits pins the maxFractionDigits regressions the guard fixes', () => {
 		expect(
 			capStringFractionDigits('1.23456', { maxFractionDigits: NaN })
 		).to.equal('1.23456');
@@ -147,6 +147,11 @@ describe('format/step helpers', () => {
 		expect(
 			capStringFractionDigits('1.23456', { maxFractionDigits: 2.5 })
 		).to.equal('1.23456');
+	});
+
+	it('capStringFractionDigits also returns the input unchanged on an infinite maxFractionDigits', () => {
+		// Not a regression: fraction.length <= Infinity was always true, so this
+		// case passed through unchanged before the guard existed too.
 		expect(
 			capStringFractionDigits('1.23456', { maxFractionDigits: Infinity })
 		).to.equal('1.23456');
