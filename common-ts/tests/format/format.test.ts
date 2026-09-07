@@ -140,6 +140,22 @@ describe('format/formatValue digits and rounding', () => {
 		).to.equal('1.90000');
 	});
 
+	it('maxDecimals rounds the input once, never the rounded value again', () => {
+		const digits = {
+			kind: 'significant' as const,
+			significant: 3,
+			maxDecimals: 2,
+			rounding: 'half-up' as const,
+		};
+		expect(formatText('0.1249', { digits })).to.equal('0.12');
+		expect(formatText('-0.1249', { digits })).to.equal('-0.12');
+		expect(formatText('0.1251', { digits })).to.equal('0.13');
+		// The cap does not bind, so three significant digits survive.
+		expect(
+			formatText('0.1249', { digits: { ...digits, maxDecimals: 6 } })
+		).to.equal('0.125');
+	});
+
 	it('tick and step read the market precision', () => {
 		const market = {
 			priceDecimals: 2,

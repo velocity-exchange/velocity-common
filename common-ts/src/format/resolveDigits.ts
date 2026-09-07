@@ -95,8 +95,11 @@ export function applyDigitSpec(
 	if (spec.kind === 'significant') {
 		mode = requireMode(spec);
 		value = roundToSignificant(input, spec.significant, mode);
+		// The significant pass only decides whether the cap binds. Rounding it a
+		// second time would carry twice: 0.1249 at 3sf half-up is 0.125, and
+		// capping that at 2 decimals gives 0.13 rather than 0.12.
 		if (spec.maxDecimals !== undefined && value.scale > spec.maxDecimals) {
-			value = roundToDecimals(value, spec.maxDecimals, mode);
+			value = roundToDecimals(input, spec.maxDecimals, mode);
 		}
 	} else if (spec.kind !== 'exact') {
 		const decimals = decimalsFor(spec, market);
