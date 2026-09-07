@@ -7,6 +7,9 @@ import {
 import {
 	dividesExactly,
 	numbersFitEvenly,
+	roundToStepSize,
+	roundToStepSizeIfLargeEnough,
+	truncateInputToPrecision,
 } from '../../src/utils/math/precision';
 import { isExactMultiple } from '../../src/format/index';
 import { getDecimalsFromSize } from '../../src/utils/markets/precisions';
@@ -285,6 +288,295 @@ describe('getBigNumRoundedToStepSize delegates to snapValueToStep toward-zero', 
 		expect(() => getBigNumRoundedToStepSize(value, new BN(0))).to.throw(
 			/Cannot snap/
 		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// truncateInputToPrecision / roundToStepSize / roundToStepSizeIfLargeEnough
+// ---------------------------------------------------------------------------
+
+const legacyTruncateInputToPrecision = (input: string, exp: BN) => {
+	const decimalPlaces = input.split('.')[1]?.length ?? 0;
+	const maxDecimals = exp.toNumber();
+	if (decimalPlaces > maxDecimals) {
+		return input.slice(0, input.length - (decimalPlaces - maxDecimals));
+	}
+	return input;
+};
+
+const legacyRoundToStepSize = (value: string, stepSize?: number) => {
+	const stepSizeExp = stepSize?.toString().split('.')[1]?.length ?? 0;
+	const truncated = legacyTruncateInputToPrecision(value, new BN(stepSizeExp));
+	if (truncated.charAt(truncated.length - 1) === '.')
+		return truncated.slice(0, -1);
+	return truncated;
+};
+
+const legacyRoundToStepSizeIfLargeEnough = (
+	value: string,
+	stepSize?: number
+) => {
+	const parsedValue = parseFloat(value);
+	if (isNaN(parsedValue) || stepSize === 0 || !value || parsedValue === 0) {
+		return value;
+	}
+	return legacyRoundToStepSize(value, stepSize);
+};
+
+const INPUT_CORPUS = [
+	'',
+	'abc',
+	'0',
+	'0.0',
+	'1',
+	'1.0',
+	'1.',
+	'.5',
+	'-.5',
+	'.12345',
+	'00.1230',
+	'1.2345678',
+	'-1.2345678',
+	'0.0000001',
+	'-0.0000001',
+	'1e-7',
+	'1,234.5678',
+	'1.2.3',
+	'1.2.345',
+	'.1.23456',
+	'123456789012345.123456789',
+];
+
+const STEP_CORPUS: Array<number | undefined> = [
+	undefined,
+	0,
+	1,
+	2,
+	10,
+	100,
+	0.5,
+	0.1,
+	0.01,
+	0.001,
+	1e-6,
+	1e-7,
+	1e-9,
+	1.5e-7,
+	0.30000000000000004,
+	1e21,
+];
+
+// Neither shape can come from the input path's own keystrokes; both are here
+// because the old and new code disagree on them, so the disagreement is pinned
+// rather than left to be discovered by a caller.
+const MULTI_SEPARATOR =
+	'input holding more than one separator counts its fraction digits after the last one, not the first, so a cap can now bite where it used to pass';
+const NON_STRING =
+	'a non-string value passes through untouched instead of throwing on `.split`, because the delegate type-checks its input first';
+
+const separatorFix = (old: string, next: string): Divergence => ({
+	behaviour: MULTI_SEPARATOR,
+	old,
+	next,
+});
+
+describe('truncateInputToPrecision delegates to capStringFractionDigits', () => {
+	const cases: CorpusCase[] = [];
+	for (const input of INPUT_CORPUS) {
+		for (const exp of [0, 1, 2, 6, 9]) {
+			cases.push({
+				key: `${JSON.stringify(input)} exp ${exp}`,
+				legacy: () => legacyTruncateInputToPrecision(input, new BN(exp)),
+				next: () => truncateInputToPrecision(input, new BN(exp)),
+			});
+		}
+	}
+	cases.push({
+		key: 'non-string 5 exp 6',
+		legacy: () =>
+			legacyTruncateInputToPrecision(5 as unknown as string, new BN(6)),
+		next: () =>
+			String(truncateInputToPrecision(5 as unknown as string, new BN(6))),
+	});
+
+	it('reproduces the slice implementation except at the annotated divergences', () => {
+		runCorpus(cases, {
+			// A single trailing separator is back to the old shape: the head now
+			// comes from the last separator, the same one the core split on.
+			'"1.2.345" exp 0': separatorFix('1.2.34', '1.2.'),
+			'"1.2.345" exp 1': separatorFix('1.2.345', '1.2.3'),
+			'"1.2.345" exp 2': separatorFix('1.2.345', '1.2.34'),
+			'".1.23456" exp 0': separatorFix('.1.2345', '.1.'),
+			'".1.23456" exp 1': separatorFix('.1.23456', '.1.2'),
+			'".1.23456" exp 2': separatorFix('.1.23456', '.1.23'),
+			'non-string 5 exp 6': {
+				behaviour: NON_STRING,
+				old: 'THROWS: input.split is not a function',
+				next: '5',
+			},
+		});
+	});
+
+	it('keeps the in-progress shapes the input path types through', () => {
+		expect(truncateInputToPrecision('1.', new BN(6))).to.equal('1.');
+		expect(truncateInputToPrecision('.5', new BN(6))).to.equal('.5');
+		expect(truncateInputToPrecision('.12345', new BN(2))).to.equal('.12');
+		expect(truncateInputToPrecision('1.23', new BN(0))).to.equal('1.');
+	});
+
+	it('keeps the old head on multi-separator input', () => {
+		expect(legacyTruncateInputToPrecision('1.2.3', new BN(0))).to.equal('1.2.');
+		expect(truncateInputToPrecision('1.2.3', new BN(0))).to.equal('1.2.');
+	});
+});
+
+// The whole point of the delegation: `(1e-7).toString()` is '1e-7', which has
+// no '.', so the old digit count was 0 and every fraction digit was cut.
+const EXPONENTIAL_STEP =
+	'a step below 1e-6, which `Number.prototype.toString` renders exponentially, reports its real decimals instead of zero, so typed fraction digits survive';
+
+const exponentialFix = (old: string, next: string): Divergence => ({
+	behaviour: EXPONENTIAL_STEP,
+	old,
+	next,
+});
+
+const STEP_SIZE_DIVERGENCES: Record<string, Divergence> = {
+	'"0.0" step 1e-7': exponentialFix('0', '0.0'),
+	'"0.0" step 1e-9': exponentialFix('0', '0.0'),
+	'"1.0" step 1e-7': exponentialFix('1', '1.0'),
+	'"1.0" step 1e-9': exponentialFix('1', '1.0'),
+	'".5" step 1e-7': exponentialFix('', '.5'),
+	'".5" step 1e-9': exponentialFix('', '.5'),
+	'"-.5" step 1e-7': exponentialFix('-', '-.5'),
+	'"-.5" step 1e-9': exponentialFix('-', '-.5'),
+	'".12345" step 1e-7': exponentialFix('', '.12345'),
+	'".12345" step 1e-9': exponentialFix('', '.12345'),
+	'".12345" step 1.5e-7': exponentialFix('.1234', '.12345'),
+	'"00.1230" step 1e-7': exponentialFix('00', '00.1230'),
+	'"00.1230" step 1e-9': exponentialFix('00', '00.1230'),
+	'"1.2345678" step 1e-7': exponentialFix('1', '1.2345678'),
+	'"1.2345678" step 1e-9': exponentialFix('1', '1.2345678'),
+	'"1.2345678" step 1.5e-7': exponentialFix('1.2345', '1.2345678'),
+	'"-1.2345678" step 1e-7': exponentialFix('-1', '-1.2345678'),
+	'"-1.2345678" step 1e-9': exponentialFix('-1', '-1.2345678'),
+	'"-1.2345678" step 1.5e-7': exponentialFix('-1.2345', '-1.2345678'),
+	'"0.0000001" step 1e-7': exponentialFix('0', '0.0000001'),
+	'"0.0000001" step 1e-9': exponentialFix('0', '0.0000001'),
+	'"0.0000001" step 1.5e-7': exponentialFix('0.0000', '0.0000001'),
+	'"-0.0000001" step 1e-7': exponentialFix('-0', '-0.0000001'),
+	'"-0.0000001" step 1e-9': exponentialFix('-0', '-0.0000001'),
+	'"-0.0000001" step 1.5e-7': exponentialFix('-0.0000', '-0.0000001'),
+	'"1,234.5678" step 1e-7': exponentialFix('1,234', '1,234.5678'),
+	'"1,234.5678" step 1e-9': exponentialFix('1,234', '1,234.5678'),
+	// Multi-separator input at an exponential step: the digit count, not the
+	// head, is what moved, so these belong to the same fix.
+	'"1.2.3" step 1e-7': exponentialFix('1.2', '1.2.3'),
+	'"1.2.3" step 1e-9': exponentialFix('1.2', '1.2.3'),
+	'"1.2.345" step 1e-7': exponentialFix('1.2.34', '1.2.345'),
+	'"1.2.345" step 1e-9': exponentialFix('1.2.34', '1.2.345'),
+	'".1.23456" step 1e-7': exponentialFix('.1.2345', '.1.23456'),
+	'".1.23456" step 1e-9': exponentialFix('.1.2345', '.1.23456'),
+	'"123456789012345.123456789" step 1e-7': exponentialFix(
+		'123456789012345',
+		'123456789012345.1234567'
+	),
+	'"123456789012345.123456789" step 1e-9': exponentialFix(
+		'123456789012345',
+		'123456789012345.123456789'
+	),
+	'"123456789012345.123456789" step 1.5e-7': exponentialFix(
+		'123456789012345.1234',
+		'123456789012345.12345678'
+	),
+	// '1.2.3' is absent from here on: at every plainly stringified step it now
+	// reproduces the old output exactly.
+	'"1.2.345" step undefined': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 0': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 1': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 2': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 10': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 100': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 1e+21': separatorFix('1.2.34', '1.2'),
+	'"1.2.345" step 0.5': separatorFix('1.2.345', '1.2.3'),
+	'"1.2.345" step 0.1': separatorFix('1.2.345', '1.2.3'),
+	'"1.2.345" step 0.01': separatorFix('1.2.345', '1.2.34'),
+	'".1.23456" step undefined': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 0': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 1': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 2': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 10': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 100': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 1e+21': separatorFix('.1.2345', '.1'),
+	'".1.23456" step 0.5': separatorFix('.1.23456', '.1.2'),
+	'".1.23456" step 0.1': separatorFix('.1.23456', '.1.2'),
+	'".1.23456" step 0.01': separatorFix('.1.23456', '.1.23'),
+	'".1.23456" step 0.001': separatorFix('.1.23456', '.1.234'),
+};
+
+describe('roundToStepSize delegates to capStringFractionDigits with an exact step', () => {
+	const cases: CorpusCase[] = [];
+	for (const input of INPUT_CORPUS) {
+		for (const step of STEP_CORPUS) {
+			cases.push({
+				key: `${JSON.stringify(input)} step ${step}`,
+				legacy: () => legacyRoundToStepSize(input, step),
+				next: () => roundToStepSize(input, step),
+			});
+		}
+	}
+
+	it('reproduces the slice implementation except at the annotated fixes', () => {
+		runCorpus(cases, STEP_SIZE_DIVERGENCES);
+	});
+
+	it('keeps the fraction digits of a step that stringifies exponentially', () => {
+		expect(legacyRoundToStepSize('1.2345678', 1e-7)).to.equal('1');
+		expect(roundToStepSize('1.2345678', 1e-7)).to.equal('1.2345678');
+		expect(legacyRoundToStepSize('1.2345678', 1e-9)).to.equal('1');
+		expect(roundToStepSize('1.2345678', 1e-9)).to.equal('1.2345678');
+	});
+
+	it('leaves every step that stringifies plainly untouched', () => {
+		expect(roundToStepSize('1.2345678', 1e-6)).to.equal('1.234567');
+		expect(roundToStepSize('1.2345678', 0.01)).to.equal('1.23');
+		expect(roundToStepSize('1.2345678', 1)).to.equal('1');
+		expect(roundToStepSize('1.2345678', 100)).to.equal('1');
+	});
+});
+
+describe('roundToStepSizeIfLargeEnough keeps its guard and inherits the step fix', () => {
+	const cases: CorpusCase[] = [];
+	for (const input of INPUT_CORPUS) {
+		for (const step of STEP_CORPUS) {
+			cases.push({
+				key: `${JSON.stringify(input)} step ${step}`,
+				legacy: () => legacyRoundToStepSizeIfLargeEnough(input, step),
+				next: () => roundToStepSizeIfLargeEnough(input, step),
+			});
+		}
+	}
+
+	// '0' and '0.0' short-circuit on the parsedValue === 0 guard, '' on the
+	// falsy-value guard and 'abc' on the NaN guard, and a zero step returns the
+	// value untouched, so none of those reach roundToStepSize at all.
+	const GUARDED_INPUTS = ['', 'abc', '0', '0.0'];
+	const divergences: Record<string, Divergence> = {};
+	for (const [key, divergence] of Object.entries(STEP_SIZE_DIVERGENCES)) {
+		const [rawInput, rawStep] = key.split('" step ');
+		if (GUARDED_INPUTS.includes(rawInput.slice(1))) continue;
+		if (Number(rawStep) === 0) continue;
+		divergences[key] = divergence;
+	}
+
+	it('reproduces the guard exactly and only differs where roundToStepSize does', () => {
+		runCorpus(cases, divergences);
+	});
+
+	it('returns the value untouched wherever the guard fires', () => {
+		expect(roundToStepSizeIfLargeEnough('0.0', 1e-7)).to.equal('0.0');
+		expect(roundToStepSizeIfLargeEnough('1.2.345', 0)).to.equal('1.2.345');
+		expect(roundToStepSizeIfLargeEnough('abc', 1e-7)).to.equal('abc');
 	});
 });
 
