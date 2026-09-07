@@ -46,9 +46,11 @@ export type NumericInput =
 	| undefined;
 
 /**
- * All six modes. `truncate` is toward zero (what BigNum.toFixed does today);
- * `floor` is toward negative infinity. They differ on negatives and the
- * difference is load-bearing, so they are never aliases.
+ * `truncate` is toward zero (what BigNum.toFixed does today); `floor` is toward
+ * negative infinity. They differ on negatives and the difference is
+ * load-bearing, so they are never aliases. The two half modes differ on
+ * negatives the same way: `half-up` sends an exact tie away from zero, and
+ * `half-ceil` sends it toward positive infinity, which is what Math.round does.
  */
 export type RoundingMode =
 	| 'truncate'
@@ -56,6 +58,7 @@ export type RoundingMode =
 	| 'ceil'
 	| 'expand'
 	| 'half-up'
+	| 'half-ceil'
 	| 'half-even';
 
 /** What a value is, when it is not an ordinary number. */

@@ -21,6 +21,12 @@ function shouldIncrement(
 			return true;
 		case 'half-up':
 			return Number(dropped[0]) >= 5;
+		case 'half-ceil': {
+			const first = Number(dropped[0]);
+			if (first !== 5) return first > 5;
+			// An exact negative tie moves toward zero, so its magnitude does not grow.
+			return sign === 1 || !isAllZeros(dropped.slice(1));
+		}
 		case 'half-even': {
 			const first = Number(dropped[0]);
 			if (first > 5) return true;

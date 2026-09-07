@@ -328,6 +328,119 @@ describe('format/core rounding', () => {
 	});
 });
 
+describe('format/core half-ceil rounding', () => {
+	it('sends an exact tie toward positive infinity, at every scale', () => {
+		const cases: [string, number, string][] = [
+			['1.5', 0, '2'],
+			['2.5', 0, '3'],
+			['0.5', 0, '1'],
+			['-0.5', 0, '0'],
+			['-1.5', 0, '-1'],
+			['-2.5', 0, '-2'],
+			['1.005', 2, '1.01'],
+			['-1.005', 2, '-1.00'],
+			['0.125', 2, '0.13'],
+			['-0.125', 2, '-0.12'],
+			['-12.345', 2, '-12.34'],
+			['0.0000005', 6, '0.000001'],
+			['-0.0000005', 6, '0.000000'],
+		];
+		for (const [input, decimals, expected] of cases) {
+			expect(
+				toPlainString(roundToDecimals(d(input), decimals, 'half-ceil')),
+				`${input} @${decimals}dp`
+			).to.equal(expected);
+		}
+	});
+
+	it('matches half-up wherever the dropped digits are not an exact tie', () => {
+		const values = [
+			'1.4',
+			'-1.4',
+			'1.6',
+			'-1.6',
+			'2.449',
+			'-2.449',
+			'0.4999',
+			'-0.4999',
+			'-1.0051',
+			'9.999999',
+			'-9.999999',
+		];
+		for (const raw of values) {
+			for (const decimals of [0, 1, 2, 3]) {
+				expect(
+					toPlainString(roundToDecimals(d(raw), decimals, 'half-ceil')),
+					`${raw} @${decimals}dp`
+				).to.equal(toPlainString(roundToDecimals(d(raw), decimals, 'half-up')));
+			}
+		}
+	});
+
+	it('carries the same tie rule into significant-figure rounding', () => {
+		expect(
+			toPlainString(roundToSignificant(d('1.25'), 2, 'half-ceil'))
+		).to.equal('1.3');
+		expect(
+			toPlainString(roundToSignificant(d('-1.25'), 2, 'half-ceil'))
+		).to.equal('-1.2');
+		expect(
+			toPlainString(roundToSignificant(d('-1.35'), 2, 'half-ceil'))
+		).to.equal('-1.3');
+		expect(
+			toPlainString(roundToSignificant(d('1234500'), 4, 'half-ceil'))
+		).to.equal('1235000');
+		expect(
+			toPlainString(roundToSignificant(d('-1234500'), 4, 'half-ceil'))
+		).to.equal('-1234000');
+	});
+
+	it('toFixedPointParts carries the mode through', () => {
+		expect(toFixedPointParts(d('-1.5'), 0, 'half-ceil')).to.deep.equal({
+			units: '1',
+			scale: 0,
+			sign: -1,
+		});
+		expect(toFixedPointParts(d('1.5'), 0, 'half-ceil')).to.deep.equal({
+			units: '2',
+			scale: 0,
+			sign: 1,
+		});
+	});
+
+	it('is indistinguishable from half-up on every non-negative value', () => {
+		let state = 20260907;
+		const random = () => {
+			state = (state * 1664525 + 1013904223) >>> 0;
+			return state / 4294967296;
+		};
+		for (let i = 0; i < 400; i++) {
+			let digits = String(1 + Math.floor(random() * 9));
+			const digitCount = 1 + Math.floor(random() * 18);
+			for (let j = 1; j < digitCount; j++) {
+				digits += String(Math.floor(random() * 10));
+			}
+			const value =
+				random() < 0.05
+					? ZERO
+					: fromParts(1, digits, Math.floor(random() * 12));
+			const decimals = Math.floor(random() * 12);
+			const significant = 1 + Math.floor(random() * 8);
+			const label = `${toPlainString(value)} @${decimals}dp @${significant}sf`;
+			expect(
+				toPlainString(roundToDecimals(value, decimals, 'half-ceil')),
+				label
+			).to.equal(toPlainString(roundToDecimals(value, decimals, 'half-up')));
+			expect(
+				toPlainString(roundToSignificant(value, significant, 'half-ceil')),
+				label
+			).to.equal(
+				toPlainString(roundToSignificant(value, significant, 'half-up'))
+			);
+		}
+	});
+});
+
 describe('format/core egress', () => {
 	it('toPlainString never emits exponent or separator notation', () => {
 		expect(toPlainString(d('1e-9'))).to.equal('0.000000001');
