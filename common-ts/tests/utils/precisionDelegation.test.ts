@@ -398,6 +398,38 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 		next: () =>
 			String(truncateInputToPrecision(5 as unknown as string, new BN(6))),
 	});
+	cases.push({
+		key: '"1234.5678" exp -1',
+		legacy: () => legacyTruncateInputToPrecision('1234.5678', new BN(-1)),
+		next: () => truncateInputToPrecision('1234.5678', new BN(-1)),
+	});
+	cases.push({
+		key: '"1234.5678" exp NaN',
+		legacy: () =>
+			legacyTruncateInputToPrecision('1234.5678', {
+				toNumber: () => NaN,
+			} as unknown as BN),
+		next: () =>
+			truncateInputToPrecision('1234.5678', {
+				toNumber: () => NaN,
+			} as unknown as BN),
+	});
+
+	it('throws on 5 as a non-string, both old and new, and unwinds to the same input', () => {
+		expect(() =>
+			legacyRoundToStepSize(5 as unknown as string, 0.01)
+		).to.throw();
+		expect(() => roundToStepSize(5 as unknown as string, 0.01)).to.throw();
+		expect(() =>
+			legacyRoundToStepSizeIfLargeEnough(5 as unknown as string, 0.01)
+		).to.throw();
+		expect(() =>
+			roundToStepSizeIfLargeEnough(5 as unknown as string, 0.01)
+		).to.throw();
+		expect(
+			truncateInputToPrecision(5 as unknown as string, new BN(6))
+		).to.equal(5);
+	});
 
 	it('reproduces the slice implementation except at the annotated divergences', () => {
 		runCorpus(cases, {
@@ -413,6 +445,12 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 				behaviour: NON_STRING,
 				old: 'THROWS: input.split is not a function',
 				next: '5',
+			},
+			'"1234.5678" exp -1': {
+				behaviour:
+					'a negative maxFractionDigits is invalid input and now leaves the value untouched, instead of the old arithmetic cutting into the integer part',
+				old: '1234',
+				next: '1234.5678',
 			},
 		});
 	});

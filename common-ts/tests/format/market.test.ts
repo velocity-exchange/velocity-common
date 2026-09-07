@@ -137,6 +137,30 @@ describe('format/step helpers', () => {
 		);
 	});
 
+	it('capStringFractionDigits returns the input unchanged on an invalid maxFractionDigits', () => {
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: NaN })
+		).to.equal('1.23456');
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: -1 })
+		).to.equal('1.23456');
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: 2.5 })
+		).to.equal('1.23456');
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: Infinity })
+		).to.equal('1.23456');
+	});
+
+	it('capStringFractionDigits still caps at a valid maxFractionDigits', () => {
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: 0 })
+		).to.equal('1');
+		expect(
+			capStringFractionDigits('1.23456', { maxFractionDigits: 2 })
+		).to.equal('1.23');
+	});
+
 	it('a 1e-7 step keeps every digit the user typed', () => {
 		const step = d('0.0000001');
 		expect(
