@@ -48,10 +48,15 @@ export const valueIsBelowStepSize = (value: string, stepSize: number) => {
 };
 
 /**
- * NOTE: Do not use modulo alone to check if numbers fit evenly.
- * Due to floating point precision issues this can return incorrect results.
- * i.e. 5.1 % 0.1 = 0.09999999999999959 (should be 0)
- * tells me 5.1 / 0.1 = 50.99999999999999
+ * @deprecated Prefer `isExactMultiple` from
+ * `@velocity-exchange/common/format`, but read the tolerance note first: this
+ * is NOT an exact check and swapping it is a behaviour change.
+ *
+ * `5.1 / 0.1` is `50.99999999999999` in floats, so the modulo alone reports 5.1
+ * as not fitting 0.1. This rounds the quotient to 9 decimals before testing it
+ * for integrality, so the tolerance is on the quotient: a value within about
+ * 1e-9 steps, that is 1e-9 times the step, is pulled onto the lattice.
+ * `isExactMultiple` returns false for those.
  */
 export const numbersFitEvenly = (
 	numberOne: number,
@@ -67,10 +72,14 @@ export const numbersFitEvenly = (
 };
 
 /**
- * Check if numbers divide exactly, accounting for floating point division annoyingness
- * @param numerator
- * @param denominator
- * @returns
+ * @deprecated Prefer `isExactMultiple` from
+ * `@velocity-exchange/common/format`, but read the tolerance note first: this
+ * is NOT an exact check and swapping it is a behaviour change.
+ *
+ * The `|remainder - 1| < 1e-6` branch accepts a quotient that landed just under
+ * the next integer, so numbers within one part in 1e6 of dividing are treated
+ * as dividing. It is also asymmetric: a remainder just above zero is rejected
+ * while a remainder just below one is accepted. `isExactMultiple` rejects both.
  */
 export const dividesExactly = (numerator: number, denominator: number) => {
 	const division = numerator / denominator;
@@ -78,7 +87,6 @@ export const dividesExactly = (numerator: number, denominator: number) => {
 
 	if (remainder === 0) return true;
 
-	// Because of floating point weirdness, we're just going to assume that if the remainder after dividing is less than 1/10^6 then the numbers do divide exactly
 	if (Math.abs(remainder - 1) < 1 / 10 ** 6) return true;
 
 	return false;

@@ -1,12 +1,14 @@
 import { expect } from 'chai';
 import {
 	BASE_PRECISION_EXP,
+	BigNum,
 	BN,
 	PerpMarketAccount,
 	QUOTE_PRECISION_EXP,
 } from '@velocity-exchange/sdk';
 import {
 	capStringFractionDigits,
+	isExactMultiple,
 	marketPrecisionFromSizes,
 	snapValueToStep,
 	stepFractionDigits,
@@ -142,5 +144,44 @@ describe('format/step helpers', () => {
 				maxFractionDigits: stepFractionDigits(step),
 			})
 		).to.equal('1.2345678');
+	});
+
+	it('isExactMultiple is exact, with no float tolerance anywhere', () => {
+		expect(isExactMultiple('5.1', '0.1')).to.equal(true);
+		expect(isExactMultiple('0.3', '0.1')).to.equal(true);
+		expect(isExactMultiple('5', '2')).to.equal(false);
+		expect(isExactMultiple('1.0000001', '0.0000001')).to.equal(true);
+		expect(isExactMultiple('1.00000015', '0.0000001')).to.equal(false);
+		expect(isExactMultiple('0.9999999', '1')).to.equal(false);
+	});
+
+	it('isExactMultiple returns false on a zero, missing or unparseable step', () => {
+		expect(isExactMultiple(7, 0)).to.equal(false);
+		expect(isExactMultiple('1', null)).to.equal(false);
+		expect(isExactMultiple('1', 'nope')).to.equal(false);
+		expect(isExactMultiple(null, '1')).to.equal(false);
+	});
+
+	it('isExactMultiple returns false on a negative step, as snapValueToStep does', () => {
+		expect(isExactMultiple(10, -5)).to.equal(false);
+		expect(isExactMultiple('10', '-5')).to.equal(false);
+		expect(isExactMultiple(-10, -5)).to.equal(false);
+		expect(isExactMultiple(10, -0.1)).to.equal(false);
+		expect(snapValueToStep('10', '-5')).to.equal(null);
+	});
+
+	it('isExactMultiple reads BigNum and raw-unit inputs without a float hop', () => {
+		expect(
+			isExactMultiple(BigNum.fromPrint('1.5', new BN(9)), {
+				raw: new BN(500000000),
+				scale: 9,
+			})
+		).to.equal(true);
+		expect(
+			isExactMultiple(BigNum.fromPrint('1.5', new BN(9)), {
+				raw: new BN(700000000),
+				scale: 9,
+			})
+		).to.equal(false);
 	});
 });
