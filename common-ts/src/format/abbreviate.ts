@@ -8,7 +8,12 @@ import {
 	toDecimal,
 } from './core/index';
 import { applyDigitSpec } from './resolveDigits';
-import { AbbreviateOptions, AbbreviateUnits, DigitSpec } from './types';
+import {
+	AbbreviateOptions,
+	AbbreviateUnits,
+	DigitSpec,
+	MarketPrecision,
+} from './types';
 
 const FINANCIAL_UNITS = ['', 'K', 'M', 'B', 'T', 'Q'];
 const SI_UNITS = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
@@ -54,7 +59,8 @@ function passesThreshold(value: Decimal, options: AbbreviateOptions): boolean {
  */
 export function abbreviateValue(
 	value: Decimal,
-	options: AbbreviateOptions
+	options: AbbreviateOptions,
+	market?: MarketPrecision
 ): AbbreviateResult {
 	const units = unitTable(options.units);
 	const maxIndex = units.length - 1;
@@ -80,10 +86,10 @@ export function abbreviateValue(
 		index = maxIndex;
 	}
 
-	let resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits);
+	let resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, market);
 	if (resolved.integer.length > 3 && index < maxIndex) {
 		index += 1;
-		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits);
+		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, market);
 	}
 	if (resolved.status !== 'ok') return notApplied;
 

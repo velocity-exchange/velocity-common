@@ -179,7 +179,7 @@ export function formatValue(
 	if (!small) {
 		const abbreviateOptions = options.abbreviate || undefined;
 		const abbreviated = abbreviateOptions
-			? abbreviateValue(working, abbreviateOptions)
+			? abbreviateValue(working, abbreviateOptions, options.market)
 			: null;
 
 		if (abbreviated?.applied) {

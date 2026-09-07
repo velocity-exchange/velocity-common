@@ -436,6 +436,34 @@ describe('format/abbreviate', () => {
 		const result = abbreviateValue(d('4582930'), { threshold: 'always' });
 		expect(result).to.include({ applied: true, unit: 'M', exponent: 6 });
 	});
+
+	it('abbreviate digits of kind tick or step read the market', () => {
+		const market = {
+			priceDecimals: 2,
+			sizeDecimals: 3,
+			tick: d('0.01'),
+			step: d('0.001'),
+			source: 'onchain' as const,
+		};
+		const withDigits = (kind: 'tick' | 'step') => ({
+			market,
+			abbreviate: {
+				threshold: 'always' as const,
+				digits: { kind, rounding: 'half-up' as const },
+			},
+		});
+		expect(formatText('12345.6789', withDigits('tick'))).to.equal('12.35K');
+		expect(formatText('12345.6789', withDigits('step'))).to.equal('12.346K');
+		// Without a market the spec still cannot resolve, so it falls through.
+		expect(
+			formatText('12345.6789', {
+				abbreviate: {
+					threshold: 'always',
+					digits: { kind: 'tick', rounding: 'half-up' },
+				},
+			})
+		).to.equal('12,345.6789');
+	});
 });
 
 describe('format/small numbers', () => {
