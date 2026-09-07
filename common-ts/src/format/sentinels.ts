@@ -28,19 +28,3 @@ export function belowThreshold(t: NumericInput, text: string): SentinelRule {
 		text,
 	};
 }
-
-/** Matches every value whose absolute magnitude is strictly below `t`. */
-export function absBelowThreshold(t: NumericInput, text: string): SentinelRule {
-	const parsed = toDecimal(t);
-	if (parsed.status !== 'ok' || !parsed.value) {
-		throw new Error(
-			`absBelowThreshold needs a finite numeric threshold, got ${t}`
-		);
-	}
-	const threshold = parsed.value;
-	return {
-		matches: (v) =>
-			v.sign !== 0 && compare(fromParts(1, v.units, v.scale), threshold) === -1,
-		text,
-	};
-}

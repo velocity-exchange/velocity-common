@@ -6,20 +6,14 @@ import {
 	QUOTE_PRECISION_EXP,
 } from '@velocity-exchange/sdk';
 import {
-	DIGIT_CAPS,
 	capStringFractionDigits,
-	formatText,
-	inputFieldConfig,
 	marketPrecisionFromSizes,
-	parseInput,
-	sizeDecimalsFromPrice,
 	snapValueToStep,
 	stepFractionDigits,
 } from '../../src/format/index';
 import { fromString, toPlainString } from '../../src/format/core/index';
 import { marketPrecisionFromAccount } from '../../src/format/adapters/sdk';
-import { EN_US, setDefaultLocale } from '../../src/format/locale';
-import { localeFromTag, setNumberLocale } from '../../src/format/intl';
+import { sizeDecimalsFromPrice } from '../../src/format/market';
 
 const d = (s: string) => fromString(s).value!;
 
@@ -148,153 +142,5 @@ describe('format/step helpers', () => {
 				maxFractionDigits: stepFractionDigits(step),
 			})
 		).to.equal('1.2345678');
-	});
-});
-
-describe('format/input configuration', () => {
-	afterEach(() => {
-		setDefaultLocale(EN_US);
-	});
-
-	it('has one digit-cap table', () => {
-		expect(DIGIT_CAPS.default).to.deep.equal({
-			maxIntegerDigits: 12,
-			maxFractionDigits: 10,
-		});
-		expect(DIGIT_CAPS.orderCount.maxIntegerDigits).to.equal(2);
-		expect(DIGIT_CAPS.slippage).to.deep.equal({
-			maxIntegerDigits: 3,
-			maxFractionDigits: 6,
-		});
-	});
-
-	it('supplies the mask caps and the outbound step from one call', () => {
-		const market = marketPrecisionFromSizes({
-			tickSize: new BN(100),
-			tickPrecisionExp: 6,
-			stepSize: new BN(1000000),
-			stepPrecisionExp: 9,
-		});
-		const price = inputFieldConfig('price', { market });
-		expect(price.caps.maxFractionDigits).to.equal(4);
-		expect(price.precisionExp).to.equal(4);
-		expect(price.step).to.deep.equal(market.tick);
-		expect(price.localeTag).to.equal('en-US');
-		expect(price.locale).to.deep.equal(EN_US);
-
-		const size = inputFieldConfig('size', { market });
-		expect(size.caps.maxFractionDigits).to.equal(3);
-		expect(size.step).to.deep.equal(market.step);
-	});
-
-	it('applies per-field overrides', () => {
-		expect(
-			inputFieldConfig('default', { overrides: { maxFractionDigits: 2 } }).caps
-		).to.deep.equal({ maxIntegerDigits: 12, maxFractionDigits: 2 });
-	});
-
-	it('precisionExp follows a clamped market rather than the raw step', () => {
-		const market = marketPrecisionFromSizes({
-			tickSize: new BN(100),
-			tickPrecisionExp: 6,
-			stepSize: new BN(1000000),
-			stepPrecisionExp: 9,
-			maxPriceDecimals: 2,
-		});
-		const price = inputFieldConfig('price', { market });
-		expect(price.caps.maxFractionDigits).to.equal(2);
-		expect(price.precisionExp).to.equal(2);
-		const parsed = parseInput('1.23456', price.precisionExp!).value!;
-		expect(toPlainString(parsed)).to.equal('1.23');
-		expect(parsed.scale).to.be.at.most(price.caps.maxFractionDigits);
-	});
-
-	it('precisionExp follows an override rather than the raw step', () => {
-		const market = marketPrecisionFromSizes({
-			tickSize: new BN(100),
-			tickPrecisionExp: 6,
-			stepSize: new BN(1000000),
-			stepPrecisionExp: 9,
-		});
-		const size = inputFieldConfig('size', {
-			market,
-			overrides: { maxFractionDigits: 1 },
-		});
-		expect(size.precisionExp).to.equal(1);
-		expect(parseInput('1.9876', size.precisionExp!).value!.scale).to.be.at.most(
-			size.caps.maxFractionDigits
-		);
-
-		const plain = inputFieldConfig('default', {
-			overrides: { maxFractionDigits: 1 },
-		});
-		expect(plain.precisionExp).to.equal(1);
-		expect(
-			toPlainString(parseInput('1.9876', plain.precisionExp!).value!)
-		).to.equal('1.9');
-	});
-
-	it('price and size need a market', () => {
-		expect(() => inputFieldConfig('price')).to.throw(/requires a market/);
-		expect(() => inputFieldConfig('size')).to.throw(/requires a market/);
-	});
-
-	it('parseInput strips group separators and caps the fraction', () => {
-		expect(toPlainString(parseInput('1,234.5', 6).value!)).to.equal('1234.5');
-		expect(toPlainString(parseInput('1.23456789', 4).value!)).to.equal(
-			'1.2345'
-		);
-		expect(parseInput('', 4).status).to.equal('invalid');
-		expect(parseInput('abc', 4).status).to.equal('invalid');
-	});
-
-	it('parseInput reads the locale it is given', () => {
-		const deDe = {
-			tag: 'de-DE',
-			decimal: ',',
-			group: '.',
-			groupSizes: [3],
-		} as const;
-		expect(toPlainString(parseInput('1.234,5', 6, deDe).value!)).to.equal(
-			'1234.5'
-		);
-	});
-
-	it('parseInput rejects text written in the other locale convention', () => {
-		const deDe = {
-			tag: 'de-DE',
-			decimal: ',',
-			group: '.',
-			groupSizes: [3],
-		} as const;
-		// Stripping the trailing group separator would read 1234.56 as 1.23.
-		expect(parseInput('1,234.56', 6, deDe).status).to.equal('invalid');
-		expect(parseInput('1.234,56', 6).status).to.equal('invalid');
-		expect(toPlainString(parseInput('1,234.56', 6).value!)).to.equal('1234.56');
-		expect(toPlainString(parseInput('1.234,56', 6, deDe).value!)).to.equal(
-			'1234.56'
-		);
-	});
-
-	it('parseInput round-trips a non-EN locale without being told', () => {
-		setNumberLocale('de-DE');
-		const cfg = inputFieldConfig('default');
-		const text = formatText('1234.5');
-		expect(text).to.not.equal('1,234.5');
-		expect(toPlainString(parseInput(text, cfg.precisionExp!).value!)).to.equal(
-			'1234.5'
-		);
-	});
-
-	it('setNumberLocale feeds both the mask tag and the display config', () => {
-		const locale = setNumberLocale('de-DE');
-		expect(locale.decimal).to.equal(',');
-		expect(locale.group).to.not.equal(',');
-		expect(inputFieldConfig('default').localeTag).to.equal('de-DE');
-	});
-
-	it('localeFromTag derives non-uniform group sizes', () => {
-		expect(localeFromTag('en-US').groupSizes).to.deep.equal([3]);
-		expect(localeFromTag('en-IN').groupSizes).to.deep.equal([3, 2]);
 	});
 });

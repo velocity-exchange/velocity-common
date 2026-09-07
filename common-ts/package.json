@@ -109,14 +109,6 @@
 		"./format": {
 			"types": "./lib/format/index.d.ts",
 			"default": "./lib/format/index.js"
-		},
-		"./format/core": {
-			"types": "./lib/format/core/index.d.ts",
-			"default": "./lib/format/core/index.js"
-		},
-		"./format/intl": {
-			"types": "./lib/format/intl.d.ts",
-			"default": "./lib/format/intl.js"
 		}
 	},
 	"typesVersions": {
@@ -156,16 +148,9 @@
 			],
 			"format": [
 				"lib/format/index.d.ts"
-			],
-			"format/core": [
-				"lib/format/core/index.d.ts"
-			],
-			"format/intl": [
-				"lib/format/intl.d.ts"
 			]
 		}
 	},
-	"sideEffects": false,
 	"files": [
 		"lib"
 	],

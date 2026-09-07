@@ -8,7 +8,7 @@ import {
 } from './core/index';
 import { abbreviateValue } from './abbreviate';
 import { groupInteger } from './grouping';
-import { getDefaultLocale } from './locale';
+import { DECIMAL_SEPARATOR } from './locale';
 import { applyDigitSpec, minDecimalsOf } from './resolveDigits';
 import { applySmallNumber } from './small';
 import { trimFractionZeros } from './trim';
@@ -155,7 +155,6 @@ export function formatValue(
 		options.percentScale === 'ratio' ? shiftPoint(exact, 2) : exact;
 
 	const digits = options.digits ?? EXACT;
-	const locale = options.locale ?? getDefaultLocale();
 
 	let integer = '';
 	let fraction = '';
@@ -231,7 +230,7 @@ export function formatValue(
 	}
 
 	if (trimTrailingZeros) fraction = trimFractionZeros(fraction, minDecimals);
-	if (options.grouping !== false) integer = groupInteger(integer, locale);
+	if (options.grouping !== false) integer = groupInteger(integer);
 
 	const postRoundSign = signOf(rounded);
 	const exactSign = signOf(exact);
@@ -253,7 +252,7 @@ export function formatValue(
 	parts.currency =
 		options.style === 'currency' ? (options.currencySymbol ?? '$') : '';
 	parts.integer = integer;
-	parts.decimalSeparator = fraction === '' ? '' : locale.decimal;
+	parts.decimalSeparator = fraction === '' ? '' : DECIMAL_SEPARATOR;
 	parts.fraction = fraction;
 	parts.unit = `${unit}${options.unit ?? ''}`;
 	parts.percent = options.style === 'percent' ? '%' : '';

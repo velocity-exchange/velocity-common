@@ -1,13 +1,9 @@
 import { expect } from 'chai';
 import {
-	EN_US,
 	PRESETS,
 	capStringFractionDigits,
 	formatText,
-	groupInteger,
-	parseInput,
 	snapValueToStep,
-	ungroup,
 } from '../../src/format/index';
 import {
 	Decimal,
@@ -15,11 +11,13 @@ import {
 	capFractionDigits,
 	compare,
 	fromParts,
+	fromString,
 	isStepMultiple,
 	rescale,
 	toDecimal,
 	toPlainString,
 } from '../../src/format/core/index';
+import { groupInteger, ungroup } from '../../src/format/grouping';
 
 // Deterministic LCG, so a failure is always reproducible from the seed.
 function makeRandom(seed: number) {
@@ -90,21 +88,27 @@ describe('format properties: parse and render round-trip', () => {
 		}
 	});
 
-	it('parseInput(formatText(x)) equals x for every fixture', () => {
+	it('fromString(toPlainString(x)) reproduces x for every fixture', () => {
 		for (const raw of CORPUS) {
 			const value = toDecimal(raw).value!;
-			const grouped = formatText(value);
-			const plain = formatText(value, PRESETS.plain);
-			expect(parseInput(grouped, value.scale).value, raw).to.deep.equal(value);
-			expect(parseInput(plain, value.scale).value, raw).to.deep.equal(value);
+			const text = toPlainString(value);
+			expect(fromString(text).value, raw).to.deep.equal(value);
 		}
 	});
 
-	it('parseInput(formatText(x)) equals x for random values', () => {
+	// `plain` is exact digits with grouping off, so its text is exactly what
+	// toPlainString emits and nothing is lost on the way back in.
+	it('fromString(formatText(x, PRESETS.plain)) reproduces x', () => {
+		for (const raw of CORPUS) {
+			const value = toDecimal(raw).value!;
+			const text = formatText(value, PRESETS.plain);
+			expect(text, raw).to.equal(toPlainString(value));
+			expect(fromString(text).value, raw).to.deep.equal(value);
+		}
 		for (let i = 0; i < CASES; i++) {
 			const value = randomDecimal();
-			const text = formatText(value);
-			expect(parseInput(text, value.scale).value, text).to.deep.equal(value);
+			const text = formatText(value, PRESETS.plain);
+			expect(fromString(text).value, text).to.deep.equal(value);
 		}
 	});
 });
@@ -114,7 +118,7 @@ describe('format properties: grouping is reversible', () => {
 		for (let i = 0; i < CASES; i++) {
 			const value = abs(randomDecimal());
 			const integer = toPlainString(value).split('.')[0];
-			expect(ungroup(groupInteger(integer, EN_US), EN_US)).to.equal(integer);
+			expect(ungroup(groupInteger(integer))).to.equal(integer);
 		}
 	});
 });

@@ -4,7 +4,6 @@ import {
 	NumericInput,
 	RoundingMode,
 } from './core/index';
-import { LocaleConfig } from './locale';
 
 /**
  * Digit control. Mutually exclusive by construction, so "precision beats
@@ -108,7 +107,6 @@ export interface FormatOptions {
 	negativeZero?: 'preserve' | 'suppress';
 	grouping?: boolean;
 	trimTrailingZeros?: boolean;
-	locale?: LocaleConfig;
 	market?: MarketPrecision;
 	abbreviate?: AbbreviateOptions | false;
 	small?: SmallNumberOptions | false;

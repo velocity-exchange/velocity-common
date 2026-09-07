@@ -9,7 +9,7 @@ import {
 	snapToStep,
 	toDecimal,
 } from './core/index';
-import { EN_US, LocaleConfig } from './locale';
+import { DECIMAL_SEPARATOR } from './locale';
 import { MarketPrecision } from './types';
 
 function requireDecimal(input: NumericInput, label: string): Decimal {
@@ -105,20 +105,22 @@ export function snapValueToStep(
  */
 export function capStringFractionDigits(
 	input: string,
-	cfg: { maxFractionDigits: number; locale?: LocaleConfig }
+	cfg: { maxFractionDigits: number }
 ): string {
-	const locale = cfg.locale ?? EN_US;
 	if (typeof input !== 'string' || input === '') return input;
-	const separatorIndex = input.lastIndexOf(locale.decimal);
+	const separatorIndex = input.lastIndexOf(DECIMAL_SEPARATOR);
 	if (separatorIndex === -1) return input;
 
 	const head = input.slice(0, separatorIndex) || '0';
-	const fraction = input.slice(separatorIndex + locale.decimal.length);
+	const fraction = input.slice(separatorIndex + DECIMAL_SEPARATOR.length);
 	// At zero fraction digits the separator itself is never valid, so it goes on
 	// both an in-progress '5.' and a complete '5.7'.
 	if (cfg.maxFractionDigits === 0) return head;
 	if (fraction.length <= cfg.maxFractionDigits) return input;
-	return `${head}${locale.decimal}${fraction.slice(0, cfg.maxFractionDigits)}`;
+	return `${head}${DECIMAL_SEPARATOR}${fraction.slice(
+		0,
+		cfg.maxFractionDigits
+	)}`;
 }
 
 /** Fraction digits a step allows, for feeding capStringFractionDigits. */

@@ -1,39 +1,25 @@
 import { expect } from 'chai';
 import {
-	EN_US,
 	ENTIRE_POSITION,
 	PRESETS,
-	absBelowThreshold,
 	belowThreshold,
 	formatText,
 	formatValue,
-	groupInteger,
 	optionsForLegacyType,
-	toSubscript,
-	ungroup,
 } from '../../src/format/index';
 import { abbreviateValue } from '../../src/format/abbreviate';
 import { fromString } from '../../src/format/core/index';
-import { leadingZeroCount } from '../../src/format/small';
+import { groupInteger, ungroup } from '../../src/format/grouping';
+import { leadingZeroCount, toSubscript } from '../../src/format/small';
 
 const d = (s: string) => fromString(s).value!;
-const EN_IN = {
-	tag: 'en-IN',
-	decimal: '.',
-	group: ',',
-	groupSizes: [3, 2],
-} as const;
 
 describe('format/grouping', () => {
 	it('groups uniformly and reverses', () => {
-		expect(groupInteger('1234567', EN_US)).to.equal('1,234,567');
-		expect(groupInteger('123', EN_US)).to.equal('123');
-		expect(groupInteger('1000', EN_US)).to.equal('1,000');
-		expect(ungroup('1,234,567', EN_US)).to.equal('1234567');
-	});
-
-	it('supports non-uniform group sizes', () => {
-		expect(groupInteger('12345678', EN_IN)).to.equal('1,23,45,678');
+		expect(groupInteger('1234567')).to.equal('1,234,567');
+		expect(groupInteger('123')).to.equal('123');
+		expect(groupInteger('1000')).to.equal('1,000');
+		expect(ungroup('1,234,567')).to.equal('1234567');
 	});
 });
 
@@ -84,13 +70,13 @@ describe('format/formatValue sentinels and statuses', () => {
 		).to.equal('Entire Position');
 	});
 
-	it('belowThreshold is signed and absBelowThreshold is not', () => {
-		expect(formatText(-5, { sentinels: [belowThreshold('1', '1x')] })).to.equal(
-			'1x'
-		);
+	it('belowThreshold is signed, so a negative matches', () => {
 		expect(
-			formatText(-5, { sentinels: [absBelowThreshold('1', 'tiny')] })
-		).to.equal('-5');
+			formatText(-5, { sentinels: [belowThreshold('1', 'tiny')] })
+		).to.equal('tiny');
+		expect(
+			formatText(5, { sentinels: [belowThreshold('1', 'tiny')] })
+		).to.equal('5');
 	});
 });
 
