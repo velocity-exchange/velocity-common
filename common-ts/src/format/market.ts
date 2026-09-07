@@ -6,6 +6,7 @@ import {
 	abs,
 	fractionDigitCount,
 	integerDigitCount,
+	isStepMultiple,
 	snapToStep,
 	toDecimal,
 } from './core/index';
@@ -92,6 +93,27 @@ export function snapValueToStep(
 	if (parsedStep.status !== 'ok') return null;
 	if (parsedStep.value.sign !== 1) return null;
 	return snapToStep(parsedValue.value, parsedStep.value, mode);
+}
+
+/**
+ * Exact multiple check, with no float tolerance anywhere: 5.1 is a multiple of
+ * 0.1 because the decimal digits divide, not because a remainder came in under
+ * an epsilon. Prefer this over the deprecated `numbersFitEvenly` and
+ * `dividesExactly` in `utils/math/precision`.
+ *
+ * Returns false when either side is missing or unparseable, and when the step
+ * is zero.
+ */
+export function isExactMultiple(
+	value: NumericInput,
+	step: NumericInput
+): boolean {
+	const parsedValue = toDecimal(value);
+	const parsedStep = toDecimal(step);
+	if (parsedValue.status !== 'ok' || !parsedValue.value) return false;
+	if (parsedStep.status !== 'ok' || !parsedStep.value) return false;
+	if (parsedStep.value.sign === 0) return false;
+	return isStepMultiple(parsedValue.value, parsedStep.value);
 }
 
 /**
