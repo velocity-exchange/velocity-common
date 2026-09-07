@@ -105,6 +105,10 @@
 		"./utils/core": {
 			"types": "./lib/utils/core/index.d.ts",
 			"default": "./lib/utils/core/index.js"
+		},
+		"./format": {
+			"types": "./lib/format/index.d.ts",
+			"default": "./lib/format/index.js"
 		}
 	},
 	"typesVersions": {
@@ -141,6 +145,9 @@
 			],
 			"utils/core": [
 				"lib/utils/core/index.d.ts"
+			],
+			"format": [
+				"lib/format/index.d.ts"
 			]
 		}
 	},
