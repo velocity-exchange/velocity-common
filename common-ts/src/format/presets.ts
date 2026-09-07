@@ -152,6 +152,7 @@ export const PRESETS = Object.freeze({
 			rounding: 'half-up' as const,
 		},
 		unit: 'x',
+		grouping: false,
 		sentinels: [NON_POSITIVE_LEVERAGE],
 		fallback: '1x',
 		invalidText: '1x',

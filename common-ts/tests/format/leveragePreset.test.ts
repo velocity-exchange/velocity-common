@@ -80,13 +80,22 @@ const CORPUS: [string, Input][] = [
 	['19.99', 19.99],
 	['20', 20],
 	['100.5', 100.5],
+	['999.5', 999.5],
+	['1000', 1000],
+	['12345.6', 12345.6],
+	['1234567', 1234567],
 	['-1', -1],
 	['-0.5', -0.5],
+	['-0', -0],
 	['NaN', NaN],
 	['Infinity', Infinity],
+	['-Infinity', -Infinity],
 	['null', null],
 	['undefined', undefined],
 	["'1.6'", '1.6'],
+	["'  2 '", '  2 '],
+	["'2x'", '2x'],
+	['1e21', 1e21],
 	["''", ''],
 	["'abc'", 'abc'],
 ];
@@ -102,6 +111,17 @@ const DIVERGENCES: Record<string, Divergence> = {
 		behaviour: 'an infinite leverage renders as a symbol, not as the word',
 		old: 'Infinityx',
 		next: '∞x',
+	},
+	"'2x'": {
+		behaviour: 'suffixed strings are not parsed',
+		old: '2x',
+		next: '1x',
+	},
+	'1e21': {
+		behaviour:
+			'the full integer is rendered, where toFixed switches to exponential',
+		old: '1e+21x',
+		next: '1000000000000000000000x',
 	},
 };
 
