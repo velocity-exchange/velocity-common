@@ -68,8 +68,7 @@ export const getPctCompletion = (
  * +Infinity, and `1.005` at 2dp gives `1`). Fine for a ratio or a chart tick,
  * wrong for anything displayed as money or sent on chain.
  *
- * For an exact result use `roundToDecimals(decimal, decimals, mode)` from
- * `@velocity-exchange/common/format/core`.
+ * For exact rounding of BigNum values use `roundBigNumToDecimalPlace`.
  */
 export function roundToDecimal(
 	value: number,

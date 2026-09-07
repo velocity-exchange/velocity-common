@@ -23,19 +23,10 @@ const requireDecimal = (bignum: BigNum): Decimal => {
 };
 
 /**
- * @deprecated Use `roundToDecimals(value, decimalPlaces, 'half-ceil')` from
- * `@velocity-exchange/common/format/core`.
- *
- * Now exact half-ceil, so ties still go toward +Infinity exactly as
- * `Math.round` did (`-1.5` at 0dp is still `-1`). What changes is that the
- * value no longer goes through `toNum()`: a double that cannot hold the value
- * used to round off the wrong neighbour (`1.005` at 2dp gave `1.00`), and
- * digits beyond 2^53 used to be lost.
- *
- * A negative `decimalPlaces` still rounds to tens, hundreds and so on, but a
- * non-integer one now throws where the float version returned noise
- * (`Math.pow(10, 1.5)` is not a power of ten, so the result was neither
- * rounded nor exact).
+ * Exact half-ceil rounding of a BigNum: ties go toward +Infinity, as
+ * `Math.round` did (`-1.5` at 0dp is still `-1`). A negative `decimalPlaces`
+ * rounds to tens, hundreds and so on. A non-integer one throws, where the
+ * float version returned noise.
  */
 export const roundBigNumToDecimalPlace = (
 	bignum: BigNum,
