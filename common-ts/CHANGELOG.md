@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.0...common-ts-v0.7.1) (2026-09-07)
+
+
+### Code Refactoring
+
+* **common-ts:** delegate the input-path precision helpers to the format layer ([#442](https://github.com/velocity-exchange/velocity-common/issues/442)) ([a75ccd5](https://github.com/velocity-exchange/velocity-common/commit/a75ccd570535dd206c35e38e7cee8e090b0f864d))
+
 ## [0.7.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.6.0...common-ts-v0.7.0) (2026-09-07)
 
 
