@@ -20,7 +20,8 @@
 		"common-ts": {
 			"package-name": "@velocity-exchange/common",
 			"component": "common-ts",
-			"changelog-path": "CHANGELOG.md"
+			"changelog-path": "CHANGELOG.md",
+			"bump-minor-pre-major": true
 		},
 		"posthog-types": {
 			"package-name": "@velocity-exchange/posthog-types",
