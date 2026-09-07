@@ -345,6 +345,11 @@ const INPUT_CORPUS = [
 	'1.2.345',
 	'.1.23456',
 	'123456789012345.123456789',
+	// A long first fraction segment ahead of a second separator: the old head
+	// comes from the first separator, the new one from the last, and here that
+	// makes the new value longer than the old, not shorter.
+	'1.23456.7',
+	'9.99999.9',
 ];
 
 const STEP_CORPUS: Array<number | undefined> = [
@@ -364,6 +369,11 @@ const STEP_CORPUS: Array<number | undefined> = [
 	1.5e-7,
 	0.30000000000000004,
 	1e21,
+	-1,
+	-0.01,
+	-1e-7,
+	NaN,
+	Infinity,
 ];
 
 // Neither shape can come from the input path's own keystrokes; both are here
@@ -371,11 +381,19 @@ const STEP_CORPUS: Array<number | undefined> = [
 // rather than left to be discovered by a caller.
 const MULTI_SEPARATOR =
 	'input holding more than one separator counts its fraction digits after the last one, not the first, so a cap can now bite where it used to pass';
+const MULTI_SEPARATOR_GROWS =
+	'master truncated into the first fraction from the wrong separator; the delegate keeps every digit up to the cap counted from the last separator, so the parsed value can move upward toward what was typed';
 const NON_STRING =
 	'a non-string value passes through untouched instead of throwing on `.split`, because the delegate type-checks its input first';
 
 const separatorFix = (old: string, next: string): Divergence => ({
 	behaviour: MULTI_SEPARATOR,
+	old,
+	next,
+});
+
+const separatorGrows = (old: string, next: string): Divergence => ({
+	behaviour: MULTI_SEPARATOR_GROWS,
 	old,
 	next,
 });
@@ -414,6 +432,17 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 				toNumber: () => NaN,
 			} as unknown as BN),
 	});
+	cases.push({
+		key: '"1234.5678" exp 2.5',
+		legacy: () =>
+			legacyTruncateInputToPrecision('1234.5678', {
+				toNumber: () => 2.5,
+			} as unknown as BN),
+		next: () =>
+			truncateInputToPrecision('1234.5678', {
+				toNumber: () => 2.5,
+			} as unknown as BN),
+	});
 
 	it('throws on 5 as a non-string, both old and new, and unwinds to the same input', () => {
 		expect(() =>
@@ -429,6 +458,8 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 		expect(
 			truncateInputToPrecision(5 as unknown as string, new BN(6))
 		).to.equal(5);
+		expect(truncateInputToPrecision(NaN as unknown as string, new BN(6))).to.be
+			.NaN;
 	});
 
 	it('reproduces the slice implementation except at the annotated divergences', () => {
@@ -441,6 +472,12 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 			'".1.23456" exp 0': separatorFix('.1.2345', '.1.'),
 			'".1.23456" exp 1': separatorFix('.1.23456', '.1.2'),
 			'".1.23456" exp 2': separatorFix('.1.23456', '.1.23'),
+			'"1.23456.7" exp 0': separatorGrows('1.23', '1.23456.'),
+			'"1.23456.7" exp 1': separatorGrows('1.234', '1.23456.7'),
+			'"1.23456.7" exp 2': separatorGrows('1.2345', '1.23456.7'),
+			'"9.99999.9" exp 0': separatorGrows('9.99', '9.99999.'),
+			'"9.99999.9" exp 1': separatorGrows('9.999', '9.99999.9'),
+			'"9.99999.9" exp 2': separatorGrows('9.9999', '9.99999.9'),
 			'non-string 5 exp 6': {
 				behaviour: NON_STRING,
 				old: 'THROWS: input.split is not a function',
@@ -450,6 +487,12 @@ describe('truncateInputToPrecision delegates to capStringFractionDigits', () => 
 				behaviour:
 					'a negative maxFractionDigits is invalid input and now leaves the value untouched, instead of the old arithmetic cutting into the integer part',
 				old: '1234',
+				next: '1234.5678',
+			},
+			'"1234.5678" exp 2.5': {
+				behaviour:
+					'a non-integer maxFractionDigits is invalid input and now leaves the value untouched, instead of the old arithmetic slicing at a fractional string index',
+				old: '1234.56',
 				next: '1234.5678',
 			},
 		});
@@ -550,6 +593,75 @@ const STEP_SIZE_DIVERGENCES: Record<string, Divergence> = {
 	'".1.23456" step 0.1': separatorFix('.1.23456', '.1.2'),
 	'".1.23456" step 0.01': separatorFix('.1.23456', '.1.23'),
 	'".1.23456" step 0.001': separatorFix('.1.23456', '.1.234'),
+	// A long first fraction ahead of a second separator: the delegate keeps
+	// digits master threw away, so the new value is longer, not shorter.
+	'"1.23456.7" step undefined': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 0': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 1': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 2': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 10': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 100': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 1e+21': separatorGrows('1.23', '1.23456'),
+	'"1.23456.7" step 0.5': separatorGrows('1.234', '1.23456.7'),
+	'"1.23456.7" step 0.1': separatorGrows('1.234', '1.23456.7'),
+	'"1.23456.7" step 0.01': separatorGrows('1.2345', '1.23456.7'),
+	'"1.23456.7" step 0.001': separatorGrows('1.23456', '1.23456.7'),
+	'"1.23456.7" step 1e-7': separatorGrows('1.23', '1.23456.7'),
+	'"1.23456.7" step 1e-9': separatorGrows('1.23', '1.23456.7'),
+	'"1.23456.7" step 1.5e-7': separatorGrows('1.23456', '1.23456.7'),
+	'"9.99999.9" step undefined': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 0': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 1': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 2': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 10': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 100': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 1e+21': separatorGrows('9.99', '9.99999'),
+	'"9.99999.9" step 0.5': separatorGrows('9.999', '9.99999.9'),
+	'"9.99999.9" step 0.1': separatorGrows('9.999', '9.99999.9'),
+	'"9.99999.9" step 0.01': separatorGrows('9.9999', '9.99999.9'),
+	'"9.99999.9" step 0.001': separatorGrows('9.99999', '9.99999.9'),
+	'"9.99999.9" step 1e-7': separatorGrows('9.99', '9.99999.9'),
+	'"9.99999.9" step 1e-9': separatorGrows('9.99', '9.99999.9'),
+	'"9.99999.9" step 1.5e-7': separatorGrows('9.99999', '9.99999.9'),
+	// A negative or non-finite step: `stepFractionDigits` reads its magnitude
+	// the same as the plain step it mirrors, so these reproduce that step's
+	// divergence values exactly, just under a step-side sign or non-finite key.
+	'"1.2.345" step -1': separatorFix('1.2.34', '1.2'),
+	'".1.23456" step -1': separatorFix('.1.2345', '.1'),
+	'"1.23456.7" step -1': separatorGrows('1.23', '1.23456'),
+	'"9.99999.9" step -1': separatorGrows('9.99', '9.99999'),
+	'"1.2.345" step -0.01': separatorFix('1.2.345', '1.2.34'),
+	'".1.23456" step -0.01': separatorFix('.1.23456', '.1.23'),
+	'"1.23456.7" step -0.01': separatorGrows('1.2345', '1.23456.7'),
+	'"9.99999.9" step -0.01': separatorGrows('9.9999', '9.99999.9'),
+	'"0.0" step -1e-7': exponentialFix('0', '0.0'),
+	'"1.0" step -1e-7': exponentialFix('1', '1.0'),
+	'".5" step -1e-7': exponentialFix('', '.5'),
+	'"-.5" step -1e-7': exponentialFix('-', '-.5'),
+	'".12345" step -1e-7': exponentialFix('', '.12345'),
+	'"00.1230" step -1e-7': exponentialFix('00', '00.1230'),
+	'"1.2345678" step -1e-7': exponentialFix('1', '1.2345678'),
+	'"-1.2345678" step -1e-7': exponentialFix('-1', '-1.2345678'),
+	'"0.0000001" step -1e-7': exponentialFix('0', '0.0000001'),
+	'"-0.0000001" step -1e-7': exponentialFix('-0', '-0.0000001'),
+	'"1,234.5678" step -1e-7': exponentialFix('1,234', '1,234.5678'),
+	'"1.2.3" step -1e-7': exponentialFix('1.2', '1.2.3'),
+	'"1.2.345" step -1e-7': exponentialFix('1.2.34', '1.2.345'),
+	'".1.23456" step -1e-7': exponentialFix('.1.2345', '.1.23456'),
+	'"123456789012345.123456789" step -1e-7': exponentialFix(
+		'123456789012345',
+		'123456789012345.1234567'
+	),
+	'"1.23456.7" step -1e-7': separatorGrows('1.23', '1.23456.7'),
+	'"9.99999.9" step -1e-7': separatorGrows('9.99', '9.99999.9'),
+	'"1.2.345" step NaN': separatorFix('1.2.34', '1.2'),
+	'".1.23456" step NaN': separatorFix('.1.2345', '.1'),
+	'"1.23456.7" step NaN': separatorGrows('1.23', '1.23456'),
+	'"9.99999.9" step NaN': separatorGrows('9.99', '9.99999'),
+	'"1.2.345" step Infinity': separatorFix('1.2.34', '1.2'),
+	'".1.23456" step Infinity': separatorFix('.1.2345', '.1'),
+	'"1.23456.7" step Infinity': separatorGrows('1.23', '1.23456'),
+	'"9.99999.9" step Infinity': separatorGrows('9.99', '9.99999'),
 };
 
 describe('roundToStepSize delegates to capStringFractionDigits with an exact step', () => {
