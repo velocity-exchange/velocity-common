@@ -1,4 +1,5 @@
 import { PublicKey } from '@velocity-exchange/sdk';
+import { trimFractionZeros } from '../../format/trim';
 import { getCachedUiString } from '../core/cache';
 
 export const abbreviateAddress = (address: string | PublicKey, length = 4) => {
@@ -11,6 +12,14 @@ export const abbreviateAddress = (address: string | PublicKey, length = 4) => {
  * Trim trailing zeros from a numerical string
  * @param str - numerical string to format
  * @param zerosToShow - max number of zeros to show after the decimal. Similar to number.toFixed() but won't trim non-zero values. Optional, default value is 1
+ *
+ * @deprecated The string-to-string form has no drop-in replacement.
+ * `minDecimals` on its own does not trim, it only pads: the equivalent is
+ * `formatText(value, { trimTrailingZeros: true, digits: { kind: 'decimals',
+ * decimals: N, minDecimals: Z } })` from `@velocity-exchange/common/format`,
+ * which trims through the same core trimmer this now delegates to. That takes a
+ * value, not an already formatted string, so a caller holding a formatted string
+ * should format from the value instead of trimming the string afterwards.
  */
 export const trimTrailingZeros = (str: string, zerosToShow = 1) => {
 	// Ignore strings with no decimal point
@@ -18,12 +27,7 @@ export const trimTrailingZeros = (str: string, zerosToShow = 1) => {
 
 	const sides = str.split('.');
 
-	sides[1] = sides[1].replace(/0+$/, '');
-
-	if (sides[1].length < zerosToShow) {
-		const zerosToAdd = zerosToShow - sides[1].length;
-		sides[1] = `${sides[1]}${Array(zerosToAdd).fill('0').join('')}`;
-	}
+	sides[1] = trimFractionZeros(sides[1], zerosToShow);
 
 	if (sides[1].length === 0) {
 		return sides[0];
