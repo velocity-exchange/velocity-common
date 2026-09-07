@@ -1,5 +1,5 @@
-import { expect } from 'chai';
 import { PRESETS, formatText } from '../../src/format/index';
+import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
  * Characterization corpus for the leverage preset. `formatLeverageLabel` below
@@ -14,53 +14,6 @@ const formatLeverageLabel = (value: number | string): string => {
 	const fixed = numeric.toFixed(0);
 	const trimmed = fixed.replace(/\.0+$/, '').replace(/(\.[1-9]*)0+$/, '$1');
 	return `${trimmed}x`;
-};
-
-interface CorpusCase {
-	key: string;
-	legacy: () => string;
-	next: () => string;
-}
-
-interface Divergence {
-	behaviour: string;
-	old: string;
-	next: string;
-}
-
-const attempt = (fn: () => string) => {
-	try {
-		return fn();
-	} catch (e) {
-		return `THROWS: ${(e as Error).message}`;
-	}
-};
-
-const runCorpus = (
-	cases: CorpusCase[],
-	divergences: Record<string, Divergence>
-) => {
-	const unusedKeys = new Set(Object.keys(divergences));
-	for (const testCase of cases) {
-		const legacy = attempt(testCase.legacy);
-		const next = attempt(testCase.next);
-		const divergence = divergences[testCase.key];
-		if (divergence) {
-			unusedKeys.delete(testCase.key);
-			expect(legacy, `${testCase.key} old (${divergence.behaviour})`).to.equal(
-				divergence.old
-			);
-			expect(next, `${testCase.key} new (${divergence.behaviour})`).to.equal(
-				divergence.next
-			);
-		} else {
-			expect(next, `${testCase.key} must be unchanged`).to.equal(legacy);
-		}
-	}
-	expect(
-		[...unusedKeys],
-		'every annotated divergence must be reached'
-	).to.deep.equal([]);
 };
 
 type Input = number | string | null | undefined;

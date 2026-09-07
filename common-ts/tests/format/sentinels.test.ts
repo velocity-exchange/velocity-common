@@ -2,6 +2,7 @@ import { BN, BigNum } from '@velocity-exchange/sdk';
 import { expect } from 'chai';
 import { PRESETS, formatText, formatValue } from '../../src/format/index';
 import { isEntirePositionOrder } from '../../src/utils/trading/size';
+import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
  * Characterization corpus for the entire-position sentinel. `isEntirePositionOrder`
@@ -9,53 +10,6 @@ import { isEntirePositionOrder } from '../../src/utils/trading/size';
  * the cases listed in the diff table, and every entry in the table names the
  * behaviour it is there for.
  */
-
-interface CorpusCase {
-	key: string;
-	legacy: () => string;
-	next: () => string;
-}
-
-interface Divergence {
-	behaviour: string;
-	old: string;
-	next: string;
-}
-
-const attempt = (fn: () => string) => {
-	try {
-		return fn();
-	} catch (e) {
-		return `THROWS: ${(e as Error).message}`;
-	}
-};
-
-const runCorpus = (
-	cases: CorpusCase[],
-	divergences: Record<string, Divergence>
-) => {
-	const unusedKeys = new Set(Object.keys(divergences));
-	for (const testCase of cases) {
-		const legacy = attempt(testCase.legacy);
-		const next = attempt(testCase.next);
-		const divergence = divergences[testCase.key];
-		if (divergence) {
-			unusedKeys.delete(testCase.key);
-			expect(legacy, `${testCase.key} old (${divergence.behaviour})`).to.equal(
-				divergence.old
-			);
-			expect(next, `${testCase.key} new (${divergence.behaviour})`).to.equal(
-				divergence.next
-			);
-		} else {
-			expect(next, `${testCase.key} must be unchanged`).to.equal(legacy);
-		}
-	}
-	expect(
-		[...unusedKeys],
-		'every annotated divergence must be reached'
-	).to.deep.equal([]);
-};
 
 const MARKERS = {
 	u64Max: '18446744073709551615',
@@ -113,11 +67,10 @@ const buildCases = (): CorpusCase[] => {
 // marker. The sentinel now matches the exact units and nothing else.
 const TOLERANCE =
 	'a value within one printed unit of the marker no longer reads as the marker';
-// The two markers are 1,709,551,615 raw units apart, which at precision 9 is
-// 1.71 printed units, so a value offset from one marker could land inside the
-// old tolerance band of the other.
-const OVERLAP =
-	'an offset from one marker no longer reads as the other marker at precision 9';
+// The two markers are 1,709,551,615 raw units apart. Past precision 9 that gap
+// is under one printed unit, so a value offset from one marker could land
+// inside the old tolerance band of the other.
+const OVERLAP = 'an offset from one marker no longer reads as the other marker';
 
 const banded = (behaviour: string): Divergence => ({
 	behaviour,
