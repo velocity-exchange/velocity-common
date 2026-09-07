@@ -54,7 +54,8 @@ export const valueIsBelowStepSize = (value: string, stepSize: number) => {
  *
  * `5.1 / 0.1` is `50.99999999999999` in floats, so the modulo alone reports 5.1
  * as not fitting 0.1. This rounds the quotient to 9 decimals before testing it
- * for integrality, which pulls values within ~1e-9 of a lattice point onto it.
+ * for integrality, so the tolerance is on the quotient: a value within about
+ * 1e-9 steps, that is 1e-9 times the step, is pulled onto the lattice.
  * `isExactMultiple` returns false for those.
  */
 export const numbersFitEvenly = (
