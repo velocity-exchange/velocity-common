@@ -17,7 +17,6 @@ import {
 	toDecimal,
 	toPlainString,
 } from '../../src/format/core/index';
-import { groupInteger, ungroup } from '../../src/format/grouping';
 
 // Deterministic LCG, so a failure is always reproducible from the seed.
 function makeRandom(seed: number) {
@@ -109,16 +108,6 @@ describe('format properties: parse and render round-trip', () => {
 			const value = randomDecimal();
 			const text = formatText(value, PRESETS.plain);
 			expect(fromString(text).value, text).to.deep.equal(value);
-		}
-	});
-});
-
-describe('format properties: grouping is reversible', () => {
-	it('ungroup undoes groupInteger', () => {
-		for (let i = 0; i < CASES; i++) {
-			const value = abs(randomDecimal());
-			const integer = toPlainString(value).split('.')[0];
-			expect(ungroup(groupInteger(integer))).to.equal(integer);
 		}
 	});
 });

@@ -9,17 +9,16 @@ import {
 } from '../../src/format/index';
 import { abbreviateValue } from '../../src/format/abbreviate';
 import { fromString } from '../../src/format/core/index';
-import { groupInteger, ungroup } from '../../src/format/grouping';
+import { groupInteger } from '../../src/format/grouping';
 import { leadingZeroCount, toSubscript } from '../../src/format/small';
 
 const d = (s: string) => fromString(s).value!;
 
 describe('format/grouping', () => {
-	it('groups uniformly and reverses', () => {
+	it('groups uniformly', () => {
 		expect(groupInteger('1234567')).to.equal('1,234,567');
 		expect(groupInteger('123')).to.equal('123');
 		expect(groupInteger('1000')).to.equal('1,000');
-		expect(ungroup('1,234,567')).to.equal('1234567');
 	});
 });
 

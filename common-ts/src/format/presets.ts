@@ -112,10 +112,6 @@ export const PRESETS = Object.freeze({
 		digits: { kind: 'tick' as const, rounding: 'half-up' as const },
 	}),
 	/** Requires options.market. Without one the value renders as invalidText. */
-	priceForOrder: freeze({
-		digits: { kind: 'tick' as const, rounding: 'truncate' as const },
-	}),
-	/** Requires options.market. Without one the value renders as invalidText. */
 	size: freeze({
 		digits: { kind: 'step' as const, rounding: 'truncate' as const },
 	}),

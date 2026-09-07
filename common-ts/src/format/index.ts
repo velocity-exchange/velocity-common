@@ -6,7 +6,6 @@ export {
 	Decimal,
 	DecimalStatus,
 	NumericInput,
-	ParseResult,
 	RawWithScale,
 	RoundingMode,
 	StepMode,

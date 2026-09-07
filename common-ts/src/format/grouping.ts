@@ -13,8 +13,3 @@ export function groupInteger(integerDigits: string): string {
 	chunks.unshift(remaining);
 	return chunks.join(GROUP_SEPARATOR);
 }
-
-/** Removes every group separator. Does not touch the decimal separator. */
-export function ungroup(text: string): string {
-	return text.split(GROUP_SEPARATOR).join('');
-}
