@@ -73,6 +73,8 @@ export const roundBigNumToDecimalPlace = (
  * real decimal step, so the raw step BN has to be paired with the value's own
  * precision exponent, exactly as it is below, or the step is read at the wrong
  * magnitude.
+ *
+ * A zero or negative step now throws instead of returning the value unchanged.
  */
 export const getBigNumRoundedToStepSize = (baseSize: BigNum, stepSize: BN) => {
 	// Snapping in raw units gives the same result at every precision and needs

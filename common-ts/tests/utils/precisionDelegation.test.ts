@@ -237,8 +237,29 @@ describe('getBigNumRoundedToStepSize delegates to snapValueToStep toward-zero', 
 		}
 	}
 
-	it('reproduces the BN division exactly, with no annotated divergences', () => {
-		runCorpus(cases, {});
+	cases.push({
+		key: '1.5 p6 step -10',
+		legacy: () =>
+			legacyGetBigNumRoundedToStepSize(
+				BigNum.fromPrint('1.5', new BN(6)),
+				new BN(-10)
+			).print(),
+		next: () =>
+			getBigNumRoundedToStepSize(
+				BigNum.fromPrint('1.5', new BN(6)),
+				new BN(-10)
+			).print(),
+	});
+
+	it('reproduces the BN division except at the annotated divergence', () => {
+		runCorpus(cases, {
+			'1.5 p6 step -10': {
+				behaviour:
+					'a negative step is invalid input and now fails loudly, where two sign flips used to cancel and return the value unchanged',
+				old: '1.500000',
+				next: 'THROWS: Cannot snap 1500000 to step -10',
+			},
+		});
 	});
 
 	it('still refuses a zero step, with a named error instead of a BN assertion', () => {
