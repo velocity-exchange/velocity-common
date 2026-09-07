@@ -8,8 +8,10 @@ import { SentinelRule } from './types';
 const ENTIRE_POSITION_UNITS = ['18446744073709551615', '18446744072000000000'];
 
 export const ENTIRE_POSITION: SentinelRule = Object.freeze({
+	// Sign matters: the magnitude is a marker written into a positive size, so a
+	// negative amount that happens to carry the same units is an ordinary value.
 	matches: (v: { units: string; scale: number; sign: -1 | 0 | 1 }) =>
-		ENTIRE_POSITION_UNITS.includes(v.units),
+		v.sign === 1 && ENTIRE_POSITION_UNITS.includes(v.units),
 	text: 'Entire Position',
 });
 
