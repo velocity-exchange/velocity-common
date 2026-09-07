@@ -766,6 +766,18 @@ describe('format/presets', () => {
 		).to.equal('Entire Position');
 	});
 
+	it('every tick or step preset needs a market', () => {
+		const marketless = [
+			['price', PRESETS.price],
+			['size', PRESETS.size],
+			['orderSizeStep', PRESETS.orderSizeStep],
+		] as const;
+		for (const [name, preset] of marketless) {
+			expect(formatText('1.23456', preset), name).to.equal('?');
+			expect(formatValue('1.23456', preset).status, name).to.equal('invalid');
+		}
+	});
+
 	it('the abbreviate path reports the mode its digit spec actually used', () => {
 		const half = formatValue('999999', {
 			abbreviate: {
