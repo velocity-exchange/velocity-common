@@ -136,14 +136,10 @@ export interface FormatParts {
 	surroundEnd: string;
 }
 
-/** Branded, so a formatted string cannot type-check into order math. */
-declare const displayBrand: unique symbol;
-export type DisplayString = string & { readonly [displayBrand]: true };
-
 export type ValueSign = 'positive' | 'negative' | 'zero' | 'none';
 
 export interface FormatResult {
-	readonly text: DisplayString;
+	readonly text: string;
 	readonly parts: FormatParts;
 	/** Computed AFTER rounding, so it always agrees with the rendered digits. */
 	readonly sign: ValueSign;
@@ -163,8 +159,6 @@ export interface FormatResult {
 	readonly roundedAway: boolean;
 	readonly usedSmallForm: boolean;
 	readonly roundingApplied: RoundingMode | null;
-	/** The untouched input. The ONLY thing allowed back into math. */
-	readonly exact: Decimal | null;
 }
 
 export type LegacyNumberType =

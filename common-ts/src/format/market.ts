@@ -14,7 +14,7 @@ import { MarketPrecision } from './types';
 
 function requireDecimal(input: NumericInput, label: string): Decimal {
 	const parsed = toDecimal(input);
-	if (parsed.status !== 'ok' || !parsed.value) {
+	if (parsed.status !== 'ok') {
 		throw new Error(`${label} must be a finite numeric value`);
 	}
 	return parsed.value;
@@ -76,9 +76,7 @@ export function sizeDecimalsFromPrice(
 ): number {
 	const max = opts?.max ?? 6;
 	const parsed = toDecimal(assetPrice);
-	if (parsed.status !== 'ok' || !parsed.value || parsed.value.sign === 0) {
-		return max;
-	}
+	if (parsed.status !== 'ok' || parsed.value.sign === 0) return max;
 	const exponent = integerDigitCount(abs(parsed.value)) - 1;
 	return Math.min(exponent + 2, max);
 }
@@ -90,8 +88,8 @@ export function snapValueToStep(
 ): Decimal | null {
 	const parsedValue = toDecimal(value);
 	const parsedStep = toDecimal(step);
-	if (parsedValue.status !== 'ok' || !parsedValue.value) return null;
-	if (parsedStep.status !== 'ok' || !parsedStep.value) return null;
+	if (parsedValue.status !== 'ok') return null;
+	if (parsedStep.status !== 'ok') return null;
 	if (parsedStep.value.sign !== 1) return null;
 	return snapToStep(parsedValue.value, parsedStep.value, mode);
 }
@@ -126,6 +124,6 @@ export function capStringFractionDigits(
 /** Fraction digits a step allows, for feeding capStringFractionDigits. */
 export function stepFractionDigits(step: NumericInput): number {
 	const parsed = toDecimal(step);
-	if (parsed.status !== 'ok' || !parsed.value) return 0;
+	if (parsed.status !== 'ok') return 0;
 	return fractionDigitCount(parsed.value);
 }

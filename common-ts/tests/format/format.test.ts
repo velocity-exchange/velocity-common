@@ -679,11 +679,4 @@ describe('format/formatValue parts', () => {
 		});
 		expect(result.text).to.equal('(-$1,234.50 USDC)');
 	});
-
-	it('keeps the untouched input available for maths', () => {
-		const result = formatValue('1.999', {
-			digits: { kind: 'decimals', decimals: 2, rounding: 'truncate' },
-		});
-		expect(result.exact).to.deep.equal(d('1.999'));
-	});
 });

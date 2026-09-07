@@ -44,9 +44,7 @@ function passesThreshold(value: Decimal, options: AbbreviateOptions): boolean {
 	const parsed = toDecimal(threshold);
 	// An unusable threshold falls back to the default, never to 'always'.
 	const bound =
-		parsed.status === 'ok' && parsed.value
-			? parsed.value
-			: toDecimal(DEFAULT_THRESHOLD).value!;
+		parsed.status === 'ok' ? parsed.value : toDecimal(DEFAULT_THRESHOLD).value!;
 	return compare(abs(value), bound) >= 0;
 }
 

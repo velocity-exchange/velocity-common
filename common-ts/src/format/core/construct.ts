@@ -19,11 +19,15 @@ const DECIMAL_STRING =
  */
 export const MAX_EXPONENT_SHIFT = 10_000;
 
-export const ZERO: Decimal = Object.freeze({
-	sign: 0 as const,
-	digits: '0',
-	scale: 0,
-});
+// The brand exists only in the type, so every literal that becomes a Decimal
+// is cast here rather than carrying a runtime marker property.
+const seal = (d: {
+	sign: -1 | 0 | 1;
+	digits: string;
+	scale: number;
+}): Decimal => Object.freeze(d) as Decimal;
+
+export const ZERO: Decimal = seal({ sign: 0, digits: '0', scale: 0 });
 
 function ok(value: Decimal): ParseResult {
 	return { status: 'ok', value };
@@ -55,13 +59,11 @@ export function fromParts(
 		throw new Error(`Decimal digits must be a digit string, got ${digits}`);
 	}
 	const normalised = stripLeadingZeros(digits);
-	if (normalised === '0') {
-		return Object.freeze({ sign: 0 as const, digits: '0', scale });
-	}
+	if (normalised === '0') return seal({ sign: 0, digits: '0', scale });
 	if (sign !== -1 && sign !== 1) {
 		throw new Error(`Decimal sign ${sign} is invalid for digits ${normalised}`);
 	}
-	return Object.freeze({ sign, digits: normalised, scale });
+	return seal({ sign, digits: normalised, scale });
 }
 
 /**

@@ -14,7 +14,6 @@ import { applySmallNumber } from './small';
 import { trimFractionZeros } from './trim';
 import {
 	DigitSpec,
-	DisplayString,
 	FormatOptions,
 	FormatParts,
 	FormatResult,
@@ -46,8 +45,9 @@ function emptyParts(): FormatParts {
 	};
 }
 
-function assemble(parts: FormatParts): DisplayString {
-	return (parts.surroundStart +
+function assemble(parts: FormatParts): string {
+	return (
+		parts.surroundStart +
 		parts.sign +
 		parts.currency +
 		parts.integer +
@@ -56,7 +56,8 @@ function assemble(parts: FormatParts): DisplayString {
 		parts.unit +
 		parts.percent +
 		parts.suffix +
-		parts.surroundEnd) as DisplayString;
+		parts.surroundEnd
+	);
 }
 
 function signOf(d: Decimal | null): ValueSign {
@@ -90,7 +91,7 @@ function textResult(
 	const parts = emptyParts();
 	parts.integer = text;
 	return {
-		text: text as DisplayString,
+		text,
 		parts,
 		sign,
 		exactSign: signOf(exact),
@@ -103,7 +104,6 @@ function textResult(
 		roundedAway: false,
 		usedSmallForm: false,
 		roundingApplied: null,
-		exact,
 	};
 }
 
@@ -137,7 +137,7 @@ export function formatValue(
 		);
 	}
 
-	const exact = parsed.value as Decimal;
+	const exact = parsed.value;
 
 	for (const rule of options.sentinels ?? []) {
 		if (
@@ -280,13 +280,12 @@ export function formatValue(
 		roundedAway,
 		usedSmallForm,
 		roundingApplied,
-		exact,
 	};
 }
 
 export function formatText(
 	input: NumericInput,
 	options?: FormatOptions
-): DisplayString {
+): string {
 	return formatValue(input, options).text;
 }

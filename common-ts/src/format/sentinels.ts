@@ -16,7 +16,7 @@ export const ENTIRE_POSITION: SentinelRule = Object.freeze({
 /** Matches every value strictly below `t`, signed. */
 export function belowThreshold(t: NumericInput, text: string): SentinelRule {
 	const parsed = toDecimal(t);
-	if (parsed.status !== 'ok' || !parsed.value) {
+	if (parsed.status !== 'ok') {
 		throw new Error(
 			`belowThreshold needs a finite numeric threshold, got ${t}`
 		);

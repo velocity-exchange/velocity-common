@@ -48,7 +48,7 @@ export function applySmallNumber(
 
 	if (options.mode === 'sentinel') {
 		const parsed = toDecimal(options.sentinelAt);
-		if (parsed.status !== 'ok' || !parsed.value) return null;
+		if (parsed.status !== 'ok') return null;
 		if (compare(magnitude, parsed.value) >= 0) return null;
 		const bound = toDigitStrings(parsed.value);
 		return {
