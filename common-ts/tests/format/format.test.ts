@@ -437,6 +437,25 @@ describe('format/abbreviate', () => {
 		expect(result).to.include({ applied: true, unit: 'M', exponent: 6 });
 	});
 
+	it('the trim floor comes from the abbreviation digits', () => {
+		const abbreviate = {
+			threshold: 'always' as const,
+			trimTrailingZeros: true,
+			digits: {
+				kind: 'decimals' as const,
+				decimals: 4,
+				minDecimals: 2,
+				rounding: 'half-up' as const,
+			},
+		};
+		expect(formatText('1200', { abbreviate })).to.equal('1.20K');
+		expect(formatText('1000', { abbreviate })).to.equal('1.00K');
+		expect(formatText('1234.5', { abbreviate })).to.equal('1.2345K');
+		const noFloor = { ...abbreviate, digits: { ...abbreviate.digits } };
+		delete (noFloor.digits as { minDecimals?: number }).minDecimals;
+		expect(formatText('1200', { abbreviate: noFloor })).to.equal('1.2K');
+	});
+
 	it('abbreviate digits of kind tick or step read the market', () => {
 		const market = {
 			priceDecimals: 2,

@@ -194,7 +194,9 @@ export function formatValue(
 			rounded = abbreviated.value;
 			wasRounded = abbreviated.wasRounded;
 			roundingApplied = abbreviated.roundingApplied;
-			minDecimals = 0;
+			minDecimals = minDecimalsOf(
+				abbreviateOptions?.digits ?? ABBREVIATE_FALLBACK
+			);
 			trimTrailingZeros =
 				abbreviateOptions?.trimTrailingZeros ?? trimTrailingZeros;
 		} else {
