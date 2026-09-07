@@ -1,4 +1,5 @@
 import { SpotMarketConfig } from '@velocity-exchange/sdk';
+import { DECIMAL_SEPARATOR } from '../../format/locale';
 import {
 	capStringFractionDigits,
 	stepFractionDigits,
@@ -24,10 +25,10 @@ const capToFractionDigits = (input: string, maxFractionDigits: number) => {
 	const capped = capStringFractionDigits(input, { maxFractionDigits });
 	if (capped === input) return input;
 
-	const sep = input.lastIndexOf('.');
+	const sep = input.lastIndexOf(DECIMAL_SEPARATOR);
 	const head = input.slice(0, sep);
-	if (maxFractionDigits === 0) return `${head}.`;
-	return sep === 0 ? capped.slice(1) : capped;
+	if (maxFractionDigits === 0) return `${head}${DECIMAL_SEPARATOR}`;
+	return sep === 0 ? capped.slice(DECIMAL_SEPARATOR.length) : capped;
 };
 
 /**

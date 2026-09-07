@@ -128,6 +128,8 @@ export function capStringFractionDigits(
 	cfg: { maxFractionDigits: number }
 ): string {
 	if (typeof input !== 'string' || input === '') return input;
+	if (!Number.isInteger(cfg.maxFractionDigits) || cfg.maxFractionDigits < 0)
+		return input;
 	const separatorIndex = input.lastIndexOf(DECIMAL_SEPARATOR);
 	if (separatorIndex === -1) return input;
 
