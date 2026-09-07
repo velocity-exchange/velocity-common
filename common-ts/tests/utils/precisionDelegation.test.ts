@@ -217,6 +217,26 @@ describe('getBigNumRoundedToStepSize delegates to snapValueToStep toward-zero', 
 		}
 	}
 
+	// A negative precision exponent has no fixed-point scale to print at, so
+	// these compare the raw units and the exponent the result carries.
+	const rawUnits = (bigNum: BigNum) =>
+		`${bigNum.val.toString()} p${bigNum.precision.toString()}`;
+	for (const precision of [-1, -2, -6]) {
+		for (const raw of ['0', '1', '1234', '1500000', '18446744073709551615']) {
+			for (const step of ['1', '3', '10', '25', '1000']) {
+				const key = `raw ${raw} p${precision} step ${step}`;
+				const bigNum = () => BigNum.from(new BN(raw), new BN(precision));
+				cases.push({
+					key,
+					legacy: () =>
+						rawUnits(legacyGetBigNumRoundedToStepSize(bigNum(), new BN(step))),
+					next: () =>
+						rawUnits(getBigNumRoundedToStepSize(bigNum(), new BN(step))),
+				});
+			}
+		}
+	}
+
 	it('reproduces the BN division exactly, with no annotated divergences', () => {
 		runCorpus(cases, {});
 	});

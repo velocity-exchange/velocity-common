@@ -8,8 +8,8 @@ import {
 } from '../../format/core';
 import { snapValueToStep } from '../../format/market';
 
-const toBigNum = (value: Decimal, precision: BN): BigNum => {
-	const parts = toFixedPointParts(value, precision.toNumber(), 'truncate');
+const toBigNum = (value: Decimal, scale: number, precision: BN): BigNum => {
+	const parts = toFixedPointParts(value, scale, 'truncate');
 	const units = new BN(parts.units);
 	return BigNum.from(parts.sign === -1 ? units.neg() : units, precision);
 };
@@ -46,10 +46,12 @@ export const roundBigNumToDecimalPlace = (
 			`decimalPlaces must be an integer, got ${String(decimalPlaces)}`
 		);
 	}
+	const scale = bignum.precision.toNumber();
 	const value = requireDecimal(bignum);
 	if (decimalPlaces >= 0) {
 		return toBigNum(
 			roundToDecimals(value, decimalPlaces, 'half-ceil'),
+			scale,
 			bignum.precision
 		);
 	}
@@ -60,7 +62,7 @@ export const roundBigNumToDecimalPlace = (
 		0,
 		'half-ceil'
 	);
-	return toBigNum(shiftPoint(whole, -decimalPlaces), bignum.precision);
+	return toBigNum(shiftPoint(whole, -decimalPlaces), scale, bignum.precision);
 };
 
 /**
@@ -73,9 +75,11 @@ export const roundBigNumToDecimalPlace = (
  * magnitude.
  */
 export const getBigNumRoundedToStepSize = (baseSize: BigNum, stepSize: BN) => {
+	// Snapping in raw units gives the same result at every precision and needs
+	// no fixed-point scale, which a negative precision exponent has no room for.
 	const snapped = snapValueToStep(
-		{ raw: baseSize.val, scale: baseSize.precision },
-		{ raw: stepSize, scale: baseSize.precision },
+		{ raw: baseSize.val, scale: 0 },
+		{ raw: stepSize, scale: 0 },
 		'toward-zero'
 	);
 	if (!snapped) {
@@ -83,5 +87,5 @@ export const getBigNumRoundedToStepSize = (baseSize: BigNum, stepSize: BN) => {
 			`Cannot snap ${baseSize.toString()} to step ${stepSize.toString()}`
 		);
 	}
-	return toBigNum(snapped, baseSize.precision);
+	return toBigNum(snapped, 0, baseSize.precision);
 };
