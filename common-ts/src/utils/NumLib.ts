@@ -21,15 +21,11 @@ const NUMERIC_TEXT: FormatOptions = {
  * Utilities to convert numbers and BigNumbers (BN) to different formats for the UI.
  */
 export class NumLib {
-	private static locale = 'en';
-
 	/**
-	 * @deprecated The format layer renders en-US only, so this no longer moves
-	 * any separator the display members print.
+	 * @deprecated The format layer renders en-US only, so a locale set here
+	 * moves nothing.
 	 */
-	static setLocale = (locale: string) => {
-		this.locale = locale;
-	};
+	static setLocale = (_locale: string) => {};
 
 	/**
 	 * Converts a Big Number to its regular number representation.
@@ -65,9 +61,10 @@ export class NumLib {
 
 	static formatNum = {
 		/**
-		 * Converts a number to a precision suitable to trade with
+		 * Converts a number to a precision suitable to trade with. Returns a
+		 * number, so the replacement parses the rendered text back.
 		 *
-		 * @deprecated Use `formatText(num, PRESETS.priceText)` from
+		 * @deprecated Use `parseFloat(formatText(num, PRESETS.priceText))` from
 		 * '@velocity-exchange/common/format'.
 		 */
 		toTradePrecision: (num: number) =>
@@ -113,26 +110,32 @@ export class NumLib {
 			_assetPrice?: number,
 			_skipLocaleFormatting = false,
 			customSigFigs = 5
-		): string =>
-			formatText(baseAmount, {
+		): string => {
+			const options: FormatOptions = {
 				...PRESETS.baseAmount,
 				grouping: !_skipLocaleFormatting,
-				// The price-magnitude digits were only ever reached by an amount of
-				// one or more; below that the four-decimal shape stands.
-				digits:
-					_skipLocaleFormatting && Math.abs(baseAmount) >= 1
-						? {
-								kind: 'magnitude',
-								assetPrice: _assetPrice ?? 0,
-								rounding: 'half-up',
-							}
-						: {
-								kind: 'significant',
-								significant: customSigFigs,
-								rounding: 'half-up',
-								maxDecimals: 4,
-							},
-			}),
+			};
+
+			// Below one the shape stops at four decimals whatever digits the caller
+			// asked for. The guard reads the magnitude, so a negative amount takes
+			// the same digits as the positive one, not the small-amount bound.
+			if (Math.abs(baseAmount) >= 1) {
+				options.digits = _skipLocaleFormatting
+					? {
+							kind: 'magnitude',
+							assetPrice: _assetPrice ?? 0,
+							rounding: 'half-up',
+						}
+					: {
+							kind: 'significant',
+							significant: customSigFigs,
+							rounding: 'half-up',
+							maxDecimals: 4,
+						};
+			}
+
+			return formatText(baseAmount, options);
+		},
 		/**
 		 * This function prints the base amount of an asset with a number of decimals relative to the price of the asset, because for high priced assets we care about more accuracy in the base amount. Number of decimals corresponds to accuracy to ~ 1 cent
 		 * @param baseAmount
@@ -216,8 +219,8 @@ export class NumLib {
 		 * Rounds a number down to a certain number of decimal places. This differs from .toFixed() in that it rounds down, whereas .toFixed() rounds to the nearest number. Rounds toward negative infinity, so a negative value grows.
 		 *
 		 * @deprecated Use `formatText(num, { digits: { kind: 'decimals',
-		 * decimals, rounding: 'floor' }, grouping: false })` from
-		 * '@velocity-exchange/common/format'.
+		 * decimals, rounding: 'floor' }, grouping: false, trimTrailingZeros:
+		 * noPadding })` from '@velocity-exchange/common/format'.
 		 */
 		toDecimalPlaces: (
 			num: number,
@@ -273,7 +276,8 @@ export class NumLib {
 			mantissa: 10 ** (formatted.abbreviation?.exponent ?? 0),
 			symbol: formatted.abbreviation?.unit ?? '',
 			sigFigs: Math.max(rendered.replace(/^0+/, '').length, 1),
-			displayValue: Number(numeric),
+			// A missing value renders the fallback, which is text rather than digits.
+			displayValue: formatted.status === 'ok' ? Number(numeric) : 0,
 			displayString: formatted.text,
 		};
 	};

@@ -212,8 +212,9 @@ export const PRESETS = Object.freeze({
 	}),
 	/**
 	 * Two decimals of an abbreviated mantissa, for balances, volumes and
-	 * totals. Below a cent it keeps two significant digits instead, and
-	 * anything unusable reads as a plain zero.
+	 * totals. Below a cent it keeps two significant digits instead, an
+	 * unreadable or non-finite value reads as a plain zero, and a missing one
+	 * takes the fallback.
 	 */
 	millifiedAmount: freeze({
 		digits: {

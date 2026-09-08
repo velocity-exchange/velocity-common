@@ -11,9 +11,9 @@ const CANDIDATES = [
 const SRC = CANDIDATES.find((path) => existsSync(join(path, 'format', 'core')));
 
 /**
- * `NumLib.setLocale` still records a locale, but every display member now
- * renders through the format layer, which is en-US only. A call therefore reads
- * as a separator change and does nothing at all, so src may not make one.
+ * Every NumLib display member renders through the format layer, which is en-US
+ * only, so `NumLib.setLocale` keeps its signature and does nothing at all. A
+ * call reads as a separator change that never happens, so src may not make one.
  */
 const FORBIDDEN = new RegExp(
 	[

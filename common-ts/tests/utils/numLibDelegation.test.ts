@@ -46,8 +46,6 @@ const SMALL_DIGIT_CREDIT =
 	'below 1e-5 the digit count no longer grows by one per leading zero';
 const NEGATIVES_KEEP_DIGITS =
 	'a negative amount keeps its digits, where a guard without an abs() sent all of them to the small-amount bound';
-const ZERO_FOLLOWS_SIG_FIGS =
-	'a zero renders one decimal fewer than the significant count asks for, instead of a flat four';
 const PRICE_MAGNITUDE =
 	'the decimals come from the price itself, not from the price plus one, so a price just below a power of ten no longer buys one';
 const PRICE_MAGNITUDE_MISSING =
@@ -75,6 +73,8 @@ const MILLIFY_SMALL_FORM =
 
 const legacyToTradePrecision = (num: number) => parseFloat(num.toPrecision(6));
 
+// The oracle spells the zero check `===` where the original had `==`; both
+// compare a number against zero, so the corpus is unaffected.
 const legacyToTradePrecisionString = (
 	num: number,
 	toLocaleString?: boolean
@@ -325,6 +325,8 @@ const VALUES: [string, number][] = [
 	['0.2849', 0.2849],
 	['0.29', 0.29],
 	['-0.29', -0.29],
+	['0.0567', 0.0567],
+	['0.12345', 0.12345],
 	['0.5', 0.5],
 	['-0.5', -0.5],
 	['0.0000049', 0.0000049],
@@ -353,6 +355,7 @@ const VALUES: [string, number][] = [
 	['1e21', 1e21],
 	['2^53', 2 ** 53],
 	['-2^53', -(2 ** 53)],
+	['MAX_VALUE', Number.MAX_VALUE],
 	['NaN', NaN],
 	['Infinity', Infinity],
 	['-Infinity', -Infinity],
@@ -363,12 +366,15 @@ const VALUES: [string, number][] = [
 /** The magnitudes worth re-running for every extra parameter. */
 const SWEEP_KEYS = [
 	'0',
+	'0.0567',
+	'0.12345',
 	'0.5',
 	'-0.5',
 	'0.0000049',
 	'1.23456789',
 	'12345.6789',
 	'1e6',
+	'-9999.995',
 	'NaN',
 ];
 
@@ -490,6 +496,16 @@ describe('NumLib.formatNum.toTradePrecisionString', () => {
 			behaviour: NO_PADDING_BELOW_ONE,
 			old: '-0.29000',
 			next: '-0.29',
+		},
+		'0.0567': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.05670',
+			next: '0.0567',
+		},
+		'0.0567 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.05670',
+			next: '0.0567',
 		},
 		'0.5': {
 			behaviour: NO_PADDING_BELOW_ONE,
@@ -621,6 +637,11 @@ describe('NumLib.formatNum.toTradePrecisionString', () => {
 			old: '-9.00720e+15',
 			next: '-9007200000000000',
 		},
+		MAX_VALUE: {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.79769e+308',
+			next: '179769000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+		},
 		NaN: {
 			behaviour: NON_FINITE_TEXT,
 			old: 'NaN',
@@ -694,6 +715,11 @@ describe('NumLib.formatNum.toNotionalDisplay', () => {
 			behaviour: EXACT_DIGITS,
 			old: '$999,999,999,999,999,900,000.00',
 			next: '$1,000,000,000,000,000,000,000.00',
+		},
+		MAX_VALUE: {
+			behaviour: EXACT_DIGITS,
+			old: '$∞',
+			next: '$179,769,313,486,231,570,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000.00',
 		},
 		NaN: {
 			behaviour: NON_FINITE_TEXT,
@@ -850,11 +876,6 @@ describe('NumLib.formatNum.toBaseDisplay', () => {
 			old: '<0.00001',
 			next: '-',
 		},
-		'0 @3sf': {
-			behaviour: ZERO_FOLLOWS_SIG_FIGS,
-			old: '0.0000',
-			next: '0.00',
-		},
 		'0.5 raw no price': {
 			behaviour: NO_PADDING_BELOW_ONE,
 			old: '0.5000',
@@ -901,7 +922,7 @@ describe('NumLib.formatNum.toBaseDisplay', () => {
 			next: '-0.5',
 		},
 		'-0.5 raw price 9': {
-			behaviour: PRICE_MAGNITUDE,
+			behaviour: NEGATIVES_KEEP_DIGITS,
 			old: '<0.00001',
 			next: '-0.5',
 		},
@@ -944,6 +965,41 @@ describe('NumLib.formatNum.toBaseDisplay', () => {
 			behaviour: SIG_FIGS_DECIMAL_CAP,
 			old: '1.2345679',
 			next: '1.2346',
+		},
+		'-9999.995 raw no price': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9999.995000',
+		},
+		'-9999.995 raw price 0': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9999.995000',
+		},
+		'-9999.995 raw price 9': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-10000.00',
+		},
+		'-9999.995 raw price 10': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9999.995',
+		},
+		'-9999.995 raw price 1234.56': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9999.99500',
+		},
+		'-9999.995 @3sf': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-10,000',
+		},
+		'-9999.995 @8sf': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9,999.9950',
 		},
 		'12345.6789 raw no price': {
 			behaviour: PRICE_MAGNITUDE_MISSING,
@@ -1063,6 +1119,16 @@ describe('NumLib.formatNum.toDisplayPrice', () => {
 			behaviour: NO_PADDING_BELOW_ONE,
 			old: '-0.290000',
 			next: '-0.29',
+		},
+		'0.0567': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0567000',
+			next: '0.0567',
+		},
+		'0.12345': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.123450',
+			next: '0.12345',
 		},
 		'0.5': {
 			behaviour: NO_PADDING_BELOW_ONE,
@@ -1210,6 +1276,16 @@ describe('NumLib.formatNum.toDecimalPlaces', () => {
 			old: '999999999999999900000',
 			next: '1000000000000000000000',
 		},
+		'MAX_VALUE @2dp': {
+			behaviour: EXACT_DIGITS,
+			old: 'Infinity.00',
+			next: '179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00',
+		},
+		'MAX_VALUE @2dp unpadded': {
+			behaviour: EXACT_DIGITS,
+			old: 'Infinity',
+			next: '179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+		},
 		'NaN @2dp': {
 			behaviour: NON_FINITE_TEXT,
 			old: 'NaN.00',
@@ -1265,6 +1341,16 @@ describe('NumLib.formatNum.toDecimalPlaces', () => {
 			old: '0.',
 			next: '0',
 		},
+		'0.0567 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '0.',
+			next: '0',
+		},
+		'0.12345 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '0.',
+			next: '0',
+		},
 		'0.5 @0dp': {
 			behaviour: TRAILING_SEPARATOR,
 			old: '0.',
@@ -1284,6 +1370,16 @@ describe('NumLib.formatNum.toDecimalPlaces', () => {
 			behaviour: TRAILING_SEPARATOR,
 			old: '1.',
 			next: '1',
+		},
+		'-9999.995 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '-10000.',
+			next: '-10000',
+		},
+		'-9999.995 @4dp': {
+			behaviour: EXACT_FLOOR,
+			old: '-9999.9951',
+			next: '-9999.9950',
 		},
 		'12345.6789 @0dp': {
 			behaviour: TRAILING_SEPARATOR,
@@ -1383,6 +1479,16 @@ describe('NumLib.millify', () => {
 			behaviour: MILLIFY_NEGATIVES,
 			old: 'THROWS: maximumSignificantDigits value is out of range.',
 			next: '1||2|-0.29|-0.29',
+		},
+		'0.0567': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||1.7535830588929067|0.06|0.06',
+			next: '1||1|0.06|0.06',
+		},
+		'0.12345': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||2.091491094267951|0.12|0.12',
+			next: '1||2|0.12|0.12',
 		},
 		'0.5': {
 			behaviour: MILLIFY_TWO_DECIMALS,
@@ -1519,6 +1625,11 @@ describe('NumLib.millify', () => {
 			old: 'THROWS: maximumSignificantDigits value is out of range.',
 			next: '1000000000000000|Q|3|-9.01|-9.01Q',
 		},
+		MAX_VALUE: {
+			behaviour: MILLIFY_LARGE_UNITS,
+			old: '1||5.254715559916747|179|179,770,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000',
+			next: '1000000000000000|Q|296|1.7976931348623157e+293|179,769,313,486,231,570,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000.00Q',
+		},
 		NaN: {
 			behaviour: MILLIFY_MANTISSA_ZERO,
 			old: '0||1|0|0',
@@ -1537,12 +1648,12 @@ describe('NumLib.millify', () => {
 		undefined: {
 			behaviour: NULLISH_DASH,
 			old: '0||1|0|0',
-			next: '1||1|NaN|-',
+			next: '1||1|0|-',
 		},
 		null: {
 			behaviour: NULLISH_DASH,
 			old: '0||1|0|0',
-			next: '1||1|NaN|-',
+			next: '1||1|0|-',
 		},
 	};
 
@@ -1561,6 +1672,14 @@ describe('millify', () => {
 		legacy: () => legacyMillify(value),
 		next: () => millify(value),
 	}));
+
+	// The trimmed path handed parseFloat().toString() a value it renders in
+	// exponent form.
+	cases.push({
+		key: '1e-7 trimmed',
+		legacy: () => legacyMillify(1e-7, { trimEndingZeroes: true }),
+		next: () => millify(1e-7, { trimEndingZeroes: true }),
+	});
 
 	const OPTIONS: [string, MillifyOptions][] = [
 		['3sf', { precision: 3 }],
@@ -1614,6 +1733,16 @@ describe('millify', () => {
 			behaviour: NO_PADDING_BELOW_ONE,
 			old: '-0.290000',
 			next: '-0.29',
+		},
+		'0.0567': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0567000',
+			next: '0.0567',
+		},
+		'0.12345': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.123450',
+			next: '0.12345',
 		},
 		'0.5': {
 			behaviour: NO_PADDING_BELOW_ONE,
@@ -1675,6 +1804,11 @@ describe('millify', () => {
 			old: '1.00000e+6Q',
 			next: '1000000Q',
 		},
+		MAX_VALUE: {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.79769e+293Q',
+			next: '179769000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000Q',
+		},
 		Infinity: {
 			behaviour: NON_FINITE_TEXT,
 			old: 'InfinityQ',
@@ -1689,6 +1823,31 @@ describe('millify', () => {
 			behaviour: NULLISH_DASH,
 			old: '0.00000',
 			next: '0',
+		},
+		'1e-7 trimmed': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1e-7',
+			next: '0.0000001',
+		},
+		'0.0567 1dp': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0567000',
+			next: '0.0567',
+		},
+		'0.0567 scientific': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0567000',
+			next: '0.0567',
+		},
+		'0.12345 1dp': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.123450',
+			next: '0.12345',
+		},
+		'0.12345 scientific': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.123450',
+			next: '0.12345',
 		},
 		'0.5 3sf': {
 			behaviour: NO_PADDING_BELOW_ONE,
