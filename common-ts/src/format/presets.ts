@@ -1,9 +1,24 @@
 import { ENTIRE_POSITION } from './sentinels';
-import { FormatOptions, LegacyNumberType, SentinelRule } from './types';
+import {
+	DigitSpec,
+	FormatOptions,
+	LegacyNumberType,
+	SentinelRule,
+} from './types';
 
 const NON_POSITIVE_LEVERAGE: SentinelRule = {
 	matches: (v) => v.sign !== 1,
 	text: '1x',
+};
+
+const ZERO_PRICE: SentinelRule = {
+	matches: (v) => v.sign === 0,
+	text: '0.00',
+};
+
+const ZERO_AMOUNT: SentinelRule = {
+	matches: (v) => v.sign === 0,
+	text: '0',
 };
 
 /** Recursive, because every nested digits/abbreviate/sentinel object is shared. */
@@ -49,6 +64,13 @@ const usdHalfUp = freeze({
 		decimals: 2,
 		rounding: 'half-up' as const,
 	},
+});
+
+/** A trade price at full precision. Shared by the two price presets below. */
+const PRICE_DIGITS: DigitSpec = deepFreeze({
+	kind: 'significant' as const,
+	significant: 6,
+	rounding: 'half-up' as const,
 });
 
 export const PRESETS = Object.freeze({
@@ -135,6 +157,102 @@ export const PRESETS = Object.freeze({
 			significant: 6,
 			rounding: 'truncate' as const,
 		},
+	}),
+	/**
+	 * The same six figures rounded rather than truncated, capped at five
+	 * decimals so a sub-cent price stops where a trade price stops.
+	 * Ungrouped, for a value read back as text.
+	 */
+	tradePrecisionHalfUp: freeze({
+		digits: {
+			kind: 'significant' as const,
+			significant: 6,
+			rounding: 'half-up' as const,
+			maxDecimals: 5,
+		},
+		grouping: false,
+	}),
+	/** Six significant figures, grouped, with a zero price shown as 0.00. */
+	displayPrice: freeze({
+		digits: PRICE_DIGITS,
+		sentinels: [ZERO_PRICE],
+	}),
+	/** The same six figures as plain text: ungrouped, trailing zeros dropped. */
+	priceText: freeze({
+		digits: PRICE_DIGITS,
+		trimTrailingZeros: true,
+		grouping: false,
+	}),
+	/**
+	 * A base-asset amount: five significant figures, never more than four
+	 * decimals, and anything under 0.00001 rendered as a bound rather than as
+	 * digits nobody can act on.
+	 */
+	baseAmount: freeze({
+		digits: {
+			kind: 'significant' as const,
+			significant: 5,
+			rounding: 'half-up' as const,
+			maxDecimals: 4,
+		},
+		small: { mode: 'sentinel' as const, sentinelAt: '0.00001' },
+	}),
+	/**
+	 * A wallet balance shown against an earn product. Floored, so it never
+	 * offers more than the wallet holds, and ungrouped for a deposit input.
+	 */
+	earnBalance: freeze({
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 4,
+			rounding: 'floor' as const,
+		},
+		trimTrailingZeros: true,
+		grouping: false,
+	}),
+	/**
+	 * Two decimals of an abbreviated mantissa, for balances, volumes and
+	 * totals. Below a cent it keeps two significant digits instead, an
+	 * unreadable or non-finite value reads as a plain zero, and a missing one
+	 * takes the fallback.
+	 */
+	millifiedAmount: freeze({
+		digits: {
+			kind: 'decimals' as const,
+			decimals: 2,
+			rounding: 'half-up' as const,
+		},
+		abbreviate: {
+			threshold: '1000',
+			digits: {
+				kind: 'decimals' as const,
+				decimals: 2,
+				rounding: 'half-up' as const,
+			},
+		},
+		small: {
+			mode: 'significant' as const,
+			minSignificant: 2,
+			maxLeadingZeros: 1,
+		},
+		sentinels: [ZERO_AMOUNT],
+		invalidText: '0',
+		nonFiniteText: { positive: '0', negative: '0' },
+	}),
+	/**
+	 * Exact digits, except at the two ends: a value with more than three
+	 * leading zeros takes the subscript form, and one with seven or more
+	 * integer digits abbreviates at six significant figures.
+	 */
+	specialValue: freeze({
+		digits: { kind: 'exact' as const },
+		small: { mode: 'subscript' as const },
+		abbreviate: {
+			minIntegerDigits: 7,
+			digits: PRICE_DIGITS,
+			trimTrailingZeros: true,
+		},
+		grouping: false,
 	}),
 	/**
 	 * Zero, a negative and unusable input all read as 1x, because there is no
