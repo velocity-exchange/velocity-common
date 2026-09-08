@@ -6,6 +6,7 @@ export {
 	Decimal,
 	DecimalStatus,
 	NumericInput,
+	ParseResult,
 	RawWithScale,
 	RoundingMode,
 	StepMode,
@@ -34,4 +35,12 @@ export {
 	snapValueToStep,
 	stepFractionDigits,
 } from './market';
+export {
+	DigitCaps,
+	InputFieldConfig,
+	InputFieldKind,
+	DIGIT_CAPS,
+	inputFieldConfig,
+	parseInput,
+} from './input';
 export { marketPrecisionFromAccount } from './adapters/sdk';
