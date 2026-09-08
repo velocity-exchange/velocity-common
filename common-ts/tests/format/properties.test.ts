@@ -3,6 +3,7 @@ import {
 	PRESETS,
 	capStringFractionDigits,
 	formatText,
+	parseInput,
 	snapValueToStep,
 } from '../../src/format/index';
 import {
@@ -106,6 +107,39 @@ describe('format properties: parse and render round-trip', () => {
 			const value = randomDecimal(random);
 			const text = formatText(value, PRESETS.plain);
 			expect(fromString(text).value, text).to.deep.equal(value);
+		}
+	});
+});
+
+describe('format properties: input round-trip', () => {
+	it('parseInput(toPlainString(x)) reproduces x at its own scale', () => {
+		const random = makeRandom(SEED);
+		for (const raw of CORPUS) {
+			const value = toDecimal(raw).value!;
+			const back = parseInput(toPlainString(value), value.scale);
+			expect(back.status, raw).to.equal('ok');
+			expect(back.value, raw).to.deep.equal(value);
+		}
+		for (let i = 0; i < CASES; i++) {
+			const value = randomDecimal(random);
+			const text = toPlainString(value);
+			const back = parseInput(text, value.scale);
+			expect(back.status, text).to.equal('ok');
+			expect(back.value, text).to.deep.equal(value);
+		}
+	});
+
+	it('parseInput reads a grouped render back exactly', () => {
+		const random = makeRandom(SEED);
+		for (let i = 0; i < CASES; i++) {
+			const value = randomDecimal(random);
+			const text = formatText(value, {
+				digits: { kind: 'exact' },
+				grouping: true,
+			});
+			const back = parseInput(text, value.scale);
+			expect(back.status, text).to.equal('ok');
+			expect(back.value, text).to.deep.equal(value);
 		}
 	});
 });
