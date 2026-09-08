@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.2...common-ts-v0.8.0) (2026-09-08)
+
+
+### Features
+
+* **common-ts:** add the input field config and parser ([#447](https://github.com/velocity-exchange/velocity-common/issues/447)) ([bcb05a9](https://github.com/velocity-exchange/velocity-common/commit/bcb05a9f1bbe2ff07926d02c08cad501a55c842d))
+
 ## [0.7.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.1...common-ts-v0.7.2) (2026-09-08)
 
 
