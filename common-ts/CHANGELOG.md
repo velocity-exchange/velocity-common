@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.1...common-ts-v0.7.2) (2026-09-08)
+
+
+### Code Refactoring
+
+* **common-ts:** delegate the NumLib display members to the format layer ([#445](https://github.com/velocity-exchange/velocity-common/issues/445)) ([7bf9eab](https://github.com/velocity-exchange/velocity-common/commit/7bf9eaba3f846d3984943d29e0715761b9959ab3))
+
 ## [0.7.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.0...common-ts-v0.7.1) (2026-09-07)
 
 
