@@ -178,6 +178,33 @@ describe('format/inputFieldConfig', () => {
 		expect(config.precisionExp).to.equal(QUOTE_EXP);
 	});
 
+	it('ignores an override the caller left unset', () => {
+		const config = inputFieldConfig('price', {
+			market,
+			overrides: { maxFractionDigits: undefined },
+		});
+		expect(config.caps).to.deep.equal({
+			maxIntegerDigits: 12,
+			maxFractionDigits: 2,
+		});
+	});
+
+	it('ignores an override that is not a digit count', () => {
+		for (const bad of [-3, 2.5, NaN, undefined]) {
+			const config = inputFieldConfig('slippage', {
+				overrides: { maxFractionDigits: bad, maxIntegerDigits: bad },
+			});
+			expect(config.caps, String(bad)).to.deep.equal(DIGIT_CAPS.slippage);
+		}
+	});
+
+	it('caps an unrecognised kind rather than throwing inside a render', () => {
+		const config = inputFieldConfig('spooky' as InputFieldKind);
+		expect(config.caps).to.deep.equal(DIGIT_CAPS.default);
+		expect(config.localeTag).to.equal('en-US');
+		expect(config.step).to.equal(undefined);
+	});
+
 	it('does not hand out the table object itself', () => {
 		const config = inputFieldConfig('default');
 		config.caps.maxFractionDigits = 1;
@@ -271,9 +298,10 @@ describe('format/parseInput', () => {
 	});
 
 	it('rejects a precision exponent that is not a digit count', () => {
-		for (const exp of [-1, 1.5, NaN, 10_001]) {
+		for (const exp of [-1, 1.5, NaN, 31]) {
 			expect(parseInput('1.5', exp).status, String(exp)).to.equal('invalid');
 		}
+		expect(parseInput('1.5', 30).status).to.equal('ok');
 	});
 
 	it('parses what inputFieldConfig says the field submits', () => {
