@@ -23,6 +23,56 @@ import { CorpusCase, Divergence, runCorpus } from '../format/divergence';
 
 const LOCALE = 'en';
 
+// The behaviours the delegates change, named once and pointed at from every
+// case that shows one.
+const NO_PADDING_BELOW_ONE =
+	'a value below one keeps the digits it has, where a significant count used to pad it out';
+const NON_FINITE_TEXT =
+	'a non-finite or unreadable value renders as a symbol, not as the word NaN or Infinity';
+const NULLISH_DASH =
+	'a nullish input renders the fallback, where the old code threw or coerced it to zero';
+const NULLISH_NAN = 'a nullish input returns NaN instead of throwing';
+const EXACT_TIE =
+	'an exact decimal tie rounds up, where the double sat just below the tie';
+const EXACT_DIGITS =
+	'the digits come from the exact decimal, not from a double that cannot hold them';
+const EXACT_FLOOR =
+	'the floor is exact, where multiplying by a power of ten had already crossed the boundary';
+const NO_EXPONENT_FORM =
+	'the whole number is rendered, where toPrecision and toString switch to exponential';
+const DIGITS_AFTER_ROUNDING =
+	'the digit count follows the rounded value, so a carry past one keeps six figures';
+const SMALL_DIGIT_CREDIT =
+	'below 1e-5 the digit count no longer grows by one per leading zero';
+const NEGATIVES_KEEP_DIGITS =
+	'a negative amount keeps its digits, where a guard without an abs() sent all of them to the small-amount bound';
+const ZERO_FOLLOWS_SIG_FIGS =
+	'a zero renders one decimal fewer than the significant count asks for, instead of a flat four';
+const PRICE_MAGNITUDE =
+	'the decimals come from the price itself, not from the price plus one, so a price just below a power of ten no longer buys one';
+const PRICE_MAGNITUDE_MISSING =
+	'a missing or zero price takes six decimals, agreeing with toBase, where the price-plus-one heuristic gave two';
+const SIG_FIGS_DECIMAL_CAP =
+	'a significant count above five is still capped at four decimals';
+const TRAILING_SEPARATOR =
+	'at zero decimal places nothing dangles after the separator';
+const INVALID_PLACES =
+	'a negative or non-integer decimalPlaces throws instead of returning float noise';
+const MILLIFY_SIG_FIGS =
+	'sigFigs counts the digits actually rendered, where it used to be a fractional log';
+const MILLIFY_MANTISSA_ZERO =
+	'an unusable value reports a mantissa of one, the identity, rather than zero';
+const MILLIFY_TWO_DECIMALS = 'the mantissa always carries two decimals';
+const MILLIFY_NEGATIVES =
+	'a negative value renders, where the log of a negative left a NaN digit count that threw';
+const MILLIFY_NON_FINITE =
+	'a non-finite value renders zero, where the NaN digit count threw';
+const MILLIFY_UNIT_REDERIVED =
+	'the unit is re-derived after rounding, so 999,999.5 reads 1.00M rather than 1,000K';
+const MILLIFY_LARGE_UNITS = 'the units continue past T';
+const MILLIFY_SMALL_FORM =
+	'a value under a cent keeps two significant digits instead of one';
+
 const legacyToTradePrecision = (num: number) => parseFloat(num.toPrecision(6));
 
 const legacyToTradePrecisionString = (
@@ -335,7 +385,18 @@ describe('NumLib.formatNum.toTradePrecision', () => {
 		next: () => String(NumLib.formatNum.toTradePrecision(value)),
 	}));
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		undefined: {
+			behaviour: NULLISH_NAN,
+			old: "THROWS: Cannot read properties of undefined (reading 'toPrecision')",
+			next: 'NaN',
+		},
+		null: {
+			behaviour: NULLISH_NAN,
+			old: "THROWS: Cannot read properties of null (reading 'toPrecision')",
+			next: 'NaN',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -359,7 +420,248 @@ describe('NumLib.formatNum.toTradePrecisionString', () => {
 		}
 	}
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00500',
+			next: '0.005',
+		},
+		'0.005 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00500',
+			next: '0.005',
+		},
+		'-0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00500',
+			next: '-0.005',
+		},
+		'-0.005 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00500',
+			next: '-0.005',
+		},
+		'0.05': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.05000',
+			next: '0.05',
+		},
+		'0.05 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.05000',
+			next: '0.05',
+		},
+		'0.285': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.28500',
+			next: '0.285',
+		},
+		'0.285 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.28500',
+			next: '0.285',
+		},
+		'0.2849': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.28490',
+			next: '0.2849',
+		},
+		'0.2849 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.28490',
+			next: '0.2849',
+		},
+		'0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.29000',
+			next: '0.29',
+		},
+		'0.29 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.29000',
+			next: '0.29',
+		},
+		'-0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.29000',
+			next: '-0.29',
+		},
+		'-0.29 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.29000',
+			next: '-0.29',
+		},
+		'0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.50000',
+			next: '0.5',
+		},
+		'0.5 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.50000',
+			next: '0.5',
+		},
+		'-0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.50000',
+			next: '-0.5',
+		},
+		'-0.5 localised': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.50000',
+			next: '-0.5',
+		},
+		'0.0000049': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '0.000005',
+			next: '0.00000',
+		},
+		'0.0000049 localised': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '0.000005',
+			next: '0.00000',
+		},
+		'-0.0000049': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '-0.000005',
+			next: '-0.00000',
+		},
+		'-0.0000049 localised': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '-0.000005',
+			next: '-0.00000',
+		},
+		'0.0000051': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '0.000005',
+			next: '0.00001',
+		},
+		'0.0000051 localised': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '0.000005',
+			next: '0.00001',
+		},
+		'1e-7': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '1e-7',
+			next: '0.00000',
+		},
+		'1e-7 localised': {
+			behaviour: SMALL_DIGIT_CREDIT,
+			old: '0.0000001',
+			next: '0.00000',
+		},
+		'0.999995': {
+			behaviour: EXACT_TIE,
+			old: '0.99999',
+			next: '1.00000',
+		},
+		'0.999995 localised': {
+			behaviour: DIGITS_AFTER_ROUNDING,
+			old: '1.0000',
+			next: '1.00000',
+		},
+		'0.9999995': {
+			behaviour: DIGITS_AFTER_ROUNDING,
+			old: '1.0000',
+			next: '1.00000',
+		},
+		'0.9999995 localised': {
+			behaviour: DIGITS_AFTER_ROUNDING,
+			old: '1.0000',
+			next: '1.00000',
+		},
+		'1e6': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+6',
+			next: '1000000',
+		},
+		'999999.5': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+6',
+			next: '1000000',
+		},
+		'-999999.5': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '-1.00000e+6',
+			next: '-1000000',
+		},
+		'999999999': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+9',
+			next: '1000000000',
+		},
+		'1e9': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+9',
+			next: '1000000000',
+		},
+		'1e12': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+12',
+			next: '1000000000000',
+		},
+		'1e15': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+15',
+			next: '1000000000000000',
+		},
+		'1e21': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+21',
+			next: '1000000000000000000000',
+		},
+		'2^53': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '9.00720e+15',
+			next: '9007200000000000',
+		},
+		'-2^53': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '-9.00720e+15',
+			next: '-9007200000000000',
+		},
+		NaN: {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN localised': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'THROWS: minimumSignificantDigits value is out of range.',
+			next: '?',
+		},
+		Infinity: {
+			behaviour: NON_FINITE_TEXT,
+			old: 'Infinity',
+			next: '∞',
+		},
+		'-Infinity': {
+			behaviour: NON_FINITE_TEXT,
+			old: '-Infinity',
+			next: '-∞',
+		},
+		undefined: {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of undefined (reading 'toPrecision')",
+			next: '-',
+		},
+		'undefined localised': {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of undefined (reading 'toPrecision')",
+			next: '-',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of null (reading 'toPrecision')",
+			next: '-',
+		},
+		'null localised': {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of null (reading 'toPrecision')",
+			next: '-',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -377,7 +679,48 @@ describe('NumLib.formatNum.toNotionalDisplay', () => {
 		next: () => NumLib.formatNum.toNotionalDisplay(value),
 	}));
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.285': {
+			behaviour: EXACT_TIE,
+			old: '$0.28',
+			next: '$0.29',
+		},
+		'1.005': {
+			behaviour: EXACT_TIE,
+			old: '$1.00',
+			next: '$1.01',
+		},
+		'1e21': {
+			behaviour: EXACT_DIGITS,
+			old: '$999,999,999,999,999,900,000.00',
+			next: '$1,000,000,000,000,000,000,000.00',
+		},
+		NaN: {
+			behaviour: NON_FINITE_TEXT,
+			old: '$NaN',
+			next: '?',
+		},
+		Infinity: {
+			behaviour: NON_FINITE_TEXT,
+			old: '$∞',
+			next: '∞',
+		},
+		'-Infinity': {
+			behaviour: NON_FINITE_TEXT,
+			old: '-$∞',
+			next: '-∞',
+		},
+		undefined: {
+			behaviour: NULLISH_DASH,
+			old: '$NaN',
+			next: '-',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: '$0.00',
+			next: '-',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -421,7 +764,253 @@ describe('NumLib.formatNum.toBaseDisplay', () => {
 		}
 	}
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0050',
+			next: '0.005',
+		},
+		'-0.005': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.005',
+		},
+		'0.05': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0500',
+			next: '0.05',
+		},
+		'0.285': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.2850',
+			next: '0.285',
+		},
+		'0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.2900',
+			next: '0.29',
+		},
+		'-0.29': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.29',
+		},
+		'0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'-0.5': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.0000049': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '>-0.00001',
+		},
+		'-1': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-1.0000',
+		},
+		'-9999.995': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-10,000',
+		},
+		'-999999.5': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-1,000,000',
+		},
+		'-2^53': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-9,007,200,000,000,000',
+		},
+		NaN: {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'-Infinity': {
+			behaviour: NON_FINITE_TEXT,
+			old: '<0.00001',
+			next: '-∞',
+		},
+		undefined: {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of undefined (reading 'toLocaleString')",
+			next: '-',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: '<0.00001',
+			next: '-',
+		},
+		'0 @3sf': {
+			behaviour: ZERO_FOLLOWS_SIG_FIGS,
+			old: '0.0000',
+			next: '0.00',
+		},
+		'0.5 raw no price': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 raw price 0': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 raw price 9': {
+			behaviour: PRICE_MAGNITUDE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 raw price 10': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 raw price 1234.56': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 @3sf': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'0.5 @8sf': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.5000',
+			next: '0.5',
+		},
+		'-0.5 raw no price': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 raw price 0': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 raw price 9': {
+			behaviour: PRICE_MAGNITUDE,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 raw price 10': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 raw price 1234.56': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 @3sf': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'-0.5 @8sf': {
+			behaviour: NEGATIVES_KEEP_DIGITS,
+			old: '<0.00001',
+			next: '-0.5',
+		},
+		'1.23456789 raw no price': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '1.23',
+			next: '1.234568',
+		},
+		'1.23456789 raw price 0': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '1.23',
+			next: '1.234568',
+		},
+		'1.23456789 raw price 9': {
+			behaviour: PRICE_MAGNITUDE,
+			old: '1.235',
+			next: '1.23',
+		},
+		'1.23456789 @8sf': {
+			behaviour: SIG_FIGS_DECIMAL_CAP,
+			old: '1.2345679',
+			next: '1.2346',
+		},
+		'12345.6789 raw no price': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '12345.68',
+			next: '12345.678900',
+		},
+		'12345.6789 raw price 0': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '12345.68',
+			next: '12345.678900',
+		},
+		'12345.6789 raw price 9': {
+			behaviour: PRICE_MAGNITUDE,
+			old: '12345.679',
+			next: '12345.68',
+		},
+		'1e6 raw no price': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '1000000.00',
+			next: '1000000.000000',
+		},
+		'1e6 raw price 0': {
+			behaviour: PRICE_MAGNITUDE_MISSING,
+			old: '1000000.00',
+			next: '1000000.000000',
+		},
+		'1e6 raw price 9': {
+			behaviour: PRICE_MAGNITUDE,
+			old: '1000000.000',
+			next: '1000000.00',
+		},
+		'NaN raw no price': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN raw price 0': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN raw price 9': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN raw price 10': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN raw price 1234.56': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN @3sf': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'NaN @8sf': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -439,7 +1028,98 @@ describe('NumLib.formatNum.toDisplayPrice', () => {
 		next: () => NumLib.formatNum.toDisplayPrice(value),
 	}));
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00500000',
+			next: '0.005',
+		},
+		'-0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00500000',
+			next: '-0.005',
+		},
+		'0.05': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0500000',
+			next: '0.05',
+		},
+		'0.285': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.285000',
+			next: '0.285',
+		},
+		'0.2849': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.284900',
+			next: '0.2849',
+		},
+		'0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.290000',
+			next: '0.29',
+		},
+		'-0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.290000',
+			next: '-0.29',
+		},
+		'0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.500000',
+			next: '0.5',
+		},
+		'-0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.500000',
+			next: '-0.5',
+		},
+		'0.0000049': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000490000',
+			next: '0.0000049',
+		},
+		'-0.0000049': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00000490000',
+			next: '-0.0000049',
+		},
+		'0.0000051': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000510000',
+			next: '0.0000051',
+		},
+		'0.00001': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0000100000',
+			next: '0.00001',
+		},
+		'1e-7': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.000000100000',
+			next: '0.0000001',
+		},
+		'0.99999': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.999990',
+			next: '0.99999',
+		},
+		NaN: {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		undefined: {
+			behaviour: NULLISH_DASH,
+			old: '',
+			next: '-',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: "THROWS: Cannot read properties of null (reading 'toLocaleString')",
+			next: '-',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -457,7 +1137,13 @@ describe('NumLib.formatNum.toPrice', () => {
 		next: () => String(NumLib.formatNum.toPrice(value)),
 	}));
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		null: {
+			behaviour: NULLISH_NAN,
+			old: "THROWS: Cannot read properties of null (reading 'toFixed')",
+			next: 'NaN',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -503,7 +1189,143 @@ describe('NumLib.formatNum.toDecimalPlaces', () => {
 		next: () => NumLib.formatNum.toDecimalPlaces(1.005, 3),
 	});
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.29 @2dp': {
+			behaviour: EXACT_FLOOR,
+			old: '0.28',
+			next: '0.29',
+		},
+		'0.29 @2dp unpadded': {
+			behaviour: EXACT_FLOOR,
+			old: '0.28',
+			next: '0.29',
+		},
+		'1e21 @2dp': {
+			behaviour: EXACT_DIGITS,
+			old: '999999999999999900000.00',
+			next: '1000000000000000000000.00',
+		},
+		'1e21 @2dp unpadded': {
+			behaviour: EXACT_DIGITS,
+			old: '999999999999999900000',
+			next: '1000000000000000000000',
+		},
+		'NaN @2dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN.00',
+			next: '?',
+		},
+		'NaN @2dp unpadded': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN',
+			next: '?',
+		},
+		'Infinity @2dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'Infinity.00',
+			next: '∞',
+		},
+		'Infinity @2dp unpadded': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'Infinity',
+			next: '∞',
+		},
+		'-Infinity @2dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: '-Infinity.00',
+			next: '-∞',
+		},
+		'-Infinity @2dp unpadded': {
+			behaviour: NON_FINITE_TEXT,
+			old: '-Infinity',
+			next: '-∞',
+		},
+		'undefined @2dp': {
+			behaviour: NULLISH_DASH,
+			old: 'NaN.00',
+			next: '-',
+		},
+		'undefined @2dp unpadded': {
+			behaviour: NULLISH_DASH,
+			old: 'NaN',
+			next: '-',
+		},
+		'null @2dp': {
+			behaviour: NULLISH_DASH,
+			old: '0.00',
+			next: '-',
+		},
+		'null @2dp unpadded': {
+			behaviour: NULLISH_DASH,
+			old: '0',
+			next: '-',
+		},
+		'0 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '0.',
+			next: '0',
+		},
+		'0.5 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '0.',
+			next: '0',
+		},
+		'-0.5 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '-1.',
+			next: '-1',
+		},
+		'0.0000049 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '0.',
+			next: '0',
+		},
+		'1.23456789 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '1.',
+			next: '1',
+		},
+		'12345.6789 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '12345.',
+			next: '12345',
+		},
+		'1e6 @0dp': {
+			behaviour: TRAILING_SEPARATOR,
+			old: '1000000.',
+			next: '1000000',
+		},
+		'NaN @0dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN.',
+			next: '?',
+		},
+		'NaN @4dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN.0000',
+			next: '?',
+		},
+		'NaN @6dp': {
+			behaviour: NON_FINITE_TEXT,
+			old: 'NaN.000000',
+			next: '?',
+		},
+		'1.23456789 @-1dp': {
+			behaviour: INVALID_PLACES,
+			old: '0.',
+			next: 'THROWS: decimals must be a non-negative integer, got -1',
+		},
+		'1.23456789 @1.5dp': {
+			behaviour: INVALID_PLACES,
+			old: '1.2332882874656679',
+			next: 'THROWS: decimals must be a non-negative integer, got 1.5',
+		},
+		'1.005 @3dp': {
+			behaviour: EXACT_FLOOR,
+			old: '1.004',
+			next: '1.005',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -521,7 +1343,208 @@ describe('NumLib.millify', () => {
 		next: () => showMillifyResult(NumLib.millify(value)),
 	}));
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0': {
+			behaviour: MILLIFY_MANTISSA_ZERO,
+			old: '0||1|0|0',
+			next: '1||1|0|0',
+		},
+		'-0': {
+			behaviour: MILLIFY_MANTISSA_ZERO,
+			old: '0||1|0|0',
+			next: '1||1|0|0',
+		},
+		'-0.005': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||1|-0.005|-0.005',
+		},
+		'0.05': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||1.6989700043360187|0.05|0.05',
+			next: '1||1|0.05|0.05',
+		},
+		'0.285': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||2.45484486000851|0.29|0.29',
+			next: '1||2|0.29|0.29',
+		},
+		'0.2849': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||2.454692449239477|0.28|0.28',
+			next: '1||2|0.28|0.28',
+		},
+		'0.29': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||2.462397997898956|0.29|0.29',
+			next: '1||2|0.29|0.29',
+		},
+		'-0.29': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||2|-0.29|-0.29',
+		},
+		'0.5': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||2.6989700043360187|0.5|0.5',
+			next: '1||2|0.5|0.50',
+		},
+		'-0.5': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||2|-0.5|-0.50',
+		},
+		'0.0000049': {
+			behaviour: MILLIFY_SMALL_FORM,
+			old: '1||1|0.000005|0.000005',
+			next: '1||2|0.0000049|0.0000049',
+		},
+		'-0.0000049': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||2|-0.0000049|-0.0000049',
+		},
+		'0.0000051': {
+			behaviour: MILLIFY_SMALL_FORM,
+			old: '1||1|0.000005|0.000005',
+			next: '1||2|0.0000051|0.0000051',
+		},
+		'1e-7': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||2|1e-7|0.0000001',
+			next: '1||1|1e-7|0.0000001',
+		},
+		'0.99999': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||2.999995657033466|1|1',
+			next: '1||3|1|1.00',
+		},
+		'0.999995': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||2.9999978285221616|1|1',
+			next: '1||3|1|1.00',
+		},
+		'0.9999995': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||2.9999997828527047|1|1',
+			next: '1||3|1|1.00',
+		},
+		'1': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||3|1|1',
+			next: '1||3|1|1.00',
+		},
+		'-1': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||3|-1|-1.00',
+		},
+		'1.005': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||3.002166061756508|1.01|1.01',
+			next: '1||3|1.01|1.01',
+		},
+		'1.23456789': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1||3.0915149771692705|1.23|1.23',
+			next: '1||3|1.23|1.23',
+		},
+		'9.999999': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1||3.9999999565705497|10|10',
+			next: '1||4|10|10.00',
+		},
+		'9999.995': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1000|K|3.9999997828527047|10|10K',
+			next: '1000|K|4|10|10.00K',
+		},
+		'-9999.995': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1000|K|4|-10|-10.00K',
+		},
+		'12345.6789': {
+			behaviour: MILLIFY_SIG_FIGS,
+			old: '1000|K|4.09151497716927|12.35|12.35K',
+			next: '1000|K|4|12.35|12.35K',
+		},
+		'1e6': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1000000|M|3|1|1M',
+			next: '1000000|M|3|1|1.00M',
+		},
+		'999999.5': {
+			behaviour: MILLIFY_UNIT_REDERIVED,
+			old: '1000|K|5.999999782852704|1|1,000K',
+			next: '1000000|M|3|1|1.00M',
+		},
+		'-999999.5': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1000000|M|3|-1|-1.00M',
+		},
+		'999999999': {
+			behaviour: MILLIFY_UNIT_REDERIVED,
+			old: '1000000|M|5.999999999565706|1|1,000M',
+			next: '1000000000|B|3|1|1.00B',
+		},
+		'1e9': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1000000000|B|3|1|1B',
+			next: '1000000000|B|3|1|1.00B',
+		},
+		'1e12': {
+			behaviour: MILLIFY_TWO_DECIMALS,
+			old: '1000000000000|T|3|1|1T',
+			next: '1000000000000|T|3|1|1.00T',
+		},
+		'1e15': {
+			behaviour: MILLIFY_LARGE_UNITS,
+			old: '1||3|1|1,000,000,000,000,000',
+			next: '1000000000000000|Q|3|1|1.00Q',
+		},
+		'1e21': {
+			behaviour: MILLIFY_LARGE_UNITS,
+			old: '1||3|1|1,000,000,000,000,000,000,000',
+			next: '1000000000000000|Q|9|1000000|1,000,000.00Q',
+		},
+		'2^53': {
+			behaviour: MILLIFY_LARGE_UNITS,
+			old: '1||3.954589770191003|9|9,010,000,000,000,000',
+			next: '1000000000000000|Q|3|9.01|9.01Q',
+		},
+		'-2^53': {
+			behaviour: MILLIFY_NEGATIVES,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1000000000000000|Q|3|-9.01|-9.01Q',
+		},
+		NaN: {
+			behaviour: MILLIFY_MANTISSA_ZERO,
+			old: '0||1|0|0',
+			next: '1||1|0|0',
+		},
+		Infinity: {
+			behaviour: MILLIFY_NON_FINITE,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||1|0|0',
+		},
+		'-Infinity': {
+			behaviour: MILLIFY_NON_FINITE,
+			old: 'THROWS: maximumSignificantDigits value is out of range.',
+			next: '1||1|0|0',
+		},
+		undefined: {
+			behaviour: NULLISH_DASH,
+			old: '0||1|0|0',
+			next: '1||1|NaN|-',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: '0||1|0|0',
+			next: '1||1|NaN|-',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);
@@ -556,7 +1579,163 @@ describe('millify', () => {
 		}
 	}
 
-	const divergences: Record<string, Divergence> = {};
+	const divergences: Record<string, Divergence> = {
+		'0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00500000',
+			next: '0.005',
+		},
+		'-0.005': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00500000',
+			next: '-0.005',
+		},
+		'0.05': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0500000',
+			next: '0.05',
+		},
+		'0.285': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.285000',
+			next: '0.285',
+		},
+		'0.2849': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.284900',
+			next: '0.2849',
+		},
+		'0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.290000',
+			next: '0.29',
+		},
+		'-0.29': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.290000',
+			next: '-0.29',
+		},
+		'0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.500000',
+			next: '0.5',
+		},
+		'-0.5': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.500000',
+			next: '-0.5',
+		},
+		'0.0000049': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000490000',
+			next: '0.0000049',
+		},
+		'-0.0000049': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.00000490000',
+			next: '-0.0000049',
+		},
+		'0.0000051': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000510000',
+			next: '0.0000051',
+		},
+		'0.00001': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.0000100000',
+			next: '0.00001',
+		},
+		'1e-7': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e-7',
+			next: '0.0000001',
+		},
+		'0.99999': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.999990',
+			next: '0.99999',
+		},
+		'999999.5': {
+			behaviour: MILLIFY_UNIT_REDERIVED,
+			old: '1000.00K',
+			next: '1.00000M',
+		},
+		'-999999.5': {
+			behaviour: MILLIFY_UNIT_REDERIVED,
+			old: '-1000.00K',
+			next: '-1.00000M',
+		},
+		'999999999': {
+			behaviour: MILLIFY_UNIT_REDERIVED,
+			old: '1000.00M',
+			next: '1.00000B',
+		},
+		'1e21': {
+			behaviour: NO_EXPONENT_FORM,
+			old: '1.00000e+6Q',
+			next: '1000000Q',
+		},
+		Infinity: {
+			behaviour: NON_FINITE_TEXT,
+			old: 'InfinityQ',
+			next: '∞',
+		},
+		'-Infinity': {
+			behaviour: NON_FINITE_TEXT,
+			old: '-InfinityQ',
+			next: '-∞',
+		},
+		null: {
+			behaviour: NULLISH_DASH,
+			old: '0.00000',
+			next: '0',
+		},
+		'0.5 3sf': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.500',
+			next: '0.5',
+		},
+		'0.5 1dp': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.500000',
+			next: '0.5',
+		},
+		'0.5 scientific': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.500000',
+			next: '0.5',
+		},
+		'-0.5 3sf': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.500',
+			next: '-0.5',
+		},
+		'-0.5 1dp': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.500000',
+			next: '-0.5',
+		},
+		'-0.5 scientific': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '-0.500000',
+			next: '-0.5',
+		},
+		'0.0000049 3sf': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000490',
+			next: '0.0000049',
+		},
+		'0.0000049 1dp': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000490000',
+			next: '0.0000049',
+		},
+		'0.0000049 scientific': {
+			behaviour: NO_PADDING_BELOW_ONE,
+			old: '0.00000490000',
+			next: '0.0000049',
+		},
+	};
 
 	it('agrees with the pre-delegation implementation', () => {
 		runCorpus(cases, divergences);

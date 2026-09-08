@@ -4,6 +4,18 @@ import {
 	AMM_RESERVE_PRECISION,
 	BigNum,
 } from '@velocity-exchange/sdk';
+import {
+	FormatOptions,
+	PRESETS,
+	formatText,
+	formatValue,
+} from '../format/index';
+
+/** parseFloat needs the digits ungrouped, and an infinity it can read back. */
+const NUMERIC_TEXT: FormatOptions = {
+	grouping: false,
+	nonFiniteText: { positive: 'Infinity', negative: '-Infinity' },
+};
 
 /**
  * Utilities to convert numbers and BigNumbers (BN) to different formats for the UI.
@@ -11,6 +23,10 @@ import {
 export class NumLib {
 	private static locale = 'en';
 
+	/**
+	 * @deprecated The format layer renders en-US only, so this no longer moves
+	 * any separator the display members print.
+	 */
 	static setLocale = (locale: string) => {
 		this.locale = locale;
 	};
@@ -50,56 +66,31 @@ export class NumLib {
 	static formatNum = {
 		/**
 		 * Converts a number to a precision suitable to trade with
-		 * @param num
-		 * @returns
+		 *
+		 * @deprecated Use `formatText(num, PRESETS.priceText)` from
+		 * '@velocity-exchange/common/format'.
 		 */
-		toTradePrecision: (num: number) => {
-			return parseFloat(num.toPrecision(6));
-		},
-		toTradePrecisionString: (num: number, toLocaleString?: boolean) => {
-			if (num === 0)
-				return Number(0).toLocaleString(this.locale, {
-					minimumSignificantDigits: 6,
-					maximumSignificantDigits: 6,
-				});
-
-			// slice numbers which have leading 0s so that numbers are only 6 digits long.
-			//// trimAmount will be 1 for 0.1 -> 0.999, 2 for 0.01 -> 0.0999, etc.
-			//// Handle num = 0 edge case .. (log10(0) = infinity)
-			const trimAmount = Math.abs(
-				num >= 1 || num == 0
-					? 0
-					: Math.min(0, Math.floor(Math.log10(Math.abs(num))))
-			);
-
-			// max sigFigs = 6, min = 1
-			const sigFigs = Math.max(Math.min(6 - trimAmount, 6), 1);
-
-			const tradePrecisionString = num.toPrecision(sigFigs);
-
-			if (toLocaleString)
-				return NumLib.formatNum
-					.toTradePrecision(num)
-					.toLocaleString(this.locale, {
-						minimumSignificantDigits: sigFigs,
-						maximumSignificantDigits: sigFigs,
-					});
-
-			return tradePrecisionString;
-		},
+		toTradePrecision: (num: number) =>
+			parseFloat(formatText(num, { ...PRESETS.priceText, ...NUMERIC_TEXT })),
 		/**
-		 * Formats a notional dollar value for UI. Goes to max. 2 decimals (accurate to 1 cent)
-		 * @param num
-		 * @returns
+		 * @deprecated Use `formatText(num, PRESETS.tradePrecisionHalfUp)` from
+		 * '@velocity-exchange/common/format'.
 		 */
-		toNotionalDisplay: (num: number) => {
-			return `${num < 0 ? `-` : ``}$${(
-				Math.round(Math.abs(num) * 100) / 100
-			).toLocaleString(this.locale, {
-				maximumFractionDigits: 2,
-				minimumFractionDigits: 2,
-			})}`;
-		},
+		toTradePrecisionString: (num: number, toLocaleString?: boolean) =>
+			formatText(
+				num,
+				toLocaleString
+					? { ...PRESETS.tradePrecisionHalfUp, grouping: true }
+					: PRESETS.tradePrecisionHalfUp
+			),
+		/**
+		 * Formats a notional dollar value for UI. Goes to max. 2 decimals (accurate to 1 cent).
+		 * Rounds the cent, where `BigNum.toNotional` truncates it.
+		 *
+		 * @deprecated Use `formatText(num, PRESETS.usdHalfUp)` from
+		 * '@velocity-exchange/common/format'.
+		 */
+		toNotionalDisplay: (num: number) => formatText(num, PRESETS.usdHalfUp),
 		/**
 		 * Formats a notional dollar value. Goes to max. 2 decimals (accurate to 1 cent)
 		 * @param num
@@ -113,37 +104,35 @@ export class NumLib {
 		 * @param baseAmount
 		 * @param assetPrice in dollars
 		 * @param skipLocaleFormatting Format using toFixed rather than localeString, which can't be parsed with regular number parsing
-		 * @returns
+		 *
+		 * @deprecated Use `formatText(amount, PRESETS.baseAmount)` from
+		 * '@velocity-exchange/common/format'.
 		 */
 		toBaseDisplay: (
 			baseAmount: number,
 			_assetPrice?: number,
 			_skipLocaleFormatting = false,
 			customSigFigs = 5
-		): string => {
-			if (baseAmount < 1) {
-				if (baseAmount === 0) return '0.0000';
-
-				if (baseAmount < 0.00001) {
-					return '<0.00001';
-				}
-
-				return baseAmount.toFixed(4);
-			}
-			if (_skipLocaleFormatting) {
-				return baseAmount.toFixed(
-					Math.min(
-						Math.max(0, Math.floor(Math.log10((_assetPrice ?? 0) + 1))) + 2,
-						6
-					)
-				);
-			}
-
-			return baseAmount.toLocaleString(this.locale, {
-				minimumSignificantDigits: customSigFigs,
-				maximumSignificantDigits: customSigFigs,
-			});
-		},
+		): string =>
+			formatText(baseAmount, {
+				...PRESETS.baseAmount,
+				grouping: !_skipLocaleFormatting,
+				// The price-magnitude digits were only ever reached by an amount of
+				// one or more; below that the four-decimal shape stands.
+				digits:
+					_skipLocaleFormatting && Math.abs(baseAmount) >= 1
+						? {
+								kind: 'magnitude',
+								assetPrice: _assetPrice ?? 0,
+								rounding: 'half-up',
+							}
+						: {
+								kind: 'significant',
+								significant: customSigFigs,
+								rounding: 'half-up',
+								maxDecimals: 4,
+							},
+			}),
 		/**
 		 * This function prints the base amount of an asset with a number of decimals relative to the price of the asset, because for high priced assets we care about more accuracy in the base amount. Number of decimals corresponds to accuracy to ~ 1 cent
 		 * @param baseAmount
@@ -169,28 +158,28 @@ export class NumLib {
 			this.formatNum.toRawBn(quoteAmount, QUOTE_PRECISION),
 		/**
 		 * Formats to price in locale style
-		 * @param assetPrice
-		 * @returns
+		 *
+		 * @deprecated Use `formatText(price, PRESETS.displayPrice)` from
+		 * '@velocity-exchange/common/format'.
 		 */
-		toDisplayPrice: (assetPrice: number): string => {
-			if (assetPrice === undefined) return '';
-			if (assetPrice === 0) return assetPrice.toFixed(2);
-
-			return assetPrice.toLocaleString(this.locale, {
-				maximumSignificantDigits: 6,
-				minimumSignificantDigits: 6,
-			});
-		},
+		toDisplayPrice: (assetPrice: number): string =>
+			formatText(assetPrice, PRESETS.displayPrice),
 		/**
-		 * Formats a price
-		 * @param assetPrice
-		 * @returns
+		 * Rounds a price to six decimals. Converts only; it renders nothing.
+		 *
+		 * @deprecated Use `formatText(price, { digits: { kind: 'decimals',
+		 * decimals: 6, rounding: 'half-up' } })` from
+		 * '@velocity-exchange/common/format'.
 		 */
 		toPrice: (assetPrice: number): number => {
 			if (assetPrice === undefined) return 0;
-			if (assetPrice === 0) return parseFloat(assetPrice.toFixed(2));
 
-			return parseFloat(assetPrice.toFixed(6));
+			return parseFloat(
+				formatText(assetPrice, {
+					...NUMERIC_TEXT,
+					digits: { kind: 'decimals', decimals: 6, rounding: 'half-up' },
+				})
+			);
 		},
 		/**
 		 * Convert a number to a BN based on the required precision
@@ -224,28 +213,26 @@ export class NumLib {
 			return numericalAsBn;
 		},
 		/**
-		 * Truncates a number to a certain number of decimal places. This differs from .toFixed() in that it rounds down, whereas .toFixed() rounds to the nearest number.
-		 * @param num
-		 * @param decimalPlaces
-		 * @returns
+		 * Rounds a number down to a certain number of decimal places. This differs from .toFixed() in that it rounds down, whereas .toFixed() rounds to the nearest number. Rounds toward negative infinity, so a negative value grows.
+		 *
+		 * @deprecated Use `formatText(num, { digits: { kind: 'decimals',
+		 * decimals, rounding: 'floor' }, grouping: false })` from
+		 * '@velocity-exchange/common/format'.
 		 */
 		toDecimalPlaces: (
 			num: number,
 			decimalPlaces: number,
 			noPadding?: boolean
-		): string => {
-			const truncatedNum =
-				Math.floor(num * Math.pow(10, decimalPlaces)) /
-				Math.pow(10, decimalPlaces);
-			if (noPadding) {
-				return truncatedNum.toString();
-			}
-
-			const paddedNum = truncatedNum.toString();
-			const [integerPart, decimalPart = ''] = paddedNum.split('.');
-			const paddedDecimal = decimalPart.padEnd(decimalPlaces, '0');
-			return `${integerPart}.${paddedDecimal}`;
-		},
+		): string =>
+			formatText(num, {
+				digits: {
+					kind: 'decimals',
+					decimals: decimalPlaces,
+					rounding: 'floor',
+				},
+				grouping: false,
+				trimTrailingZeros: noPadding ?? false,
+			}),
 	};
 
 	static formatBn = {
@@ -259,9 +246,10 @@ export class NumLib {
 	};
 
 	/**
-	 * Outputs information and formatted string for UI based on its log10 value
-	 * @param value
-	 * @returns
+	 * Outputs information and formatted string for UI based on its magnitude
+	 *
+	 * @deprecated Use `formatValue(value, PRESETS.millifiedAmount)` from
+	 * '@velocity-exchange/common/format'.
 	 */
 	static millify = (
 		value: number
@@ -272,69 +260,31 @@ export class NumLib {
 		displayValue: number;
 		displayString: string;
 	} => {
-		if (!value)
-			return {
-				mantissa: 0,
-				symbol: '',
-				sigFigs: 1,
-				displayValue: 0,
-				displayString: '0',
-			};
-
-		const valueLog10 = Math.log10(value);
-
-		const metricAmount = Math.floor(valueLog10 / 3);
-
-		const sigFigs = Math.max(3 + (valueLog10 % 3), 1);
-
-		let symbol = '';
-		let mantissa = 1;
-
-		switch (metricAmount) {
-			case 1:
-				mantissa = 10 ** 3;
-				symbol = 'K';
-				break;
-			case 2:
-				mantissa = 10 ** 6;
-				symbol = 'M';
-				break;
-			case 3:
-				mantissa = 10 ** 9;
-				symbol = 'B';
-				break;
-			case 4:
-				mantissa = 10 ** 12;
-				symbol = 'T';
-				break;
-			case 0:
-			default:
-				mantissa = 1;
-				symbol = '';
-				break;
-		}
-
-		const displayValue = parseFloat(
-			(value / mantissa).toLocaleString(this.locale, {
-				maximumSignificantDigits: sigFigs,
-			})
-		);
-
-		const displayString = `${(value / mantissa).toLocaleString(this.locale, {
-			maximumSignificantDigits: sigFigs,
-		})}${symbol}`;
+		const formatted = formatValue(value, PRESETS.millifiedAmount);
+		const { parts } = formatted;
+		const rendered = `${parts.integer}${parts.fraction}`.replace(/,/g, '');
+		const numeric =
+			`${parts.sign}${parts.integer}${parts.decimalSeparator}${parts.fraction}`.replace(
+				/,/g,
+				''
+			);
 
 		return {
-			mantissa,
-			symbol,
-			sigFigs,
-			displayValue,
-			displayString,
+			mantissa: 10 ** (formatted.abbreviation?.exponent ?? 0),
+			symbol: formatted.abbreviation?.unit ?? '',
+			sigFigs: Math.max(rendered.replace(/^0+/, '').length, 1),
+			displayValue: Number(numeric),
+			displayString: formatted.text,
 		};
 	};
 
 	/**
-	 * Get the precision to use for an asset so that base asset amounts are on the same scale as USD cents
+	 * Get the precision to use for an asset so that base asset amounts are on the same scale as USD cents.
+	 *
+	 * This is a magnitude exponent read off the raw BN string, which counts the
+	 * minus sign as a digit, so a negative price gets one decimal more than the
+	 * same positive one. It is not the market precision `marketPrecisionFromSizes`
+	 * resolves, and must not be delegated to it.
 	 * @param assetPrice
 	 * @returns
 	 */

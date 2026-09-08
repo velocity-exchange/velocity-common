@@ -10,6 +10,7 @@ import {
 	SpotMarketAccount,
 	ZERO,
 } from '@velocity-exchange/sdk';
+import { PRESETS, formatText } from '../../format/index';
 import { MarketId } from '../../types';
 
 const getMarketTickSize = (
@@ -120,15 +121,22 @@ export const getMaxLeverageOrderSize = (orderAmount: BigNum): BigNum => {
  * @param orderAmount - The BigNum order amount to format
  * @param formatFn - Optional custom format function, defaults to prettyPrint()
  * @returns Formatted string showing either "Entire Position" or the formatted amount
+ *
+ * @deprecated Use `formatText(amount, PRESETS.orderSize)` from
+ * '@velocity-exchange/common/format'.
  */
 export const formatOrderSize = (
 	orderAmount: BigNum,
 	formatFn?: (amount: BigNum) => string
 ): string => {
+	// The sentinel in PRESETS.orderSize matches the marker units exactly, where
+	// this check also catches an amount a step size moved off them.
 	if (isEntirePositionOrder(orderAmount)) {
 		return 'Entire Position';
 	}
-	return formatFn ? formatFn(orderAmount) : orderAmount.prettyPrint();
+	return formatFn
+		? formatFn(orderAmount)
+		: formatText(orderAmount, PRESETS.orderSize);
 };
 
 export {
