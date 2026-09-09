@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.8.0...common-ts-v0.9.0) (2026-09-09)
+
+
+### Features
+
+* **common-ts:** convert a parsed decimal to a BigNum exactly ([#449](https://github.com/velocity-exchange/velocity-common/issues/449)) ([723df09](https://github.com/velocity-exchange/velocity-common/commit/723df09ed62880c2ad01909757a4713023710591))
+
 ## [0.8.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.7.2...common-ts-v0.8.0) (2026-09-08)
 
 
