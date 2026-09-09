@@ -6,14 +6,23 @@ import { BigNum, LAMPORTS_EXP } from '@velocity-exchange/sdk';
 export const NEW_ACCOUNT_DONATION = BigNum.fromPrint('0.0001', LAMPORTS_EXP);
 
 /**
- * Equal to 0.035
+ * @deprecated Fallback for SSR / before RPC-derived rent is loaded.
+ *
+ * Assumes a historical rent schedule (e.g. pre-SIMD-0437 gate 1) and an
+ * older account layout. Prefer deriving the live minimum via
+ * `fetchAccountCreationRent`.
  */
 export const NEW_ACCOUNT_BASE_RENT = new BigNum('31347840', LAMPORTS_EXP);
 
+/**
+ * @deprecated Fallback for SSR / before RPC-derived rent is loaded.
+ * Prefer `fetchAccountCreationRent`.
+ */
 export const SWIFT_ACCOUNT_BASE_RENT = new BigNum('2756160', LAMPORTS_EXP);
 
 /**
- * Equal to NEW_ACCOUNT_DONATION + NEW_ACCOUNT_BASE_RENT
+ * @deprecated Fallback for SSR / before RPC-derived rent is loaded.
+ * Prefer `fetchAccountCreationRent`.
  */
 export const NEW_ACCOUNT_BASE_COST = NEW_ACCOUNT_BASE_RENT.add(
 	NEW_ACCOUNT_DONATION

@@ -9,3 +9,4 @@ export * from './orders';
 export * from './positions';
 export * from './accounts';
 export * from './core';
+export * from './rent';
