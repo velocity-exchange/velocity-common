@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.9.0...common-ts-v0.10.0) (2026-09-10)
+
+
+### Features
+
+* **common-ts:** derive account creation rent from RPC ([#451](https://github.com/velocity-exchange/velocity-common/issues/451)) ([3722443](https://github.com/velocity-exchange/velocity-common/commit/37224433bc3100399eb1fa813c1e3c5b5c451536))
+
 ## [0.9.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.8.0...common-ts-v0.9.0) (2026-09-09)
 
 
