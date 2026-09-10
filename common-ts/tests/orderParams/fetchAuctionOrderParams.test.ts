@@ -470,18 +470,18 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
-			// auction end = slippage-capped end (100005000) + the 0.1%-of-oracle vAMM
-			// fallback buffer (100000) = 100105000. priceImpact best/worst are the raw
-			// L2-walk prices and are NOT buffered.
+			// auction end = slippage-capped end (100000250) + the 0.1%-of-oracle vAMM
+			// fallback buffer (100000) = 100100250. priceImpact best/worst are the raw
+			// L2-walk prices (first top-of-book bucket, $250) and are NOT buffered.
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'100105000'
+				'100100250'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
-				'100005000'
+				'100000250'
 			);
 			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
-				'100005000'
+				'100000250'
 			);
 			expect(
 				result.orderParams.auctionEndPrice?.gte(
@@ -547,17 +547,17 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
-			// SHORT: slippage-capped end (99995000) minus the 0.1%-of-oracle vAMM
-			// fallback buffer (100000) = 99895000. priceImpact is unbuffered.
+			// SHORT: slippage-capped end (99999750) minus the 0.1%-of-oracle vAMM
+			// fallback buffer (100000) = 99899750. priceImpact is unbuffered.
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'99895000'
+				'99899750'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
-				'99995000'
+				'99999750'
 			);
 			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
-				'99995000'
+				'99999750'
 			);
 			// For a SHORT order the auction must walk the price down (or stay flat),
 			// never up — the opposite invariant of the LONG case above.
@@ -588,7 +588,7 @@ describe('fetchAuctionOrderParams', () => {
 			);
 			// includes the 0.1%-of-oracle vAMM fallback buffer (+100000 on the long end)
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'100105000'
+				'100101250'
 			);
 
 			expect(result.meta.priceImpact?.bestPrice.gt(new BN(0))).to.be.true;
@@ -604,10 +604,10 @@ describe('fetchAuctionOrderParams', () => {
 			});
 
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
-				'100000500'
+				'100000250'
 			);
 			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
-				'100000500'
+				'100000250'
 			);
 		});
 
@@ -623,15 +623,15 @@ describe('fetchAuctionOrderParams', () => {
 			expect(result.orderParams.auctionStartPrice?.toString()).to.equal(
 				'100000000'
 			);
-			// SHORT end = 99999500 minus the 0.1%-of-oracle vAMM fallback buffer (100000)
+			// SHORT end = 99999750 minus the 0.1%-of-oracle vAMM fallback buffer (100000)
 			expect(result.orderParams.auctionEndPrice?.toString()).to.equal(
-				'99899500'
+				'99899750'
 			);
 			expect(result.meta.priceImpact?.bestPrice.toString()).to.equal(
-				'99999500'
+				'99999750'
 			);
 			expect(result.meta.priceImpact?.worstPrice.toString()).to.equal(
-				'99999500'
+				'99999750'
 			);
 		});
 	});
