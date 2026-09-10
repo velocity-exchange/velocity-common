@@ -1,6 +1,10 @@
 import { Connection } from '@solana/web3.js';
 import { BigNum, LAMPORTS_EXP } from '@velocity-exchange/sdk';
-import { NEW_ACCOUNT_DONATION } from '../constants/misc';
+import {
+	NEW_ACCOUNT_BASE_RENT,
+	NEW_ACCOUNT_DONATION,
+	SWIFT_ACCOUNT_BASE_RENT,
+} from '../constants/misc';
 
 /**
  * Velocity User account data length (`User::SIZE` in
@@ -25,27 +29,46 @@ export type AccountCreationRent = {
 	userAccountRent: BigNum;
 	swiftAccountRent: BigNum;
 	baseCost: BigNum;
+	/** False when the RPC call failed and the result is the hardcoded fallback. */
+	isLive: boolean;
 };
 
 /**
- * Live rent-exempt minimums for creating a user + default swift account.
- * Prefer this over the hardcoded `NEW_ACCOUNT_BASE_*` fallbacks — rent gates
- * (SIMD-0437) change `lamports_per_byte_year` over time.
+ * Live rent-exempt minimums for creating a user + swift account with
+ * `numOrders` order slots (default 8). Prefer this over the hardcoded
+ * `NEW_ACCOUNT_BASE_*` fallbacks — rent gates (SIMD-0437) change
+ * `lamports_per_byte_year` over time. Falls back to those constants
+ * (`isLive: false`) if the RPC call fails, so callers get one code path.
  */
 export async function fetchAccountCreationRent(
-	connection: Connection
+	connection: Connection,
+	numOrders = 8
 ): Promise<AccountCreationRent> {
-	const [userLamports, swiftLamports] = await Promise.all([
-		connection.getMinimumBalanceForRentExemption(USER_ACCOUNT_SIZE),
-		connection.getMinimumBalanceForRentExemption(SWIFT_ACCOUNT_SIZE),
-	]);
+	try {
+		const [userLamports, swiftLamports] = await Promise.all([
+			connection.getMinimumBalanceForRentExemption(USER_ACCOUNT_SIZE),
+			connection.getMinimumBalanceForRentExemption(
+				signedMsgUserOrdersSpace(numOrders)
+			),
+		]);
 
-	const userAccountRent = BigNum.from(userLamports, LAMPORTS_EXP);
-	const swiftAccountRent = BigNum.from(swiftLamports, LAMPORTS_EXP);
+		const userAccountRent = BigNum.from(userLamports, LAMPORTS_EXP);
+		const swiftAccountRent = BigNum.from(swiftLamports, LAMPORTS_EXP);
 
-	return {
-		userAccountRent,
-		swiftAccountRent,
-		baseCost: userAccountRent.add(NEW_ACCOUNT_DONATION).add(swiftAccountRent),
-	};
+		return {
+			userAccountRent,
+			swiftAccountRent,
+			baseCost: userAccountRent.add(NEW_ACCOUNT_DONATION).add(swiftAccountRent),
+			isLive: true,
+		};
+	} catch {
+		return {
+			userAccountRent: NEW_ACCOUNT_BASE_RENT,
+			swiftAccountRent: SWIFT_ACCOUNT_BASE_RENT,
+			baseCost: NEW_ACCOUNT_BASE_RENT.add(NEW_ACCOUNT_DONATION).add(
+				SWIFT_ACCOUNT_BASE_RENT
+			),
+			isLive: false,
+		};
+	}
 }
