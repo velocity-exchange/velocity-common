@@ -19,7 +19,7 @@
 	"author": "Velocity Exchange",
 	"dependencies": {
 		"@solana/spl-token": "0.4.14",
-		"@solana/web3.js": "1.98.0",
+		"@solana/web3.js": "1.99.0",
 		"@velocity-exchange/sdk": "0.23.0",
 		"bcryptjs-react": "2.4.6",
 		"cerializr": "3.1.4",
@@ -33,7 +33,7 @@
 		"tweetnacl": "1.0.3"
 	},
 	"peerDependencies": {
-		"@solana/web3.js": "1.98.0"
+		"@solana/web3.js": "1.99.0"
 	},
 	"scripts": {
 		"build": "bun run clean && tsc",
@@ -176,7 +176,7 @@
 		"access": "public"
 	},
 	"resolutions": {
-		"@solana/web3.js": "1.98.0",
+		"@solana/web3.js": "1.99.0",
 		"@solana/errors": "2.0.0-preview.4",
 		"@solana/codecs-data-structures": "2.0.0-preview.4"
 	}
