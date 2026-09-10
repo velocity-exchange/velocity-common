@@ -7,8 +7,11 @@ import { useEffect, useState } from 'react';
 import { singletonHook } from 'react-singleton-hook';
 import { useCommonDriftStore } from '../stores';
 import { useDriftClientIsReady } from './useDriftClientIsReady';
-// TODO(agave-42): bump `@drift/common` → `@velocity-exchange/common` and use
-// `fetchAccountCreationRent` instead of the hardcoded NEW_ACCOUNT_BASE_COST.
+// TODO(account-creation-rent): bump `@drift/common` → `@velocity-exchange/common`
+// (once published past 0.9.0) and use `fetchAccountCreationRent` instead of the
+// hardcoded NEW_ACCOUNT_BASE_COST. Blocked: react/package.json pins `@drift/common`
+// to the published npm package (currently 0.4.1), not workspace source, so the new
+// helper isn't importable here until common-ts publishes.
 import { NEW_ACCOUNT_BASE_COST } from '@drift/common';
 
 const _useAccountCreationCost = () => {
