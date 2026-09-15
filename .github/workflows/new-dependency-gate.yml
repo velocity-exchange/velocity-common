@@ -6,8 +6,9 @@ name: New dependency gate
 # set does not clear a set added afterwards.
 #
 # The parser and all of the collect/report/enforce logic live in
-# velocity-exchange/dependency-gate, reached via $GITHUB_ACTION_PATH, so a pull
-# request cannot weaken the check that is inspecting it by editing a script here.
+# velocity-exchange/shared-workflows/dependency-gate, reached via
+# $GITHUB_ACTION_PATH, so a pull request cannot weaken the check that is
+# inspecting it by editing a script here.
 #
 # This runs on `pull_request_target`, so the workflow file itself always comes
 # from the base branch: a pull request cannot edit or delete its own gate.
@@ -34,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0 # required: the action diffs against the base commit
 
-      - uses: velocity-exchange/dependency-gate@e039f99f9238eafe289d9879caae848c450a1b8e # v2.0.0
+      - uses: velocity-exchange/shared-workflows/dependency-gate@59625d7f7ee3bd49faa47a0a85978509ec57ab1f # dependency-gate-v2.0.1
         with:
           # Every published package's lockfile, plus the workspace root.
           lockfiles: bun.lock common-ts/bun.lock icons/bun.lock posthog-types/bun.lock react/bun.lock
