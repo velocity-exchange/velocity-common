@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.1...common-ts-v0.10.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **common-ts:** bump sdk to v0.25.0 ([f25159b](https://github.com/velocity-exchange/velocity-common/commit/f25159b37643f247e5a67eff3bef9a0acdc8dc1b))
+* **common-ts:** bump sdk to v0.25.0 ([099d804](https://github.com/velocity-exchange/velocity-common/commit/099d804a1aa02738ac618c5e6c6f25ebe81f9fa6))
+
 ## [0.10.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.0...common-ts-v0.10.1) (2026-09-10)
 
 
