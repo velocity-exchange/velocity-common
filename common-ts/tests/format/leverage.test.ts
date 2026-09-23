@@ -173,4 +173,14 @@ describe('exactLeverageFromMarginRatio', () => {
 		expect(maxLeverage).to.equal(legacyPerpMaxLeverage(3333.5));
 		expect(maxLeverage).to.not.equal(0);
 	});
+
+	it('falls back to MARGIN_PRECISION/DEFAULT_MAX_MARKET_LEVERAGE when marginRatioInitial is unset', () => {
+		const { maxLeverage } = getMaxLeverageForMarketAccount(
+			MarketType.PERP,
+			{} as PerpMarketAccount
+		);
+		// DEFAULT_MAX_MARKET_LEVERAGE is 10, so the fallback margin ratio is
+		// MARGIN_PRECISION / 10 = 1000, an integer the exact path takes cleanly.
+		expect(maxLeverage).to.equal(legacyPerpMaxLeverage(1000));
+	});
 });
