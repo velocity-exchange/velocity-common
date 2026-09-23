@@ -7,6 +7,7 @@ import {
 import { ENUM_UTILS } from '../enum';
 import { logger } from '../logger';
 import { DEFAULT_MAX_MARKET_LEVERAGE } from '../../constants/markets';
+import { exactLeverageFromMarginRatio } from '../trading/leverage';
 
 const getMaxLeverageForMarketAccount = (
 	marketType: MarketType,
@@ -20,28 +21,34 @@ const getMaxLeverageForMarketAccount = (
 		if (isPerp) {
 			const perpMarketAccount = marketAccount as PerpMarketAccount;
 
-			const maxLeverage = parseFloat(
-				(
-					1 /
-					((perpMarketAccount?.marginRatioInitial
-						? perpMarketAccount.marginRatioInitial
-						: 10000 / DEFAULT_MAX_MARKET_LEVERAGE) /
-						10000)
-				).toFixed(2)
-			);
+			const marginRatioInitial =
+				perpMarketAccount?.marginRatioInitial ||
+				10000 / DEFAULT_MAX_MARKET_LEVERAGE;
 
 			return {
-				maxLeverage,
+				maxLeverage: exactLeverageFromMarginRatio(marginRatioInitial, 2),
 			};
 		} else {
 			const spotMarketAccount = marketAccount as SpotMarketAccount;
 
-			const liabilityWeight = spotMarketAccount
-				? spotMarketAccount.initialLiabilityWeight / 10000
+			const initialLiabilityWeight = spotMarketAccount
+				? spotMarketAccount.initialLiabilityWeight
 				: 0;
 
+			// At or below 10000 the position carries no liability premium (or is
+			// invalid); keep today's output there rather than dividing by zero.
+			if (initialLiabilityWeight <= 10000) {
+				const liabilityWeight = initialLiabilityWeight / 10000;
+				return {
+					maxLeverage: parseFloat((1 / (liabilityWeight - 1)).toFixed(2)),
+				};
+			}
+
 			return {
-				maxLeverage: parseFloat((1 / (liabilityWeight - 1)).toFixed(2)),
+				maxLeverage: exactLeverageFromMarginRatio(
+					initialLiabilityWeight - 10000,
+					2
+				),
 			};
 		}
 	} catch (e) {

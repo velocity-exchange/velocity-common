@@ -5,6 +5,7 @@ import {
 	ZERO,
 	getUserAccountPublicKeySync,
 } from '@velocity-exchange/sdk';
+import { exactLeverageFromMarginRatio } from '../trading/leverage';
 
 const checkIfUserAccountExists = async (
 	velocityClient: VelocityClient,
@@ -87,9 +88,7 @@ const getUserMaxLeverageForMarket = (
 			return uiSavedMaxLeverage;
 		}
 
-		return parseFloat(
-			((1 / openOrClosedPosition.maxMarginRatio) * 10000).toFixed(2)
-		);
+		return exactLeverageFromMarginRatio(openOrClosedPosition.maxMarginRatio, 2);
 	}
 
 	if (isPositionOpen) {

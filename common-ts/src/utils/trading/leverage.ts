@@ -1,5 +1,24 @@
 import { BN, MARGIN_PRECISION, User } from '@velocity-exchange/sdk';
+import { fromParts, roundToDecimals, toLossyNumber } from '../../format/core';
 import { logger } from '../logger';
+
+/**
+ * 10000 / marginRatio to `decimals` places, without a float division. Shifts
+ * the dividend up by one guard digit past `decimals` before an integer
+ * divide, then rounds that truncated guard digit half-up. An exact x.xx5 tie
+ * (e.g. 10000/3200 = 3.125) rounds up instead of landing wherever float
+ * division and toFixed happen to put it.
+ */
+export function exactLeverageFromMarginRatio(
+	marginRatio: number,
+	decimals: number
+): number {
+	const guardScale = decimals + 1;
+	const numerator = BigInt(10000) * BigInt(10) ** BigInt(guardScale);
+	const scaled = numerator / BigInt(marginRatio);
+	const guarded = fromParts(1, scaled.toString(), guardScale);
+	return toLossyNumber(roundToDecimals(guarded, decimals, 'half-up'));
+}
 
 const convertLeverageToMarginRatio = (leverage: number): number | undefined => {
 	if (!leverage) return undefined;
@@ -15,7 +34,7 @@ const convertMarginRatioToLeverage = (
 	const leverage = 1 / (marginRatio / MARGIN_PRECISION.toNumber());
 
 	return decimals
-		? parseFloat(leverage.toFixed(decimals))
+		? exactLeverageFromMarginRatio(marginRatio, decimals)
 		: Math.round(leverage);
 };
 
