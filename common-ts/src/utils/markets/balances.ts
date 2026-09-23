@@ -1,6 +1,5 @@
 import {
 	BigNum,
-	QUOTE_PRECISION_EXP,
 	VelocityClient,
 	getTokenAmount,
 	PRICE_PRECISION_EXP,
@@ -9,10 +8,12 @@ import {
 } from '@velocity-exchange/sdk';
 import { roundToDecimals, toDecimal, toLossyNumber } from '../../format/core';
 
-// Exact price * amount, truncated to QUOTE_PRECISION_EXP. The truncated digits
-// are below the millionth of a dollar and never reach a cent-rounding decision.
+// The exact price * amount product at their combined precision. Never
+// shifted or truncated here: deposits report every digit, and borrows round
+// straight from this to the cent, so no intermediate scale can drop digits
+// a rounding decision still needs.
 const quoteValue = (price: BigNum, amount: BigNum) => {
-	const parsed = toDecimal(price.mul(amount).shiftTo(QUOTE_PRECISION_EXP));
+	const parsed = toDecimal(price.mul(amount));
 	if (parsed.status !== 'ok') {
 		throw new Error('market price or amount is not a finite value');
 	}
