@@ -13,8 +13,7 @@ const QUOTE_PRECISION_EXP = 6;
 
 /**
  * Only module that references the SDK at all, and only as a type. A spot
- * account's `orderStepSize` is in its own mint decimals, not base precision,
- * so it is detected by the `decimals` field the SDK only puts on a spot account.
+ * account's `orderStepSize` is in its own mint decimals, detected via `decimals`.
  */
 export function marketPrecisionFromAccount(
 	account: PerpMarketAccount | SpotMarketAccount,
