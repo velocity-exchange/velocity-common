@@ -7,12 +7,15 @@ import { PRESETS } from '../../format/presets';
 const formatTokenInputCurried =
 	(setAmount: (amount: string) => void, spotMarketConfig: SpotMarketConfig) =>
 	(newAmount: string) => {
+		if (isNaN(+newAmount)) return;
+
 		if (newAmount === '') {
 			setAmount('');
 			return;
 		}
 
-		// if last char of string is a decimal point, don't format
+		// a valid number's in-progress trailing separator is kept as typed;
+		// isNaN above already rejected a bare or malformed one (e.g. '.', 'abc.')
 		if (newAmount[newAmount.length - 1] === '.') {
 			setAmount(newAmount);
 			return;

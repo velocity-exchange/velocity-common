@@ -1,17 +1,20 @@
-import { expect } from 'chai';
 import { BN, SpotMarketConfig } from '@velocity-exchange/sdk';
 import { formatTokenInputCurried } from '../../src/utils/validation/input';
+import { CorpusCase, Divergence, runCorpus } from './divergence';
+
+/** Stands in for "setAmount was never called", so two rejections compare equal. */
+const UNCHANGED = '<unchanged>';
 
 /**
- * The pre-fix implementation, kept only so the tests below can compare against
- * it directly. It round-trips through a float via toFixed/Number, which is the
- * float re-entry this task removes.
+ * Copied from the pre-fix `formatTokenInputCurried` body: the oracle for the
+ * corpus below. Every input the current implementation disagrees with it on
+ * must be listed in DIVERGENCES, naming the behaviour that changed.
  */
 function legacyFormatTokenInput(
 	newAmount: string,
 	precisionExp: number
-): string | undefined {
-	if (isNaN(+newAmount)) return undefined;
+): string {
+	if (isNaN(+newAmount)) return UNCHANGED;
 	if (newAmount === '') return '';
 	const lastChar = newAmount[newAmount.length - 1];
 	if (lastChar === '.') return newAmount;
@@ -27,9 +30,8 @@ function legacyFormatTokenInput(
 const marketConfig = (precisionExp: number): SpotMarketConfig =>
 	({ precisionExp: new BN(precisionExp) }) as unknown as SpotMarketConfig;
 
-/** Runs the curried setter and returns what it passed, or undefined if it never called it. */
-function run(newAmount: string, precisionExp: number): string | undefined {
-	let captured: string | undefined;
+function run(newAmount: string, precisionExp: number): string {
+	let captured = UNCHANGED;
 	formatTokenInputCurried((amount) => {
 		captured = amount;
 	}, marketConfig(precisionExp))(newAmount);
@@ -42,26 +44,6 @@ function prefixesOf(amount: string): string[] {
 	return out;
 }
 
-/**
- * Every prefix where the new output intentionally disagrees with the legacy
- * one, keyed by `${prefix}|${precisionExp}`. Every disagreement here is an
- * instance of one rule: typed input truncates to precision and never rounds
- * up, and an exponent form expands to plain digits instead of a re-sliced
- * exponent string.
- */
-const DIVERGENCES: Record<string, string> = {
-	'0.1234567|6': '0.123456',
-	'0.12345678|6': '0.123456',
-	'0.123456789|6': '0.123456',
-	'1.2345678|6': '1.234567',
-	'1.23456789|6': '1.234567',
-	'0.00000005|6': '0.000000',
-	'1.23456789e-1|6': '0.123456',
-	'1.23456789e-10|6': '0.000000',
-	'0.00000005|9': '0.00000005',
-	'1.23456789e-10|9': '0.000000000',
-};
-
 const REALISTIC_AMOUNTS = [
 	'1234.567891',
 	'0.123456789',
@@ -72,66 +54,139 @@ const REALISTIC_AMOUNTS = [
 	'1e5',
 ];
 
-describe('formatTokenInputCurried', () => {
-	for (const precisionExp of [6, 9]) {
-		describe(`precisionExp ${precisionExp}`, () => {
-			for (const amount of REALISTIC_AMOUNTS) {
-				for (const prefix of prefixesOf(amount)) {
-					const key = `${prefix}|${precisionExp}`;
-					const expected = DIVERGENCES[key];
+/** Beyond typing prefixes: rejected shapes, non-finite/NaN, and precision-losing magnitudes. */
+const EXTRA_CASES: Array<[string, number]> = [
+	['', 6],
+	['1,234.5', 6],
+	['abc.', 6],
+	['1.2.3.', 6],
+	['.', 6],
+	['-.', 6],
+	['Infinity', 6],
+	['NaN', 6],
+	['-1', 6],
+];
 
-					if (expected !== undefined) {
-						it(`diverges from the float round-trip for ${JSON.stringify(prefix)}`, () => {
-							const legacy = legacyFormatTokenInput(prefix, precisionExp);
-							expect(run(prefix, precisionExp)).to.equal(expected);
-							expect(expected).to.not.equal(legacy);
-						});
-					} else {
-						it(`matches the legacy output for ${JSON.stringify(prefix)}`, () => {
-							expect(run(prefix, precisionExp)).to.equal(
-								legacyFormatTokenInput(prefix, precisionExp)
-							);
-						});
-					}
-				}
-			}
-		});
+const repunit = (digits: number) => '1'.repeat(digits);
+for (const precisionExp of [0, 6, 9]) {
+	for (const digits of [20, 30, 35]) {
+		EXTRA_CASES.push([repunit(digits), precisionExp]);
 	}
+}
 
-	it('normalises exponent-form input instead of re-slicing an exponential string', () => {
-		expect(run('1.23456789e-10', 6)).to.not.equal('1.23456789e-1');
-		expect(run('1.23456789e-10', 9)).to.not.equal('1.23456789e-1');
-	});
+// A prefix is the same input at the same precision regardless of which
+// realistic amount it came from, so pairs are deduped by key before running.
+const pairs = new Map<string, [string, number]>();
+for (const amount of REALISTIC_AMOUNTS) {
+	for (const precisionExp of [6, 9]) {
+		for (const prefix of prefixesOf(amount)) {
+			pairs.set(`${prefix}|${precisionExp}`, [prefix, precisionExp]);
+		}
+	}
+}
+for (const [input, precisionExp] of EXTRA_CASES) {
+	pairs.set(`${input}|${precisionExp}`, [input, precisionExp]);
+}
 
-	it('truncates typed input past precision rather than rounding it up', () => {
-		expect(run('1.2345675', 6)).to.equal('1.234567');
-	});
+const CASES: CorpusCase[] = [...pairs.entries()].map(
+	([key, [input, precisionExp]]) => ({
+		key,
+		legacy: () => legacyFormatTokenInput(input, precisionExp),
+		next: () => run(input, precisionExp),
+	})
+);
 
-	it('keeps a very small amount in plain notation rather than exponential', () => {
-		expect(run('0.00000005', 9)).to.equal('0.00000005');
-	});
+const DIVERGENCES: Record<string, Divergence> = {
+	'0.1234567|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '0.123457',
+		next: '0.123456',
+	},
+	'0.12345678|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '0.123457',
+		next: '0.123456',
+	},
+	'0.123456789|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '0.123457',
+		next: '0.123456',
+	},
+	'1.2345678|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '1.234568',
+		next: '1.234567',
+	},
+	'1.23456789|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '1.234568',
+		next: '1.234567',
+	},
+	'0.00000005|6': {
+		behaviour:
+			'an all-zero truncation keeps the precision-many zero decimals, instead of collapsing to a bare 0 via a float round trip',
+		old: '0',
+		next: '0.000000',
+	},
+	'1.23456789e-1|6': {
+		behaviour:
+			'truncates typed input past precision rather than rounding it up',
+		old: '0.123457',
+		next: '0.123456',
+	},
+	'1.23456789e-10|6': {
+		behaviour:
+			'exponent notation expands to plain digits instead of a re-sliced exponential string',
+		old: '1.23456789e-1',
+		next: '0.000000',
+	},
+	'0.00000005|9': {
+		behaviour: 'stays plain instead of reflowing into exponential notation',
+		old: '5e-8',
+		next: '0.00000005',
+	},
+	'1.23456789e-10|9': {
+		behaviour:
+			'exponent notation expands to plain digits instead of a re-sliced exponential string',
+		old: '1.23456789e-1',
+		next: '0.000000000',
+	},
+	'Infinity|6': {
+		behaviour:
+			'a non-finite value is rejected rather than displayed as the literal word',
+		old: 'Infinity',
+		next: UNCHANGED,
+	},
+};
 
-	it('expands a 1e5-style entry to plain digits, unchanged', () => {
-		expect(run('1e5', 6)).to.equal('100000');
-		expect(run('1e5', 9)).to.equal('100000');
-	});
+for (const precisionExp of [0, 6, 9]) {
+	DIVERGENCES[`${repunit(20)}|${precisionExp}`] = {
+		behaviour:
+			'a 20-digit amount keeps its exact digits instead of losing precision through a float',
+		old: '11111111111111110000',
+		next: repunit(20),
+	};
+	DIVERGENCES[`${repunit(30)}|${precisionExp}`] = {
+		behaviour:
+			'a 30-digit amount keeps its exact digits instead of reflowing into exponential notation',
+		old: '1.111111111111111e+29',
+		next: repunit(30),
+	};
+	DIVERGENCES[`${repunit(35)}|${precisionExp}`] = {
+		behaviour:
+			'a 35-digit amount keeps its exact digits instead of reflowing into exponential notation',
+		old: '1.111111111111111e+34',
+		next: repunit(35),
+	};
+}
 
-	it('clears the field on an empty string', () => {
-		expect(run('', 6)).to.equal('');
-	});
-
-	it('leaves an in-progress trailing separator alone', () => {
-		expect(run('12.', 6)).to.equal('12.');
-		expect(run('0.', 9)).to.equal('0.');
-	});
-
-	it('keeps a typed trailing zero within precision', () => {
-		expect(run('1.20', 6)).to.equal('1.20');
-		expect(run('10.500', 9)).to.equal('10.500');
-	});
-
-	it('ignores unparsable input, leaving the field as-is', () => {
-		expect(run('abc', 6)).to.equal(undefined);
-		expect(run('-', 6)).to.equal(undefined);
+describe('formatTokenInputCurried', () => {
+	it('agrees with the pre-fix implementation outside the annotated divergences', () => {
+		runCorpus(CASES, DIVERGENCES);
 	});
 });
