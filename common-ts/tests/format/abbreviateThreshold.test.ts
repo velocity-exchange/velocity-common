@@ -1,4 +1,10 @@
-import { FormatOptions, PRESETS, formatText } from '../../src/format/index';
+import { expect } from 'chai';
+import {
+	FormatOptions,
+	PRESETS,
+	formatText,
+	formatValue,
+} from '../../src/format/index';
 import millify from '../../src/utils/millify';
 import { CorpusCase, Divergence, runCorpus } from './divergence';
 
@@ -132,4 +138,14 @@ describe('format/abbreviateThreshold', () => {
 			runCorpus(cases, divergences);
 		});
 	}
+
+	it('reports the rounding that carried the value past the threshold', () => {
+		const result = formatValue('9999.995', {
+			...PRESETS.usd,
+			abbreviate: { threshold: '10000' },
+		});
+		expect(result.text).to.equal('$10.0K');
+		expect(result.wasRounded).to.equal(true);
+		expect(result.roundingApplied).to.equal('half-up');
+	});
 });

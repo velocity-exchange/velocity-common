@@ -5,6 +5,7 @@ import {
 	optionsForLegacyType,
 } from '../../src/format/index';
 import { expect } from 'chai';
+import { abs, compare, toDecimal } from '../../src/format/core/index';
 import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
@@ -45,8 +46,15 @@ const V0_11_ABBREVIATED: FormatOptions = Object.freeze({
 	...V0_11_USD,
 	abbreviate: Object.freeze({ threshold: 'always' as const }),
 });
-const formatV011Compact = (v: string) =>
-	formatText(v, Math.abs(Number(v)) >= 10000 ? V0_11_ABBREVIATED : V0_11_USD);
+const V0_11_THRESHOLD = toDecimal('10000');
+const formatV011Compact = (v: string) => {
+	const parsed = toDecimal(v);
+	const abbreviated =
+		parsed.status === 'ok' &&
+		V0_11_THRESHOLD.status === 'ok' &&
+		compare(abs(parsed.value), V0_11_THRESHOLD.value) >= 0;
+	return formatText(v, abbreviated ? V0_11_ABBREVIATED : V0_11_USD);
+};
 
 const CLASS_1 =
 	'1: a positive value with a dropped third digit of 5 or more rounds up';

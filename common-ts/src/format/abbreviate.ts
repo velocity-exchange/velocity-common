@@ -84,8 +84,9 @@ export function abbreviateValue(
 	// Just under the threshold, abbreviate the rounded value the full form
 	// would print, so 999.995 at 2dp reads 1.00K rather than 1,000.00.
 	let source = value;
+	let full: ReturnType<typeof applyDigitSpec> | undefined;
 	if (!passesThreshold(value, options)) {
-		const full = fullDigits && applyDigitSpec(value, fullDigits, market);
+		full = fullDigits && applyDigitSpec(value, fullDigits, market);
 		if (full?.status !== 'ok' || !passesThreshold(full.value, options)) {
 			return notApplied;
 		}
@@ -113,7 +114,8 @@ export function abbreviateValue(
 		integer: resolved.integer,
 		fraction: resolved.fraction,
 		value: resolved.value,
-		wasRounded: resolved.wasRounded || source !== value,
-		roundingApplied: resolved.roundingApplied,
+		wasRounded: resolved.wasRounded || !!full?.wasRounded,
+		// The full-digit rounding is what carried the value past the threshold.
+		roundingApplied: full?.roundingApplied ?? resolved.roundingApplied,
 	};
 }
