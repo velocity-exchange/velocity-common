@@ -21,7 +21,6 @@ export * from './utils/NumLib';
 export * from './utils/s3Buckets';
 export * from './utils/insuranceFund';
 export * from './utils/settings/settings';
-export { default as millify } from './utils/millify';
 export { getSwiftConfirmationTimeoutMs } from './utils/signedMsgs';
 export { ResultSlotIncrementer } from './utils/ResultSlotIncrementer';
 export { MultiplexWebSocket } from './utils/MultiplexWebSocket';

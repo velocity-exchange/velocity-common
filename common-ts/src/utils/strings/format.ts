@@ -1,36 +1,10 @@
 import { PublicKey } from '@velocity-exchange/sdk';
-import { trimFractionZeros } from '../../format/trim';
 import { getCachedUiString } from '../core/cache';
 
 export const abbreviateAddress = (address: string | PublicKey, length = 4) => {
 	if (!address) return '';
 	const authString = address.toString();
 	return getCachedUiString('abbreviate', authString, length);
-};
-
-/**
- * Trim trailing zeros from a numerical string
- * @param str - numerical string to format
- * @param zerosToShow - max number of zeros to show after the decimal. Similar to number.toFixed() but won't trim non-zero values. Optional, default value is 1
- *
- * @deprecated Use `formatText(value, { trimTrailingZeros: true, digits: {
- * kind: 'decimals', decimals: N, minDecimals: Z } })` from
- * `@velocity-exchange/common/format`, which takes a value rather than an
- * already formatted string.
- */
-export const trimTrailingZeros = (str: string, zerosToShow = 1) => {
-	// Ignore strings with no decimal point
-	if (!str.includes('.')) return str;
-
-	const sides = str.split('.');
-
-	sides[1] = trimFractionZeros(sides[1], zerosToShow);
-
-	if (sides[1].length === 0) {
-		return sides[0];
-	} else {
-		return sides.join('.');
-	}
 };
 
 export const toSnakeCase = (str: string): string =>

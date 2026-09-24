@@ -669,7 +669,6 @@ describe('format/small numbers', () => {
 describe('format/presets', () => {
 	it('usd rounds half-up at the cent, usdLegacy still truncates', () => {
 		expect(formatText('123.456789', PRESETS.usd)).to.equal('$123.46');
-		expect(formatText('123.456789', PRESETS.usdHalfUp)).to.equal('$123.46');
 		expect(formatText('123.456789', PRESETS.usdLegacy)).to.equal('$123.45');
 		expect(formatText('-123.456789', PRESETS.usd)).to.equal('-$123.46');
 		expect(formatText('-123.456789', PRESETS.usdLegacy)).to.equal('-$123.45');

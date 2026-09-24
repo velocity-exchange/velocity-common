@@ -10,7 +10,6 @@ import {
 	SpotMarketAccount,
 	ZERO,
 } from '@velocity-exchange/sdk';
-import { PRESETS, formatText } from '../../format/index';
 import { MarketId } from '../../types';
 
 const getMarketTickSize = (
@@ -114,27 +113,6 @@ export const isEntirePositionOrder = (orderAmount: BigNum): boolean => {
  */
 export const getMaxLeverageOrderSize = (orderAmount: BigNum): BigNum => {
 	return new BigNum(MAX_LEVERAGE_ORDER_SIZE, orderAmount.precision);
-};
-
-/**
- * Formats an order size for display, showing "Entire Position" if it's a max leverage order
- * @param orderAmount - The BigNum order amount to format
- * @param formatFn - Optional custom format function, defaults to prettyPrint()
- * @returns Formatted string showing either "Entire Position" or the formatted amount
- *
- * @deprecated Use `formatText(amount, PRESETS.orderSize)` from
- * '@velocity-exchange/common/format'.
- */
-export const formatOrderSize = (
-	orderAmount: BigNum,
-	formatFn?: (amount: BigNum) => string
-): string => {
-	if (isEntirePositionOrder(orderAmount)) {
-		return 'Entire Position';
-	}
-	return formatFn
-		? formatFn(orderAmount)
-		: formatText(orderAmount, PRESETS.orderSize);
 };
 
 export {

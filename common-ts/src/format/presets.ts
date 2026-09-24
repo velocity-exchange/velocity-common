@@ -56,16 +56,6 @@ const usd = freeze({
 	},
 });
 
-/** @deprecated Use PRESETS.usd */
-const usdHalfUp = freeze({
-	style: 'currency' as const,
-	digits: {
-		kind: 'decimals' as const,
-		decimals: 2,
-		rounding: 'half-up' as const,
-	},
-});
-
 /** A trade price at full precision. Shared by the two price presets below. */
 const PRICE_DIGITS: DigitSpec = deepFreeze({
 	kind: 'significant' as const,
@@ -76,8 +66,6 @@ const PRICE_DIGITS: DigitSpec = deepFreeze({
 export const PRESETS = Object.freeze({
 	usdLegacy,
 	usd,
-	/** @deprecated Use PRESETS.usd */
-	usdHalfUp,
 	usdSigned: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	usdCompact: freeze({
 		...usd,
@@ -145,7 +133,7 @@ export const PRESETS = Object.freeze({
 	size: freeze({
 		digits: { kind: 'step' as const, rounding: 'truncate' as const },
 	}),
-	/** The bare prettyPrint() shape formatOrderSize renders today. Needs no market. */
+	/** Exact digits, trailing zeros trimmed, sentinel-aware. Needs no market. */
 	orderSize: freeze({
 		digits: { kind: 'exact' as const },
 		trimTrailingZeros: true,

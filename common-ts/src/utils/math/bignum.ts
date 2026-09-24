@@ -6,7 +6,6 @@ import {
 	toDecimal,
 	toFixedPointParts,
 } from '../../format/core';
-import { snapValueToStep } from '../../format/market';
 
 const toBigNum = (value: Decimal, scale: number, precision: BN): BigNum => {
 	const parts = toFixedPointParts(value, scale, 'truncate');
@@ -54,27 +53,4 @@ export const roundBigNumToDecimalPlace = (
 		'half-ceil'
 	);
 	return toBigNum(shiftPoint(whole, -decimalPlaces), scale, bignum.precision);
-};
-
-/**
- * @deprecated Use `snapValueToStep(value, step, 'toward-zero')` from
- * `@velocity-exchange/common/format`, pairing the step BN with `baseSize.val`
- * at one shared scale, or the step is read at the wrong magnitude.
- *
- * A zero or negative step now throws instead of returning the value unchanged.
- */
-export const getBigNumRoundedToStepSize = (baseSize: BigNum, stepSize: BN) => {
-	// Snapping in raw units gives the same result at every precision and needs
-	// no fixed-point scale, which a negative precision exponent has no room for.
-	const snapped = snapValueToStep(
-		{ raw: baseSize.val, scale: 0 },
-		{ raw: stepSize, scale: 0 },
-		'toward-zero'
-	);
-	if (!snapped) {
-		throw new Error(
-			`Cannot snap ${baseSize.toString()} to step ${stepSize.toString()}`
-		);
-	}
-	return toBigNum(snapped, 0, baseSize.precision);
 };
