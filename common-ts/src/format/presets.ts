@@ -34,10 +34,9 @@ function deepFreeze<T>(value: T): T {
 const freeze = (o: FormatOptions): FormatOptions => deepFreeze(o);
 
 /**
- * `usdLegacy` reproduces the truncate-toward-zero cent that every
- * BigNum.toNotional call site used to render, for the sites that still need
- * it. `usd` rounds half-up instead, and is its own object so callers pinned
- * to the legacy shape are unaffected.
+ * `usdLegacy` reproduces BigNum.toNotional's truncate-toward-zero cent. `usd`
+ * rounds half-up and is a separate object, so callers pinned to the legacy
+ * shape are unaffected.
  */
 const usdLegacy = freeze({
 	style: 'currency' as const,

@@ -4,6 +4,7 @@ import {
 	formatText,
 	optionsForLegacyType,
 } from '../../src/format/index';
+import { expect } from 'chai';
 import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
@@ -47,14 +48,14 @@ interface Case {
 	newUsd: string;
 	oldSigned: string;
 	newSigned: string;
-	/** Divergence class for the unsigned (usd/usdLegacy-shaped) channels. */
+	/** Divergence class for the unsigned (usd-shaped) channels. */
 	class?: string;
 	/** Divergence class for the signed (usdSigned/pnl-shaped) channels, when it differs. */
 	signedClass?: string;
 }
 
-// Every row not listed as a divergence below is asserted unchanged, so this
-// table also documents which magnitudes the flip leaves alone.
+// Every row's strings are asserted literally, and a row with no class is also
+// asserted unchanged, so the table records which magnitudes the flip leaves alone.
 const CASES: Case[] = [
 	{
 		key: '0',
@@ -135,7 +136,7 @@ const CASES: Case[] = [
 		newUsd: '$0.01',
 		oldSigned: '+$0.00',
 		newSigned: '+$0.01',
-		class: CLASS_4,
+		class: CLASS_1,
 		signedClass: CLASS_6,
 	},
 	{
@@ -232,7 +233,7 @@ const CASES: Case[] = [
 		newUsd: '$10,000.01',
 		oldSigned: '+$10,000.00',
 		newSigned: '+$10,000.01',
-		class: CLASS_1,
+		class: CLASS_4,
 	},
 	{
 		key: '1234567.895',
@@ -327,6 +328,8 @@ const COMPACT_CASES: CompactCase[] = [
 	// Already abbreviated on the raw value, so the flip changes nothing here.
 	{ key: '10000.005', old: '$10.0K', next: '$10.0K' },
 	{ key: '1234567.895', old: '$1.23M', next: '$1.23M' },
+	// Abbreviated digits still truncate: only the full-number path flipped.
+	{ key: '1235000', old: '$1.23M', next: '$1.23M' },
 	{ key: '9999', old: '$9,999.00', next: '$9,999.00' },
 	{ key: '4582930', old: '$4.58M', next: '$4.58M' },
 	{ key: '100.20', old: '$100.20', next: '$100.20' },
@@ -349,6 +352,19 @@ function compactCorpus() {
 }
 
 describe('format/usdFlip', () => {
+	it('prints every documented string, old and new', () => {
+		for (const c of CASES) {
+			expect(formatText(c.key, OLD_USD), c.key).to.equal(c.oldUsd);
+			expect(formatText(c.key, PRESETS.usd), c.key).to.equal(c.newUsd);
+			expect(formatText(c.key, OLD_USD_SIGNED), c.key).to.equal(c.oldSigned);
+			expect(formatText(c.key, PRESETS.usdSigned), c.key).to.equal(c.newSigned);
+		}
+		for (const c of COMPACT_CASES) {
+			expect(formatText(c.key, OLD_USD_COMPACT), c.key).to.equal(c.old);
+			expect(formatText(c.key, PRESETS.usdCompact), c.key).to.equal(c.next);
+		}
+	});
+
 	it('usd rounds half-up at the cent', () => {
 		const { cases, divergences } = unsignedCorpus((v) =>
 			formatText(v, PRESETS.usd)
