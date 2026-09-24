@@ -62,10 +62,12 @@ const nextDeposits = (
 
 // Realistic 6dp oracle prices: a sub-dollar token, a $1 stable, a price with a
 // full set of non-zero digits, a value just under $1, a five-figure price
-// (BTC-like), the cent-tie price used in marketTotals.test.ts, and a price
-// with no trailing zero anywhere.
+// (BTC-like), the cent-tie price used in marketTotals.test.ts, a price with
+// no trailing zero anywhere, and that same cent-tie price negated (a stale or
+// pre-launch oracle).
 const PRICES = [
 	500_000, 1_000_000, 1_234_567, 999_999, 25_000_000_000, 1_740_000, 45_678_912,
+	-1_740_000,
 ];
 
 // Token amounts at 9dp (e.g. SOL) and 6dp (e.g. USDC), spanning zero, one raw
@@ -132,6 +134,8 @@ const BORROW_DIVERGENCES: Record<string, Divergence> = {
 	'25000000000 price / 6dp amount 999999': tie('24999.97', '24999.98'),
 	'1740000 price / 9dp amount 250000000': tie('0.43', '0.44'),
 	'1740000 price / 6dp amount 250000': tie('0.43', '0.44'),
+	'-1740000 price / 9dp amount 250000000': tie('-0.43', '-0.44'),
+	'-1740000 price / 6dp amount 250000': tie('-0.43', '-0.44'),
 };
 
 const DEPOSIT_DIVERGENCES: Record<string, Divergence> = {
@@ -204,6 +208,19 @@ const DEPOSIT_DIVERGENCES: Record<string, Divergence> = {
 	'45678912 price / 6dp amount 999999': exact(
 		'45.678866321087995',
 		'45.678866321088'
+	),
+	'-1740000 price / 9dp amount 1': exact('-1.7400000000000002e-9', '-1.74e-9'),
+	'-1740000 price / 9dp amount 123456789': exact(
+		'-0.21481481285999998',
+		'-0.21481481286'
+	),
+	'-1740000 price / 9dp amount 987654321': exact(
+		'-1.7185185185399998',
+		'-1.71851851854'
+	),
+	'-1740000 price / 6dp amount 1': exact(
+		'-0.0000017399999999999999',
+		'-0.00000174'
 	),
 };
 
