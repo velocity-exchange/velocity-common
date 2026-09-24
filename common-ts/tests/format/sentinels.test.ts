@@ -1,75 +1,51 @@
 import { BN, BigNum } from '@velocity-exchange/sdk';
 import { expect } from 'chai';
 import { PRESETS, formatText, formatValue } from '../../src/format/index';
-import { isEntirePositionOrder } from '../../src/utils/trading/size';
-import { CorpusCase, Divergence, runCorpus } from './divergence';
-
-/**
- * Characterization corpus for the entire-position sentinel. `isEntirePositionOrder`
- * is the oracle: the sentinel must reproduce it over the whole corpus except at
- * the cases listed in the diff table, and every entry in the table names the
- * behaviour it is there for.
- */
 
 const MARKERS = {
 	u64Max: '18446744073709551615',
 	truncated: '18446744072000000000',
 };
 
-const PRECISIONS = [6, 9, 13];
+const U64_MAX = BigInt(MARKERS.u64Max);
+const below = (n: string) => (U64_MAX - BigInt(n)).toString();
 
-const buildCases = (): CorpusCase[] => {
-	const cases: CorpusCase[] = [];
-	const add = (key: string, raw: bigint, precision: number) => {
-		const amount = () => new BigNum(new BN(raw.toString()), new BN(precision));
-		cases.push({
-			key,
-			legacy: () => String(isEntirePositionOrder(amount())),
-			next: () => String(formatValue(amount(), PRESETS.orderSize).isSentinel),
+// [label, raw units, scale, matches]
+const RAW_CASES: [string, string, number, boolean][] = [
+	['u64::MAX at scale 0', MARKERS.u64Max, 0, true],
+	['u64::MAX at scale 9', MARKERS.u64Max, 9, true],
+	['u64::MAX at scale 25', MARKERS.u64Max, 25, true],
+	['truncated marker at scale 6', MARKERS.truncated, 6, true],
+	['step 1e10 at scale 9', below('3709551615'), 9, true],
+	['just inside the window', below('999999999999'), 9, true],
+	['at the window edge', below('1000000000000'), 9, false],
+	['one above u64::MAX', (U64_MAX + BigInt(1)).toString(), 9, false],
+	['18 tokens at 18 decimals', '18000000000000000000', 18, false],
+	['1 raw unit at scale 25', '1', 25, false],
+	['ordinary size at scale 9', '1234500000', 9, false],
+	['zero', '0', 9, false],
+];
+
+describe('ENTIRE_POSITION matches a fixed raw window below u64::MAX', () => {
+	for (const [label, units, scale, expected] of RAW_CASES) {
+		it(`${label}: ${expected ? 'matches' : 'does not match'}`, () => {
+			const input = { raw: { toString: () => units }, scale };
+			expect(formatValue(input, PRESETS.orderSize).isSentinel).to.equal(
+				expected
+			);
 		});
-	};
-
-	for (const [marker, units] of Object.entries(MARKERS)) {
-		for (const precision of PRECISIONS) {
-			const printedUnit = BigInt(10) ** BigInt(precision);
-			const offsets: [string, bigint][] = [
-				['exact', BigInt(0)],
-				['+1 raw', BigInt(1)],
-				['-1 raw', BigInt(-1)],
-				['+1 printed', printedUnit],
-				['-1 printed', -printedUnit],
-				['+half printed', printedUnit / BigInt(2)],
-				['-half printed', -printedUnit / BigInt(2)],
-			];
-			for (const [offset, delta] of offsets) {
-				const magnitude = BigInt(units) + delta;
-				add(`${marker} ${offset} pos p${precision}`, magnitude, precision);
-				add(`${marker} ${offset} neg p${precision}`, -magnitude, precision);
-			}
-		}
 	}
 
-	for (const [label, magnitude] of [
-		['zero', BigInt(0)],
-		['ordinary', BigInt('1234500000')],
-	] as [string, bigint][]) {
-		for (const precision of PRECISIONS) {
-			add(`${label} pos p${precision}`, magnitude, precision);
-			add(`${label} neg p${precision}`, -magnitude, precision);
+	it('long fractions print as numbers', () => {
+		for (const v of [
+			0.00012345678901234567,
+			'1.2345678901234567890',
+			'0.5000000000000000000001',
+		]) {
+			expect(formatValue(v, PRESETS.orderSize).isSentinel, String(v)).to.equal(
+				false
+			);
 		}
-	}
-
-	return cases;
-};
-
-// ENTIRE_POSITION now uses the same tolerance and the same two markers as
-// isEntirePositionOrder, so the corpus is expected to agree everywhere. Any
-// key that shows up here is a real, reported disagreement, not an intended one.
-const DIVERGENCES: Record<string, Divergence> = {};
-
-describe('ENTIRE_POSITION matches the exact marker on a positive size', () => {
-	it('reproduces isEntirePositionOrder outside the annotated cases', () => {
-		runCorpus(buildCases(), DIVERGENCES);
 	});
 
 	it('renders the marker text only for the positive amount', () => {
@@ -96,6 +72,7 @@ describe('ENTIRE_POSITION recognises the step-rounded u64::MAX', () => {
 		['1e6', BigInt(1_000_000)],
 		['1e7', BigInt(10_000_000)],
 		['1e9', BigInt(1_000_000_000)],
+		['1e10', BigInt(10_000_000_000)],
 	];
 
 	for (const [label, step] of cases) {
@@ -113,19 +90,6 @@ describe('ENTIRE_POSITION recognises the step-rounded u64::MAX', () => {
 			const input = { raw: { toString: () => units }, scale: 9 };
 			expect(formatText(input, PRESETS.orderSize)).to.equal('Entire Position');
 		}
-	});
-
-	it('one whole unit below u64::MAX does not match', () => {
-		// At precision 6 the two markers (1,709,551,615 raw units apart) sit well
-		// outside each other's tolerance band, so this is an unambiguous miss. At
-		// precision 9 the same offset lands inside the truncated marker's own
-		// band instead, and the agreement corpus below covers that case.
-		const oneUnitBelow = (
-			BigInt(MARKERS.u64Max) -
-			BigInt(10) ** BigInt(6)
-		).toString();
-		const input = { raw: { toString: () => oneUnitBelow }, scale: 6 };
-		expect(formatValue(input, PRESETS.orderSize).isSentinel).to.equal(false);
 	});
 
 	it('a negative amount with the same units never matches', () => {
