@@ -34,10 +34,10 @@ function deepFreeze<T>(value: T): T {
 const freeze = (o: FormatOptions): FormatOptions => deepFreeze(o);
 
 /**
- * `usdLegacy` reproduces today's truncate-toward-zero cent, which is what every
- * BigNum.toNotional call site renders. `usd` carries the same semantics but is
- * its own object, so flipping it to half-up leaves the deliberate legacy call
- * sites alone. `usdHalfUp` is the flip target.
+ * `usdLegacy` reproduces the truncate-toward-zero cent that every
+ * BigNum.toNotional call site used to render, for the sites that still need
+ * it. `usd` rounds half-up instead, and is its own object so callers pinned
+ * to the legacy shape are unaffected.
  */
 const usdLegacy = freeze({
 	style: 'currency' as const,
@@ -53,10 +53,11 @@ const usd = freeze({
 	digits: {
 		kind: 'decimals' as const,
 		decimals: 2,
-		rounding: 'truncate' as const,
+		rounding: 'half-up' as const,
 	},
 });
 
+/** @deprecated Use PRESETS.usd */
 const usdHalfUp = freeze({
 	style: 'currency' as const,
 	digits: {
@@ -76,6 +77,7 @@ const PRICE_DIGITS: DigitSpec = deepFreeze({
 export const PRESETS = Object.freeze({
 	usdLegacy,
 	usd,
+	/** @deprecated Use PRESETS.usd */
 	usdHalfUp,
 	usdSigned: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	usdCompact: freeze({
