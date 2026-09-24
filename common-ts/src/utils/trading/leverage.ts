@@ -1,5 +1,6 @@
 import { BN, MARGIN_PRECISION, User } from '@velocity-exchange/sdk';
 import { logger } from '../logger';
+import { exactLeverageFromMarginRatio } from './exactLeverage';
 
 const convertLeverageToMarginRatio = (leverage: number): number | undefined => {
 	if (!leverage) return undefined;
@@ -15,7 +16,11 @@ const convertMarginRatioToLeverage = (
 	const leverage = 1 / (marginRatio / MARGIN_PRECISION.toNumber());
 
 	return decimals
-		? parseFloat(leverage.toFixed(decimals))
+		? exactLeverageFromMarginRatio(
+				marginRatio,
+				decimals,
+				parseFloat(leverage.toFixed(decimals))
+			)
 		: Math.round(leverage);
 };
 
