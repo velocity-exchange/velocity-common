@@ -82,8 +82,7 @@ export const PRESETS = Object.freeze({
 	usdCompact: freeze({
 		...usd,
 		abbreviate: {
-			// The smallest amount usd's half-up cent shows as 10,000.00.
-			threshold: '9999.995',
+			threshold: '10000',
 			digits: {
 				kind: 'significant' as const,
 				significant: 3,

@@ -179,8 +179,14 @@ export function formatValue(
 
 	if (!small) {
 		const abbreviateOptions = options.abbreviate || undefined;
+		const keptAbbreviateDigits =
+			abbreviateOptions !== undefined &&
+			abbreviateOptions.fallThrough === false;
+		const spec = keptAbbreviateDigits
+			? (abbreviateOptions.digits ?? ABBREVIATE_FALLBACK)
+			: digits;
 		const abbreviated = abbreviateOptions
-			? abbreviateValue(working, abbreviateOptions, options.market)
+			? abbreviateValue(working, abbreviateOptions, options.market, spec)
 			: null;
 
 		if (abbreviated?.applied) {
@@ -201,12 +207,6 @@ export function formatValue(
 			trimTrailingZeros =
 				abbreviateOptions?.trimTrailingZeros ?? trimTrailingZeros;
 		} else {
-			const keptAbbreviateDigits =
-				abbreviateOptions !== undefined &&
-				abbreviateOptions.fallThrough === false;
-			const spec = keptAbbreviateDigits
-				? (abbreviateOptions.digits ?? ABBREVIATE_FALLBACK)
-				: digits;
 			const resolved = applyDigitSpec(working, spec, options.market);
 			if (resolved.status !== 'ok') {
 				return textResult(
