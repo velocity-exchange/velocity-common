@@ -81,7 +81,15 @@ export const PRESETS = Object.freeze({
 	usdSigned: freeze({ ...usd, signDisplay: 'exceptZero' as const }),
 	usdCompact: freeze({
 		...usd,
-		abbreviate: { threshold: '10000' },
+		abbreviate: {
+			// The smallest amount usd's half-up cent shows as 10,000.00.
+			threshold: '9999.995',
+			digits: {
+				kind: 'significant' as const,
+				significant: 3,
+				rounding: 'half-up' as const,
+			},
+		},
 	}),
 	/** Never show more liability than held, on BOTH signs. */
 	balance: freeze({

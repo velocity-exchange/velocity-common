@@ -28,6 +28,19 @@ const OLD_USD_COMPACT: FormatOptions = Object.freeze({
 	...OLD_USD,
 	abbreviate: Object.freeze({ threshold: '10000' }),
 });
+/**
+ * `usdCompact` as 0.11.0 shipped it: half-up below the threshold, a truncated
+ * mantissa above it, and the threshold checked against the raw value.
+ */
+const V0_11_USD_COMPACT: FormatOptions = Object.freeze({
+	style: 'currency' as const,
+	digits: Object.freeze({
+		kind: 'decimals' as const,
+		decimals: 2,
+		rounding: 'half-up' as const,
+	}),
+	abbreviate: Object.freeze({ threshold: '10000' }),
+});
 
 const CLASS_1 =
 	'1: a positive value with a dropped third digit of 5 or more rounds up';
@@ -41,6 +54,15 @@ const CLASS_6 =
 	'6: usdSigned/pnl print the rounded penny where they used to print a signed $0.00';
 const CLASS_7 =
 	'7: usdCompact checks its threshold against the raw value, so a carry past 10,000 prints in full instead of abbreviating';
+
+const COMPACT_CLASS_1 =
+	'compact 1: a positive abbreviated mantissa with a dropped digit of 5 or more rounds up';
+const COMPACT_CLASS_2 =
+	'compact 2: a negative abbreviated mantissa rounds away from zero at 5 or more';
+const COMPACT_CLASS_3 =
+	'compact 3: a mantissa that rounds up to 1000 moves to the next unit';
+const COMPACT_CLASS_4 =
+	'compact 4: the threshold is checked after the cent rounds, so 9,999.995 abbreviates';
 
 interface Case {
 	key: string;
@@ -340,10 +362,60 @@ function compactCorpus() {
 	const cases: CorpusCase[] = COMPACT_CASES.map((c) => ({
 		key: c.key,
 		legacy: () => formatText(c.key, OLD_USD_COMPACT),
-		next: () => formatText(c.key, PRESETS.usdCompact),
+		next: () => formatText(c.key, V0_11_USD_COMPACT),
 	}));
 	const divergences: Record<string, Divergence> = {};
 	for (const c of COMPACT_CASES) {
+		if (c.class) {
+			divergences[c.key] = { behaviour: c.class, old: c.old, next: c.next };
+		}
+	}
+	return { cases, divergences };
+}
+
+const COMPACT_HALF_UP_CASES: CompactCase[] = [
+	{ key: '0', old: '$0.00', next: '$0.00' },
+	{ key: '123.456', old: '$123.46', next: '$123.46' },
+	{ key: '-0.005', old: '-$0.01', next: '-$0.01' },
+	{ key: '9999', old: '$9,999.00', next: '$9,999.00' },
+	{ key: '9999.994', old: '$9,999.99', next: '$9,999.99' },
+	{ key: '9999.9949999', old: '$9,999.99', next: '$9,999.99' },
+	{ key: '-9999.9949999', old: '-$9,999.99', next: '-$9,999.99' },
+	{
+		key: '9999.995',
+		old: '$10,000.00',
+		next: '$10.0K',
+		class: COMPACT_CLASS_4,
+	},
+	{
+		key: '-9999.995',
+		old: '-$10,000.00',
+		next: '-$10.0K',
+		class: COMPACT_CLASS_4,
+	},
+	{ key: '10000', old: '$10.0K', next: '$10.0K' },
+	{ key: '10000.004', old: '$10.0K', next: '$10.0K' },
+	// A dropped 4 stays down under half-up, the same as under truncate.
+	{ key: '1234999', old: '$1.23M', next: '$1.23M' },
+	{ key: '-1234999', old: '-$1.23M', next: '-$1.23M' },
+	{ key: '1235000', old: '$1.23M', next: '$1.24M', class: COMPACT_CLASS_1 },
+	{ key: '-1235000', old: '-$1.23M', next: '-$1.24M', class: COMPACT_CLASS_2 },
+	{ key: '1234567.895', old: '$1.23M', next: '$1.23M' },
+	{ key: '4582930', old: '$4.58M', next: '$4.58M' },
+	{ key: '999499', old: '$999K', next: '$999K' },
+	{ key: '999995', old: '$999K', next: '$1.00M', class: COMPACT_CLASS_3 },
+	{ key: '999499999', old: '$999M', next: '$999M' },
+	{ key: '999995000', old: '$999M', next: '$1.00B', class: COMPACT_CLASS_3 },
+];
+
+function compactHalfUpCorpus() {
+	const cases: CorpusCase[] = COMPACT_HALF_UP_CASES.map((c) => ({
+		key: c.key,
+		legacy: () => formatText(c.key, V0_11_USD_COMPACT),
+		next: () => formatText(c.key, PRESETS.usdCompact),
+	}));
+	const divergences: Record<string, Divergence> = {};
+	for (const c of COMPACT_HALF_UP_CASES) {
 		if (c.class) {
 			divergences[c.key] = { behaviour: c.class, old: c.old, next: c.next };
 		}
@@ -361,6 +433,10 @@ describe('format/usdFlip', () => {
 		}
 		for (const c of COMPACT_CASES) {
 			expect(formatText(c.key, OLD_USD_COMPACT), c.key).to.equal(c.old);
+			expect(formatText(c.key, V0_11_USD_COMPACT), c.key).to.equal(c.next);
+		}
+		for (const c of COMPACT_HALF_UP_CASES) {
+			expect(formatText(c.key, V0_11_USD_COMPACT), c.key).to.equal(c.old);
 			expect(formatText(c.key, PRESETS.usdCompact), c.key).to.equal(c.next);
 		}
 	});
@@ -386,8 +462,13 @@ describe('format/usdFlip', () => {
 		runCorpus(cases, divergences);
 	});
 
-	it('usdCompact rounds half-up below its abbreviation threshold', () => {
+	it('0.11.0 usdCompact rounded half-up below its abbreviation threshold', () => {
 		const { cases, divergences } = compactCorpus();
+		runCorpus(cases, divergences);
+	});
+
+	it('usdCompact rounds its abbreviated amounts half-up', () => {
+		const { cases, divergences } = compactHalfUpCorpus();
 		runCorpus(cases, divergences);
 	});
 
