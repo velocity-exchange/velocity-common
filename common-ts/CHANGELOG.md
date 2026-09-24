@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.11.0...common-ts-v0.12.0) (2026-09-24)
+
+
+### Features
+
+* **common-ts:** round abbreviated usd amounts half-up ([#466](https://github.com/velocity-exchange/velocity-common/issues/466)) ([b03d988](https://github.com/velocity-exchange/velocity-common/commit/b03d9886a025079c7be64b09fd2be3f4df841e4c))
+
+
+### Bug Fixes
+
+* **common-ts:** check the abbreviation threshold after rounding ([#469](https://github.com/velocity-exchange/velocity-common/issues/469)) ([ef3ad3c](https://github.com/velocity-exchange/velocity-common/commit/ef3ad3c23c1f4a6e29665822e1280b451f0dcac9))
+* **common-ts:** show Entire Position for step-rounded max order sizes ([#467](https://github.com/velocity-exchange/velocity-common/issues/467)) ([16de1a5](https://github.com/velocity-exchange/velocity-common/commit/16de1a54b3136e524287d167cfe916580fe3a717))
+
 ## [0.11.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.3...common-ts-v0.11.0) (2026-09-24)
 
 
