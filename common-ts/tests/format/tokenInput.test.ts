@@ -52,6 +52,8 @@ const REALISTIC_AMOUNTS = [
 	'0.00000005',
 	'1.23456789e-10',
 	'1e5',
+	'1.23456780',
+	'1.50000000',
 ];
 
 /** Beyond typing prefixes: rejected shapes, non-finite/NaN, and precision-losing magnitudes. */
@@ -161,6 +163,18 @@ const DIVERGENCES: Record<string, Divergence> = {
 			'a non-finite value is rejected rather than displayed as the literal word',
 		old: 'Infinity',
 		next: UNCHANGED,
+	},
+	'1.23456780|6': {
+		behaviour:
+			'caps every excess fraction digit instead of slicing one trailing zero',
+		old: '1.2345678',
+		next: '1.234567',
+	},
+	'1.50000000|6': {
+		behaviour:
+			'caps every excess fraction digit instead of slicing one trailing zero',
+		old: '1.5000000',
+		next: '1.500000',
 	},
 };
 
