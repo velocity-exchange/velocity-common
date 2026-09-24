@@ -142,6 +142,43 @@ const guardCases: CorpusCase[] = [
 				} as SpotMarketAccount).maxLeverage
 			),
 	},
+	// At exactly full weight the spot branch returns the legacy value directly
+	// (Infinity) instead of dividing by zero.
+	{
+		key: 'getMaxLeverageForMarketAccount(spot, initialLiabilityWeight=10000)',
+		legacy: () => String(legacySpotMaxLeverage(10000)),
+		next: () =>
+			String(
+				getMaxLeverageForMarketAccount(MarketType.SPOT, {
+					initialLiabilityWeight: 10000,
+				} as SpotMarketAccount).maxLeverage
+			),
+	},
+	// Below full weight the spot branch also returns the legacy value directly
+	// (today's negative value) rather than the exact path.
+	{
+		key: 'getMaxLeverageForMarketAccount(spot, initialLiabilityWeight=9000)',
+		legacy: () => String(legacySpotMaxLeverage(9000)),
+		next: () =>
+			String(
+				getMaxLeverageForMarketAccount(MarketType.SPOT, {
+					initialLiabilityWeight: 9000,
+				} as SpotMarketAccount).maxLeverage
+			),
+	},
+	// No account at all falls back to initialLiabilityWeight=0, which is also
+	// at-or-below full weight.
+	{
+		key: 'getMaxLeverageForMarketAccount(spot, undefined account)',
+		legacy: () => String(legacySpotMaxLeverage(0)),
+		next: () =>
+			String(
+				getMaxLeverageForMarketAccount(
+					MarketType.SPOT,
+					undefined as unknown as SpotMarketAccount
+				).maxLeverage
+			),
+	},
 ];
 
 describe('exactLeverageFromMarginRatio', () => {
@@ -159,19 +196,6 @@ describe('exactLeverageFromMarginRatio', () => {
 
 	it('falls back to the legacy value instead of throwing outside a positive integer marginRatio and a non-negative integer decimals', () => {
 		runCorpus(guardCases, {});
-	});
-
-	it("never throws into the caller's try/catch, even for a corrupted (fractional) on-chain field", () => {
-		expect(() =>
-			getMaxLeverageForMarketAccount(MarketType.PERP, {
-				marginRatioInitial: 3333.5,
-			} as PerpMarketAccount)
-		).not.to.throw();
-		const { maxLeverage } = getMaxLeverageForMarketAccount(MarketType.PERP, {
-			marginRatioInitial: 3333.5,
-		} as PerpMarketAccount);
-		expect(maxLeverage).to.equal(legacyPerpMaxLeverage(3333.5));
-		expect(maxLeverage).to.not.equal(0);
 	});
 
 	it('falls back to MARGIN_PRECISION/DEFAULT_MAX_MARKET_LEVERAGE when marginRatioInitial is unset', () => {
