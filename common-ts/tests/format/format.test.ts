@@ -667,13 +667,12 @@ describe('format/small numbers', () => {
 });
 
 describe('format/presets', () => {
-	it('usd reproduces today truncate-at-the-cent semantics', () => {
-		expect(formatText('123.456789', PRESETS.usd)).to.equal('$123.45');
+	it('usd rounds half-up at the cent, usdLegacy still truncates', () => {
+		expect(formatText('123.456789', PRESETS.usd)).to.equal('$123.46');
 		expect(formatText('123.456789', PRESETS.usdHalfUp)).to.equal('$123.46');
 		expect(formatText('123.456789', PRESETS.usdLegacy)).to.equal('$123.45');
-		expect(formatText('-123.456789', PRESETS.usd)).to.equal(
-			formatText('-123.456789', PRESETS.usdLegacy)
-		);
+		expect(formatText('-123.456789', PRESETS.usd)).to.equal('-$123.46');
+		expect(formatText('-123.456789', PRESETS.usdLegacy)).to.equal('-$123.45');
 		expect(PRESETS.usd).to.not.equal(PRESETS.usdLegacy);
 	});
 

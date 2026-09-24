@@ -84,10 +84,10 @@ export class NumLib {
 		 * Formats a notional dollar value for UI. Goes to max. 2 decimals (accurate to 1 cent).
 		 * Rounds the cent, where `BigNum.toNotional` truncates it.
 		 *
-		 * @deprecated Use `formatText(num, PRESETS.usdHalfUp)` from
+		 * @deprecated Use `formatText(num, PRESETS.usd)` from
 		 * '@velocity-exchange/common/format'.
 		 */
-		toNotionalDisplay: (num: number) => formatText(num, PRESETS.usdHalfUp),
+		toNotionalDisplay: (num: number) => formatText(num, PRESETS.usd),
 		/**
 		 * Formats a notional dollar value. Goes to max. 2 decimals (accurate to 1 cent)
 		 * @param num
