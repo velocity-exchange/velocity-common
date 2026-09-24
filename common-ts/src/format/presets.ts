@@ -133,7 +133,7 @@ export const PRESETS = Object.freeze({
 	size: freeze({
 		digits: { kind: 'step' as const, rounding: 'truncate' as const },
 	}),
-	/** The bare prettyPrint() shape formatOrderSize renders today. Needs no market. */
+	/** Exact digits, trailing zeros trimmed, sentinel-aware. Needs no market. */
 	orderSize: freeze({
 		digits: { kind: 'exact' as const },
 		trimTrailingZeros: true,

@@ -98,8 +98,8 @@ export function snapValueToStep(
 /**
  * Exact multiple check, with no float tolerance anywhere: 5.1 is a multiple of
  * 0.1 because the decimal digits divide, not because a remainder came in under
- * an epsilon. Prefer this over the deprecated `numbersFitEvenly` and
- * `dividesExactly` in `utils/math/precision`.
+ * an epsilon. `dividesExactly` in `utils/math/precision` allows a float
+ * tolerance; this does not.
  *
  * Returns false when either side is missing or unparseable, and when the step
  * is zero or negative, matching `snapValueToStep`, which returns null for both.

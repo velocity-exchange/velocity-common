@@ -50,6 +50,7 @@ const REMOVED_NAMES = [
 	'roundToStepSizeIfLargeEnough',
 	'numbersFitEvenly',
 	'formatOrderSize',
+	'getSpotMarketSizes',
 ];
 
 const SUBPATHS: Record<string, object> = {
