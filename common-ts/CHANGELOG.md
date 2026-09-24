@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.12.0...common-ts-v0.13.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **common-ts:** removes millify (utils/millify.ts default export), trimTrailingZeros, getDecimalsFromSize, getBigNumRoundedToStepSize, truncateInputToPrecision, roundToStepSize, roundToStepSizeIfLargeEnough, numbersFitEvenly, formatOrderSize, NumLib.setLocale, the seven deprecated NumLib.formatNum members (toTradePrecision, toTradePrecisionString, toNotionalDisplay, toBaseDisplay, toDisplayPrice, toPrice, toDecimalPlaces), NumLib.millify, PRESETS.usdHalfUp and getSpotMarketSizes. Each has a documented replacement; see the PR body for the full table.
+
+### Features
+
+* **common-ts:** remove the deprecated number formatting shims ([#470](https://github.com/velocity-exchange/velocity-common/issues/470)) ([7b3c595](https://github.com/velocity-exchange/velocity-common/commit/7b3c5953e669ceea26c9fa91202cd3eca4b5070a))
+
+
+### Bug Fixes
+
+* **common-ts:** use the Entire Position sentinel rule in isEntirePositionOrder ([#471](https://github.com/velocity-exchange/velocity-common/issues/471)) ([54db67c](https://github.com/velocity-exchange/velocity-common/commit/54db67c2d5a75c7ad02a9405bcbac890a2acb133))
+
 ## [0.12.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.11.0...common-ts-v0.12.0) (2026-09-24)
 
 
