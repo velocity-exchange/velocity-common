@@ -10,6 +10,7 @@ import {
 	SpotMarketAccount,
 	ZERO,
 } from '@velocity-exchange/sdk';
+import { ENTIRE_POSITION } from '../../format/index';
 import { MarketId } from '../../types';
 
 const getMarketTickSize = (
@@ -81,30 +82,17 @@ const getMarketStepSizeDecimals = (
 };
 
 /**
- * Checks if a given order amount represents an entire position order
- * by comparing it with MAX_LEVERAGE_ORDER_SIZE
+ * Checks if a given order amount is the "Entire Position" sentinel, using the
+ * same fixed raw-units rule as `PRESETS.orderSize`.
  * @param orderAmount - The BigNum order amount to check
  * @returns true if the order is for the entire position, false otherwise
  */
-export const isEntirePositionOrder = (orderAmount: BigNum): boolean => {
-	const maxLeverageSize = new BigNum(
-		MAX_LEVERAGE_ORDER_SIZE,
-		orderAmount.precision
-	);
-
-	const isMaxLeverage = Math.abs(maxLeverageSize.sub(orderAmount).toNum()) < 1;
-
-	// Some order paths produce a truncated u64::MAX instead of MAX_LEVERAGE_ORDER_SIZE
-	const ALTERNATIVE_MAX_ORDER_SIZE = '18446744072000000000';
-	const alternativeMaxSize = new BigNum(
-		ALTERNATIVE_MAX_ORDER_SIZE,
-		orderAmount.precision
-	);
-	const isAlternativeMax =
-		Math.abs(alternativeMaxSize.sub(orderAmount).toNum()) < 1;
-
-	return isMaxLeverage || isAlternativeMax;
-};
+export const isEntirePositionOrder = (orderAmount: BigNum): boolean =>
+	ENTIRE_POSITION.matches({
+		units: orderAmount.val.abs().toString(),
+		scale: orderAmount.precision.toNumber(),
+		sign: orderAmount.eqZero() ? 0 : orderAmount.isNeg() ? -1 : 1,
+	});
 
 /**
  * Gets the MAX_LEVERAGE_ORDER_SIZE as a BigNum with the same precision as the given amount
