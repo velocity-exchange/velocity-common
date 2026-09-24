@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.3](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.2...common-ts-v0.10.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **common-ts:** cap token input digits without a float round trip ([#461](https://github.com/velocity-exchange/velocity-common/issues/461)) ([52677d3](https://github.com/velocity-exchange/velocity-common/commit/52677d3cb87d3c134cfb887209a892a18c406da5))
+* **common-ts:** derive max leverage from the margin ratio exactly ([#460](https://github.com/velocity-exchange/velocity-common/issues/460)) ([c1907b6](https://github.com/velocity-exchange/velocity-common/commit/c1907b6e75a87569994bbccb017b8f689644f35f))
+* **common-ts:** multiply market totals without a double ([#459](https://github.com/velocity-exchange/velocity-common/issues/459)) ([1d58c82](https://github.com/velocity-exchange/velocity-common/commit/1d58c82e43828c2c470ab80565b3db4a366176cc))
+* **common-ts:** read a spot market's step in its mint decimals ([#462](https://github.com/velocity-exchange/velocity-common/issues/462)) ([d2726bb](https://github.com/velocity-exchange/velocity-common/commit/d2726bb565df161523e130b510a53f6c38ff2c14))
+
 ## [0.10.2](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.1...common-ts-v0.10.2) (2026-09-21)
 
 
