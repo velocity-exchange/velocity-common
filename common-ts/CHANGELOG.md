@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.3...common-ts-v0.11.0) (2026-09-24)
+
+
+### Features
+
+* **common-ts:** round the usd presets half-up ([#464](https://github.com/velocity-exchange/velocity-common/issues/464)) ([6f6d081](https://github.com/velocity-exchange/velocity-common/commit/6f6d081dd92eae7a5c37588453a4de706b732dd5))
+
 ## [0.10.3](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.10.2...common-ts-v0.10.3) (2026-09-24)
 
 
