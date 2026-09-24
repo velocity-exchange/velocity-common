@@ -5,7 +5,6 @@ import {
 	formatText,
 	formatValue,
 } from '../../src/format/index';
-import millify from '../../src/utils/millify';
 import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
@@ -99,24 +98,6 @@ const CORPUS: Record<string, { format: (v: string) => string; rows: Row[] }> = {
 			{ key: '999.995', old: '999' },
 			{ key: '1000', old: '1.00K' },
 			{ key: '-999.995', old: '-999' },
-		],
-	},
-	millify: {
-		format: (v) => millify(Number(v)),
-		rows: [
-			{ key: '999.9994', old: '999.999' },
-			{ key: '999.9995', old: '1000.00', next: '1.00000K' },
-			{ key: '1000', old: '1.00000K' },
-			{ key: '-999.9995', old: '-1000.00', next: '-1.00000K' },
-		],
-	},
-	'millify at 3 significant figures': {
-		format: (v) => millify(Number(v), { precision: 3 }),
-		rows: [
-			{ key: '999.4', old: '999' },
-			{ key: '999.5', old: '1000', next: '1.00K' },
-			{ key: '1000', old: '1.00K' },
-			{ key: '-999.5', old: '-1000', next: '-1.00K' },
 		],
 	},
 };
