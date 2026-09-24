@@ -55,12 +55,14 @@ function passesThreshold(value: Decimal, options: AbbreviateOptions): boolean {
 
 /**
  * Rounds at abbreviate.digits, then re-derives the unit, so 999,999 at 3sf
- * half-up is 1.00M rather than 1000K.
+ * half-up is 1.00M rather than 1000K. `fullDigits` is the spec that would print
+ * the value unabbreviated: a value it rounds up to the threshold abbreviates.
  */
 export function abbreviateValue(
 	value: Decimal,
 	options: AbbreviateOptions,
-	market?: MarketPrecision
+	market?: MarketPrecision,
+	fullDigits?: DigitSpec
 ): AbbreviateResult {
 	const units = unitTable(options.units);
 	const maxIndex = units.length - 1;
@@ -77,19 +79,31 @@ export function abbreviateValue(
 		roundingApplied: null,
 	};
 
-	if (value.sign === 0 || !passesThreshold(value, options)) return notApplied;
+	if (value.sign === 0) return notApplied;
 
-	let index = Math.floor((integerDigitCount(abs(value)) - 1) / 3);
+	// Just under the threshold, abbreviate the rounded value the full form
+	// would print, so 999.995 at 2dp reads 1.00K rather than 1,000.00.
+	let source = value;
+	let full: ReturnType<typeof applyDigitSpec> | undefined;
+	if (!passesThreshold(value, options)) {
+		full = fullDigits && applyDigitSpec(value, fullDigits, market);
+		if (full?.status !== 'ok' || !passesThreshold(full.value, options)) {
+			return notApplied;
+		}
+		source = full.value;
+	}
+
+	let index = Math.floor((integerDigitCount(abs(source)) - 1) / 3);
 	if (index === 0) return notApplied;
 	if (index > maxIndex) {
 		if (options.overflow === 'full') return notApplied;
 		index = maxIndex;
 	}
 
-	let resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, market);
+	let resolved = applyDigitSpec(shiftPoint(source, -3 * index), digits, market);
 	if (resolved.integer.length > 3 && index < maxIndex) {
 		index += 1;
-		resolved = applyDigitSpec(shiftPoint(value, -3 * index), digits, market);
+		resolved = applyDigitSpec(shiftPoint(source, -3 * index), digits, market);
 	}
 	if (resolved.status !== 'ok') return notApplied;
 
@@ -100,7 +114,8 @@ export function abbreviateValue(
 		integer: resolved.integer,
 		fraction: resolved.fraction,
 		value: resolved.value,
-		wasRounded: resolved.wasRounded,
-		roundingApplied: resolved.roundingApplied,
+		wasRounded: resolved.wasRounded || !!full?.wasRounded,
+		// The full-digit rounding is what carried the value past the threshold.
+		roundingApplied: full?.roundingApplied ?? resolved.roundingApplied,
 	};
 }

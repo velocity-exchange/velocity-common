@@ -5,6 +5,7 @@ import {
 	optionsForLegacyType,
 } from '../../src/format/index';
 import { expect } from 'chai';
+import { abs, compare, toDecimal } from '../../src/format/core/index';
 import { CorpusCase, Divergence, runCorpus } from './divergence';
 
 /**
@@ -30,17 +31,30 @@ const OLD_USD_COMPACT: FormatOptions = Object.freeze({
 });
 /**
  * `usdCompact` as 0.11.0 shipped it: half-up below the threshold, a truncated
- * mantissa above it, and the threshold checked against the raw value.
+ * mantissa above it, and the threshold checked against the raw value. The
+ * engine now checks the rounded value, so the raw check is made here.
  */
-const V0_11_USD_COMPACT: FormatOptions = Object.freeze({
+const V0_11_USD = Object.freeze({
 	style: 'currency' as const,
 	digits: Object.freeze({
 		kind: 'decimals' as const,
 		decimals: 2,
 		rounding: 'half-up' as const,
 	}),
-	abbreviate: Object.freeze({ threshold: '10000' }),
 });
+const V0_11_ABBREVIATED: FormatOptions = Object.freeze({
+	...V0_11_USD,
+	abbreviate: Object.freeze({ threshold: 'always' as const }),
+});
+const V0_11_THRESHOLD = toDecimal('10000');
+const formatV011Compact = (v: string) => {
+	const parsed = toDecimal(v);
+	const abbreviated =
+		parsed.status === 'ok' &&
+		V0_11_THRESHOLD.status === 'ok' &&
+		compare(abs(parsed.value), V0_11_THRESHOLD.value) >= 0;
+	return formatText(v, abbreviated ? V0_11_ABBREVIATED : V0_11_USD);
+};
 
 const CLASS_1 =
 	'1: a positive value with a dropped third digit of 5 or more rounds up';
@@ -362,7 +376,7 @@ function compactCorpus() {
 	const cases: CorpusCase[] = COMPACT_CASES.map((c) => ({
 		key: c.key,
 		legacy: () => formatText(c.key, OLD_USD_COMPACT),
-		next: () => formatText(c.key, V0_11_USD_COMPACT),
+		next: () => formatV011Compact(c.key),
 	}));
 	const divergences: Record<string, Divergence> = {};
 	for (const c of COMPACT_CASES) {
@@ -411,7 +425,7 @@ const COMPACT_HALF_UP_CASES: CompactCase[] = [
 function compactHalfUpCorpus() {
 	const cases: CorpusCase[] = COMPACT_HALF_UP_CASES.map((c) => ({
 		key: c.key,
-		legacy: () => formatText(c.key, V0_11_USD_COMPACT),
+		legacy: () => formatV011Compact(c.key),
 		next: () => formatText(c.key, PRESETS.usdCompact),
 	}));
 	const divergences: Record<string, Divergence> = {};
@@ -433,10 +447,10 @@ describe('format/usdFlip', () => {
 		}
 		for (const c of COMPACT_CASES) {
 			expect(formatText(c.key, OLD_USD_COMPACT), c.key).to.equal(c.old);
-			expect(formatText(c.key, V0_11_USD_COMPACT), c.key).to.equal(c.next);
+			expect(formatV011Compact(c.key), c.key).to.equal(c.next);
 		}
 		for (const c of COMPACT_HALF_UP_CASES) {
-			expect(formatText(c.key, V0_11_USD_COMPACT), c.key).to.equal(c.old);
+			expect(formatV011Compact(c.key), c.key).to.equal(c.old);
 			expect(formatText(c.key, PRESETS.usdCompact), c.key).to.equal(c.next);
 		}
 	});
