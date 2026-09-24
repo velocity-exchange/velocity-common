@@ -62,52 +62,10 @@ const buildCases = (): CorpusCase[] => {
 	return cases;
 };
 
-// The old check compared the two amounts as doubles and accepted a difference
-// below 1, which is one whole PRINTED unit, so every near miss read as the
-// marker. The sentinel now matches the exact units and nothing else.
-const TOLERANCE =
-	'a value within one printed unit of the marker no longer reads as the marker';
-// The two markers are 1,709,551,615 raw units apart. Past precision 9 that gap
-// is under one printed unit, so a value offset from one marker could land
-// inside the old tolerance band of the other.
-const OVERLAP = 'an offset from one marker no longer reads as the other marker';
-
-const banded = (behaviour: string): Divergence => ({
-	behaviour,
-	old: 'true',
-	next: 'false',
-});
-
-const DIVERGENCES: Record<string, Divergence> = {
-	'u64Max +1 raw pos p6': banded(TOLERANCE),
-	'u64Max -1 raw pos p6': banded(TOLERANCE),
-	'u64Max +half printed pos p6': banded(TOLERANCE),
-	'u64Max -half printed pos p6': banded(TOLERANCE),
-	'u64Max +1 raw pos p9': banded(TOLERANCE),
-	'u64Max -1 raw pos p9': banded(TOLERANCE),
-	'u64Max +half printed pos p9': banded(TOLERANCE),
-	'u64Max -half printed pos p9': banded(TOLERANCE),
-	'u64Max -1 printed pos p9': banded(OVERLAP),
-	'truncated +1 raw pos p6': banded(TOLERANCE),
-	'truncated -1 raw pos p6': banded(TOLERANCE),
-	'truncated +half printed pos p6': banded(TOLERANCE),
-	'truncated -half printed pos p6': banded(TOLERANCE),
-	'truncated +1 raw pos p9': banded(TOLERANCE),
-	'truncated -1 raw pos p9': banded(TOLERANCE),
-	'truncated +half printed pos p9': banded(TOLERANCE),
-	'truncated -half printed pos p9': banded(TOLERANCE),
-	'truncated +1 printed pos p9': banded(OVERLAP),
-	'u64Max +1 raw pos p13': banded(TOLERANCE),
-	'u64Max -1 raw pos p13': banded(TOLERANCE),
-	'u64Max +half printed pos p13': banded(TOLERANCE),
-	'u64Max -half printed pos p13': banded(TOLERANCE),
-	'u64Max -1 printed pos p13': banded(OVERLAP),
-	'truncated +1 raw pos p13': banded(TOLERANCE),
-	'truncated -1 raw pos p13': banded(TOLERANCE),
-	'truncated +half printed pos p13': banded(TOLERANCE),
-	'truncated -half printed pos p13': banded(TOLERANCE),
-	'truncated +1 printed pos p13': banded(OVERLAP),
-};
+// ENTIRE_POSITION now uses the same tolerance and the same two markers as
+// isEntirePositionOrder, so the corpus is expected to agree everywhere. Any
+// key that shows up here is a real, reported disagreement, not an intended one.
+const DIVERGENCES: Record<string, Divergence> = {};
 
 describe('ENTIRE_POSITION matches the exact marker on a positive size', () => {
 	it('reproduces isEntirePositionOrder outside the annotated cases', () => {
@@ -123,5 +81,58 @@ describe('ENTIRE_POSITION matches the exact marker on a positive size', () => {
 		expect(formatText(amount(-1), PRESETS.orderSize)).to.equal(
 			'-18,446,744,073.709551615'
 		);
+	});
+});
+
+describe('ENTIRE_POSITION recognises the step-rounded u64::MAX', () => {
+	// standardize_base_asset_amount(u64::MAX, step) floors u64::MAX to a
+	// multiple of the market step, at BASE precision (9 decimals).
+	const rounded = (step: bigint) => {
+		const max = BigInt(MARKERS.u64Max);
+		return ((max / step) * step).toString();
+	};
+
+	const cases: [string, bigint][] = [
+		['1e6', BigInt(1_000_000)],
+		['1e7', BigInt(10_000_000)],
+		['1e9', BigInt(1_000_000_000)],
+	];
+
+	for (const [label, step] of cases) {
+		it(`step ${label}: orderSize and orderSizeStep both read Entire Position`, () => {
+			const input = { raw: { toString: () => rounded(step) }, scale: 9 };
+			expect(formatText(input, PRESETS.orderSize)).to.equal('Entire Position');
+			expect(formatText(input, PRESETS.orderSizeStep)).to.equal(
+				'Entire Position'
+			);
+		});
+	}
+
+	it('the two exact marker values still match', () => {
+		for (const units of Object.values(MARKERS)) {
+			const input = { raw: { toString: () => units }, scale: 9 };
+			expect(formatText(input, PRESETS.orderSize)).to.equal('Entire Position');
+		}
+	});
+
+	it('one whole unit below u64::MAX does not match', () => {
+		// At precision 6 the two markers (1,709,551,615 raw units apart) sit well
+		// outside each other's tolerance band, so this is an unambiguous miss. At
+		// precision 9 the same offset lands inside the truncated marker's own
+		// band instead, and the agreement corpus below covers that case.
+		const oneUnitBelow = (
+			BigInt(MARKERS.u64Max) -
+			BigInt(10) ** BigInt(6)
+		).toString();
+		const input = { raw: { toString: () => oneUnitBelow }, scale: 6 };
+		expect(formatValue(input, PRESETS.orderSize).isSentinel).to.equal(false);
+	});
+
+	it('a negative amount with the same units never matches', () => {
+		const input = {
+			raw: { toString: () => `-${MARKERS.u64Max}` },
+			scale: 9,
+		};
+		expect(formatValue(input, PRESETS.orderSize).isSentinel).to.equal(false);
 	});
 });

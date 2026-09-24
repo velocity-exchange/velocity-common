@@ -129,8 +129,6 @@ export const formatOrderSize = (
 	orderAmount: BigNum,
 	formatFn?: (amount: BigNum) => string
 ): string => {
-	// The sentinel in PRESETS.orderSize matches the marker units exactly, where
-	// this check also catches an amount a step size moved off them.
 	if (isEntirePositionOrder(orderAmount)) {
 		return 'Entire Position';
 	}
