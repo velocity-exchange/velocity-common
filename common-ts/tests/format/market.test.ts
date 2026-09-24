@@ -5,6 +5,7 @@ import {
 	BN,
 	PerpMarketAccount,
 	QUOTE_PRECISION_EXP,
+	SpotMarketAccount,
 } from '@velocity-exchange/sdk';
 import {
 	capStringFractionDigits,
@@ -70,6 +71,67 @@ describe('format/market precision', () => {
 		const precision = marketPrecisionFromAccount(account);
 		expect(precision.priceDecimals).to.equal(4);
 		expect(precision.sizeDecimals).to.equal(3);
+	});
+
+	it('perp output is unchanged over a sweep of tick/step sizes', () => {
+		for (const raw of [1, 10, 100, 1000, 10000, 100000, 1000000]) {
+			const account = {
+				orderTickSize: new BN(raw),
+				orderStepSize: new BN(raw),
+			} as PerpMarketAccount;
+			const precision = marketPrecisionFromAccount(account);
+			expect(precision.priceDecimals).to.equal(
+				marketPrecisionFromSizes({
+					tickSize: new BN(raw),
+					tickPrecisionExp: QUOTE_PRECISION_EXP,
+					stepSize: new BN(raw),
+					stepPrecisionExp: BASE_PRECISION_EXP,
+				}).priceDecimals
+			);
+			expect(precision.sizeDecimals).to.equal(
+				marketPrecisionFromSizes({
+					tickSize: new BN(raw),
+					tickPrecisionExp: QUOTE_PRECISION_EXP,
+					stepSize: new BN(raw),
+					stepPrecisionExp: BASE_PRECISION_EXP,
+				}).sizeDecimals
+			);
+		}
+	});
+
+	it('reads a spot market step in the mint decimals, not base precision', () => {
+		// USDT-like: 6 mint decimals.
+		const usdt = {
+			orderTickSize: new BN(100),
+			orderStepSize: new BN(1000),
+			decimals: 6,
+			mint: {},
+		} as unknown as SpotMarketAccount;
+		const usdtPrecision = marketPrecisionFromAccount(usdt);
+		expect(usdtPrecision.priceDecimals).to.equal(4);
+		expect(usdtPrecision.sizeDecimals).to.equal(3);
+
+		// wBTC/wETH/ZEC-like: 8 mint decimals.
+		const wbtc = {
+			orderTickSize: new BN(100),
+			orderStepSize: new BN(1000),
+			decimals: 8,
+			mint: {},
+		} as unknown as SpotMarketAccount;
+		const wbtcPrecision = marketPrecisionFromAccount(wbtc);
+		expect(wbtcPrecision.priceDecimals).to.equal(4);
+		expect(wbtcPrecision.sizeDecimals).to.equal(5);
+
+		// SOL-like: 9 mint decimals, same as base precision.
+		const sol = {
+			orderTickSize: new BN(100),
+			orderStepSize: new BN(1000000),
+			decimals: 9,
+			mint: {},
+		} as unknown as SpotMarketAccount;
+		const solPrecision = marketPrecisionFromAccount(sol);
+		expect(solPrecision.priceDecimals).to.equal(4);
+		expect(solPrecision.sizeDecimals).to.equal(3);
 	});
 
 	it('the price-magnitude heuristic survives as opt-in', () => {

@@ -66,10 +66,6 @@ const LOCALE_TAG = 'en-US';
  * non-negative integer, so an unset prop cannot uncap a field.
  *
  * `precisionExp` for `size` is only as good as the `MarketPrecision` handed in.
- * `marketPrecisionFromAccount` builds every step at base precision, which is
- * right for a perp market; a spot market documents `orderStepSize` in its own
- * decimals, so a spot field must supply a `MarketPrecision` built with the
- * account's native decimals.
  */
 export function inputFieldConfig(
 	kind: InputFieldKind,
