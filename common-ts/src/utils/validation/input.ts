@@ -1,4 +1,8 @@
 import { SpotMarketConfig } from '@velocity-exchange/sdk';
+import { formatText } from '../../format/formatValue';
+import { parseInput } from '../../format/input';
+import { capStringFractionDigits } from '../../format/market';
+import { PRESETS } from '../../format/presets';
 
 const formatTokenInputCurried =
 	(setAmount: (amount: string) => void, spotMarketConfig: SpotMarketConfig) =>
@@ -10,29 +14,22 @@ const formatTokenInputCurried =
 			return;
 		}
 
-		const lastChar = newAmount[newAmount.length - 1];
-
-		// if last char of string is a decimal point, don't format
-		if (lastChar === '.') {
+		// a valid number's in-progress trailing separator is kept as typed;
+		// isNaN above already rejected a bare or malformed one (e.g. '.', 'abc.')
+		if (newAmount[newAmount.length - 1] === '.') {
 			setAmount(newAmount);
 			return;
 		}
 
-		if (lastChar === '0') {
-			// if last char of string is a zero in the decimal places, cut it off if it exceeds precision
-			const numOfDigitsAfterDecimal = newAmount.split('.')[1]?.length ?? 0;
-			if (numOfDigitsAfterDecimal > spotMarketConfig.precisionExp.toNumber()) {
-				setAmount(newAmount.slice(0, -1));
-			} else {
-				setAmount(newAmount);
-			}
-			return;
-		}
+		const precisionExp = spotMarketConfig.precisionExp.toNumber();
+		if (parseInput(newAmount, precisionExp).status !== 'ok') return;
 
-		const formattedAmount = Number(
-			(+newAmount).toFixed(spotMarketConfig.precisionExp.toNumber())
+		// exponent notation collapses to plain digits here, so capping the
+		// fraction below never mistakes an exponent suffix for extra decimals.
+		const plain = formatText(newAmount, PRESETS.plain);
+		setAmount(
+			capStringFractionDigits(plain, { maxFractionDigits: precisionExp })
 		);
-		setAmount(formattedAmount.toString());
 	};
 
 export { formatTokenInputCurried };
