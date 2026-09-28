@@ -33,8 +33,8 @@ interface EditOrderParams {
 	newBaseAmount?: BN;
 	/** New limit price for the order */
 	newLimitPrice?: BN;
-	/** New oracle price offset for oracle market/limit orders */
-	newOraclePriceOffset?: number;
+	/** New oracle price offset for oracle limit orders, PRICE_PRECISION (1e6), signed */
+	newOraclePriceOffset?: BN;
 	/** New trigger price for conditional orders */
 	newTriggerPrice?: BN;
 	/** New trigger condition for conditional orders */

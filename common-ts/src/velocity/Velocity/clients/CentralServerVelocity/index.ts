@@ -1066,7 +1066,7 @@ export class CentralServerVelocity {
 			newDirection?: PositionDirection;
 			newBaseAmount?: BN;
 			newLimitPrice?: BN;
-			newOraclePriceOffset?: number;
+			newOraclePriceOffset?: BN;
 			newTriggerPrice?: BN;
 			newTriggerCondition?: OrderTriggerCondition;
 			auctionDuration?: number;
