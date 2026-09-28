@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.13.0...common-ts-v0.13.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **common-ts:** type newOraclePriceOffset as BN ([#473](https://github.com/velocity-exchange/velocity-common/issues/473)) ([d8738df](https://github.com/velocity-exchange/velocity-common/commit/d8738df9e6ecbd6d9e1d2f295705ef6dc0001367))
+
 ## [0.13.0](https://github.com/velocity-exchange/velocity-common/compare/common-ts-v0.12.0...common-ts-v0.13.0) (2026-09-24)
 
 
