@@ -468,8 +468,7 @@ export class VelocityOperations {
 						bracketOrders,
 						dlobServerHttpUrl: this.dlobServerHttpUrl,
 						marketIndex: params.marketIndex,
-						optionalAuctionParamsInputs:
-							params.orderConfig.optionalAuctionParamsInputs,
+						quoteInputs: params.orderConfig.quoteInputs,
 						builderParams: params.builderParams,
 						positionMaxLeverage: params.positionMaxLeverage,
 						marginMode: params.marginMode,
@@ -488,8 +487,7 @@ export class VelocityOperations {
 						direction: params.direction,
 						amount: amountBN,
 						bracketOrders,
-						optionalAuctionParamsInputs:
-							params.orderConfig.optionalAuctionParamsInputs,
+						quoteInputs: params.orderConfig.quoteInputs,
 						dlobServerHttpUrl: this.dlobServerHttpUrl,
 						useSwift: false,
 						positionMaxLeverage: params.positionMaxLeverage,
@@ -589,29 +587,6 @@ export class VelocityOperations {
 						orderType: params.orderConfig.orderType,
 						triggerPrice: params.orderConfig.triggerPrice.val,
 						limitPrice: params.orderConfig.limitPrice?.val ?? ZERO,
-					},
-					reduceOnly: params.reduceOnly,
-					useSwift: false,
-					txParams: this.getTxParams(),
-					positionMaxLeverage: params.positionMaxLeverage,
-				});
-
-				const { txSig } = await this.velocityClient.sendTransaction(txn);
-
-				return txSig;
-			}
-			case 'oracleLimit': {
-				const txn = await createOpenPerpNonMarketOrder({
-					velocityClient: this.velocityClient,
-					user,
-					slotDuration: params.slotDuration,
-					direction: params.direction,
-					marketIndex: params.marketIndex,
-					amount: amountBN,
-					assetType: params.assetType,
-					orderConfig: {
-						orderType: 'oracleLimit',
-						oraclePriceOffset: params.orderConfig.oraclePriceOffset.val,
 					},
 					reduceOnly: params.reduceOnly,
 					useSwift: false,

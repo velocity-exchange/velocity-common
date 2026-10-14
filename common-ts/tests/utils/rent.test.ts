@@ -18,7 +18,7 @@ describe('rent', () => {
 		expect(signedMsgUserOrdersSpace(8)).to.equal(268);
 		expect(signedMsgUserOrdersSpace(16)).to.equal(460);
 		expect(SWIFT_ACCOUNT_SIZE).to.equal(268);
-		expect(USER_ACCOUNT_SIZE).to.equal(4496);
+		expect(USER_ACCOUNT_SIZE).to.equal(4560);
 	});
 
 	it('fetchAccountCreationRent requests the right sizes and sums donation', async () => {

@@ -1,4 +1,9 @@
-import { VelocityClient, User } from '@velocity-exchange/sdk';
+import {
+	CancelOrderV1Params,
+	CancelSidesV0,
+	User,
+	VelocityClient,
+} from '@velocity-exchange/sdk';
 import {
 	Transaction,
 	TransactionInstruction,
@@ -73,5 +78,56 @@ export const createCancelOrdersTxn = async (
 	return params.velocityClient.buildTransaction(
 		await createCancelOrdersIx(params),
 		params.txParams
+	);
+};
+
+interface CreateCancelClobOrderIxParams {
+	velocityClient: VelocityClient;
+	user: User;
+	order: CancelOrderV1Params;
+	/** The feed's `takerOrigin` flag. A taker remainder releases its signed-message entry. */
+	takerOrigin: boolean;
+	mainSignerOverride?: PublicKey;
+}
+
+/**
+ * Cancels one resting book order. A book order has no `User.orders` slot, so it cancels by the
+ * `orderRef` the feed carries. The book refuses a stale ref, so a fill that moved the order fails
+ * the cancel instead of hitting another order.
+ */
+export const createCancelClobOrderIx = async (
+	params: CreateCancelClobOrderIxParams
+): Promise<TransactionInstruction> => {
+	const { velocityClient, user, order, takerOrigin, mainSignerOverride } =
+		params;
+
+	return velocityClient.getCancelOrderV1Ix(
+		order,
+		user.getUserAccountOrThrow().subAccountId,
+		takerOrigin,
+		{ authority: mainSignerOverride }
+	);
+};
+
+interface CreateCancelAllClobOrdersIxParams {
+	velocityClient: VelocityClient;
+	user: User;
+	marketIndex: number;
+	mainSignerOverride?: PublicKey;
+}
+
+/**
+ * Sweeps both sides of one market's book. One call removes a capped number of orders and leaves
+ * taker remainders, so the caller repeats it while the feed still shows orders.
+ */
+export const createCancelAllClobOrdersIx = async (
+	params: CreateCancelAllClobOrdersIxParams
+): Promise<TransactionInstruction> => {
+	const { velocityClient, user, marketIndex, mainSignerOverride } = params;
+
+	return velocityClient.getCancelOrdersV1Ix(
+		{ marketIndex, sides: CancelSidesV0.BOTH },
+		user.getUserAccountOrThrow().subAccountId,
+		{ authority: mainSignerOverride }
 	);
 };

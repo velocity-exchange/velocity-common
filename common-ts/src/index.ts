@@ -21,7 +21,11 @@ export * from './utils/NumLib';
 export * from './utils/s3Buckets';
 export * from './utils/insuranceFund';
 export * from './utils/settings/settings';
-export { getSwiftConfirmationTimeoutMs } from './utils/signedMsgs';
+export {
+	getSwiftConfirmationDeadlineMs,
+	getSwiftConfirmationTimeoutMs,
+	getSwiftPlacementDeadlineMs,
+} from './utils/signedMsgs';
 export { ResultSlotIncrementer } from './utils/ResultSlotIncrementer';
 export { MultiplexWebSocket } from './utils/MultiplexWebSocket';
 

@@ -6,8 +6,6 @@ import {
 	RevenueShareEscrowAccount,
 } from '@velocity-exchange/sdk';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
-import { OptionalAuctionParamsRequestInputs } from './dlobServer';
-import { AuctionParamsFetchedCallback } from '../../../../utils/auctionParamsResponseMapper';
 
 export type TxnOrSwiftResult<T extends boolean> = T extends true
 	? void
@@ -33,41 +31,14 @@ export interface IsolatedPositionDepositsOverride {
 	additionalDeposits?: AdditionalIsolatedPositionDeposit[];
 }
 
-export type PlaceAndTakeParams =
-	| {
-			enable: false;
-	  }
-	| {
-			enable: true;
-			auctionDurationPercentage?: number;
-			/**
-			 * Optional override for the taker's decoded RevenueShareEscrow account.
-			 * When omitted, it is fetched automatically for referred takers (whose escrow
-			 * carries a referrer) so the program's fill-time enforcement can load it.
-			 * Supply it to skip the fetch when the escrow is already cached.
-			 */
-			takerEscrow?: RevenueShareEscrowAccount;
-	  };
+/**
+ * The taker's decoded RevenueShareEscrow. A take fetches it for a referred taker when it is
+ * omitted, so passing it only skips that fetch.
+ */
+export type TakerEscrowOverride = RevenueShareEscrowAccount;
 
-export type NonMarketOrderType =
-	| 'limit'
-	| 'takeProfit'
-	| 'stopLoss'
-	| 'oracleLimit';
-
-export interface LimitAuctionConfig {
-	enable: boolean;
-	dlobServerHttpUrl: string;
-	auctionStartPriceOffset: number;
-	oraclePrice?: BN; // used to calculate oracle price bands
-	optionalLimitAuctionParams?: OptionalAuctionParamsRequestInputs;
-	usePlaceAndTake?: {
-		enable: boolean;
-		takerEscrow?: RevenueShareEscrowAccount; // optional override; auto-fetched for referred takers
-		auctionDurationPercentage?: number;
-	};
-	onAuctionParamsFetched?: AuctionParamsFetchedCallback;
-}
+/** An oracle-offset limit is gone: the program refuses it, because it has no fixed price to rest at. */
+export type NonMarketOrderType = 'limit' | 'takeProfit' | 'stopLoss';
 
 export type BuilderParams = {
 	builderIdx: number;
@@ -89,21 +60,20 @@ export interface LimitOrderParamsOrderConfig {
 		stopLoss?: OptionalTriggerOrderParams;
 	};
 	/**
-	 * Limit orders can have an optional auction that allows it to go through the auction process.
-	 * Usually, the auction params are set up to the limit price, to allow for a possible improved
-	 * fill price. This is useful for when a limit order is crossing the orderbook.
+	 * The caller judged that the limit crosses the book. A limit that is not post-only then
+	 * takes, with the limit as its worst price, and its remainder rests. Otherwise it rests
+	 * as a maker order.
 	 */
-	limitAuction?: LimitAuctionConfig;
+	marketable?: boolean;
+	takerEscrow?: TakerEscrowOverride;
+	/**
+	 * Unix seconds after which the order expires, on the chain's clock. A relay crank removes
+	 * an expired order from the book. Absent means the order never expires.
+	 */
+	maxTs?: BN;
 }
 
-export interface OracleLimitOrderParamsOrderConfig {
-	orderType: Extract<NonMarketOrderType, 'oracleLimit'>;
-	oraclePriceOffset: BN;
-}
-
-export type SwiftLimitOrderParamsOrderConfig =
-	| LimitOrderParamsOrderConfig
-	| OracleLimitOrderParamsOrderConfig;
+export type SwiftLimitOrderParamsOrderConfig = LimitOrderParamsOrderConfig;
 
 export interface NonMarketOrderParamsConfig {
 	marketIndex: number;
@@ -126,9 +96,5 @@ export interface NonMarketOrderParamsConfig {
 				orderType: Extract<NonMarketOrderType, 'takeProfit' | 'stopLoss'>;
 				triggerPrice: BN;
 				limitPrice?: BN;
-		  }
-		| {
-				orderType: Extract<NonMarketOrderType, 'oracleLimit'>;
-				oraclePriceOffset: BN;
 		  };
 }

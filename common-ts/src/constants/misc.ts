@@ -8,12 +8,12 @@ export const NEW_ACCOUNT_DONATION = BigNum.fromPrint('0.0001', LAMPORTS_EXP);
 /**
  * @deprecated Fallback for SSR / before RPC-derived rent is loaded.
  *
- * Rent-exempt minimum for a `User::SIZE` (4496-byte) account:
- * `(128 + 4496) * 3480 * 2`. Assumes a historical rent schedule (e.g.
+ * Rent-exempt minimum for a `User::SIZE` (4560-byte) account:
+ * `(128 + 4560) * 3480 * 2`. Assumes a historical rent schedule (e.g.
  * pre-SIMD-0437 gate 1). Prefer deriving the live minimum via
  * `fetchAccountCreationRent`.
  */
-export const NEW_ACCOUNT_BASE_RENT = new BigNum('32183040', LAMPORTS_EXP);
+export const NEW_ACCOUNT_BASE_RENT = new BigNum('32628480', LAMPORTS_EXP);
 
 /**
  * @deprecated Fallback for SSR / before RPC-derived rent is loaded.

@@ -1,96 +1,58 @@
 import {
-	VelocityClient,
-	User,
 	BN,
-	PositionDirection,
 	OptionalOrderParams,
+	OrderType,
 	MarketType,
-	UserAccount,
-	PublicKey,
-	decodeUser,
-	DefaultOrderParams,
-	BASE_PRECISION,
-	L2OrderBook,
-	MMOraclePriceData,
-	getVammL2Generator,
-	createL2Levels,
-	DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
-	MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS,
-	SlotDurationMs,
+	PositionDirection,
 } from '@velocity-exchange/sdk';
-import { ENUM_UTILS } from '../../../../../../utils';
-import { calculateSpreadBidAskMark } from '../../../../../../utils/math';
-import {
-	mapAuctionParamsResponse,
-	mapAuctionParamsResponseMeta,
-	ServerAuctionParamsResponse,
-	MappedAuctionParams,
-	MappedPriceImpact,
-	AuctionOrderParamsMeta,
-	FetchAuctionOrderParamsResult,
-	AuctionParamsFetchedCallback,
-} from '../../../../../utils/auctionParamsResponseMapper';
 import { encodeQueryParams } from '../../../../../../utils/core/fetch';
-import { MarketId, TradeOffsetPrice } from '../../../../../../types';
-import {
-	convertToL2OrderBook,
-	deserializeL2Response,
-	calculateDynamicSlippageFromL2,
-	DynamicSlippageConfig,
-} from '../../../../../../utils/orderbook';
+import { MarketId } from '../../../../../../types';
+import { deserializeL2Response } from '../../../../../../utils/orderbook';
 import {
 	L2WithOracleAndMarketData,
 	RawL2Output,
 } from '../../../../../../utils/orderbook/types';
 import { PollingSequenceGuard } from '../../../../../../utils/pollingSequenceGuard';
-import { calculatePriceImpactFromL2 } from '../../../../../../utils/priceImpact';
-import {
-	getPriceObject,
-	deriveMarketOrderParams,
-} from '../../../../../../utils/trading/auction';
-import { getDefaultMarketAuctionDurationSlots } from '../../../../constants/auction';
-import invariant from 'tiny-invariant';
-import { logger } from '../../../../../../utils/logger';
 
-export interface OptionalAuctionParamsRequestInputs {
-	// Optional parameters that can override defaults or provide additional configuration
+/** What the slippage tolerance is measured from. `best` is the best price on the order's side. */
+export type MarketOrderPriceReference = 'best' | 'mark' | 'oracle' | 'entry';
+
+export interface MarketOrderQuoteInputs {
+	/** Percent. Omit it and the server picks one that covers the book walk's worst price. */
+	slippageTolerance?: number;
+	priceReference?: MarketOrderPriceReference;
+	/** Price the order as an offset from the oracle. The worst price is then `oraclePriceOffset`. */
+	isOracleOrder?: boolean;
 	maxLeverageSelected?: boolean;
 	maxLeverageOrderSize?: BN;
-	auctionDuration?: number;
-	auctionStartPriceOffset?: number;
-	auctionEndPriceOffset?: number;
-	auctionStartPriceOffsetFrom?: TradeOffsetPrice;
-	auctionEndPriceOffsetFrom?: TradeOffsetPrice;
-	slippageTolerance?: number | 'dynamic';
-	isOracleOrder?: boolean;
-	additionalEndPriceBuffer?: BN;
-	forceUpToSlippage?: boolean;
-	/**
-	 * Auction params API version, forwarded to the dlob-server's /auctionParams endpoint as `version`
-	 */
-	version?: number;
 }
 
-interface RegularOrderParams {
-	velocityClient: VelocityClient;
-	user: User;
-	assetType: 'base' | 'quote';
-	marketType: MarketType;
+export interface MarketOrderQuoteRequest {
+	dlobServerHttpUrl: string;
 	marketIndex: number;
 	direction: PositionDirection;
+	/** BASE_PRECISION for `assetType: 'base'`, QUOTE_PRECISION for `'quote'`. */
 	amount: BN;
-	dlobServerHttpUrl: string;
-	/** Live slot duration, resolved by the caller from `State` */
-	slotDuration: SlotDurationMs;
+	assetType: 'base' | 'quote';
 	reduceOnly?: boolean;
-	optionalAuctionParamsInputs?: OptionalAuctionParamsRequestInputs;
-	dynamicSlippageConfig?: DynamicSlippageConfig;
-	onAuctionParamsFetched?: AuctionParamsFetchedCallback;
-	/**
-	 * Skips the /auctionParams endpoint tier and derives params from L2 data directly.
-	 * Wired from the UI's FORCE_ORDER_PARAMS_FALLBACK feature flag.
-	 */
-	forceFallback?: boolean;
+	userOrderId?: number;
+	inputs?: MarketOrderQuoteInputs;
+}
+
+/** All prices are PRICE_PRECISION. */
+export interface MarketOrderQuote {
+	/** `price` is the worst price, and the server leaves `activationDelaySlots` at the book default. */
+	orderParams: OptionalOrderParams;
+	entryPrice: BN;
+	bestPrice: BN;
+	worstPrice: BN;
+	oraclePrice: BN;
+	markPrice: BN;
+	/** A fraction, so 0.01 is one percent. */
+	priceImpact: number;
+	/** Percent. The tolerance the worst price was built from. */
+	slippageTolerance: number;
+	generatedAt: number;
 }
 
 export interface BulkL2FetchingQueryParams {
@@ -201,475 +163,80 @@ export function fetchBulkMarketsDlobL2Data(
 	});
 }
 
-export async function fetchAuctionOrderParams(
-	params: RegularOrderParams
-): Promise<FetchAuctionOrderParamsResult> {
-	if (params.forceFallback) {
-		try {
-			return await fetchAuctionOrderParamsFromL2(params);
-		} catch (error) {
-			logger.error(error);
-			if (!ENUM_UTILS.match(params.marketType, MarketType.PERP)) {
-				throw error;
-			}
-			return await deriveAuctionParamsFromVamm(params);
-		}
-	}
-
-	try {
-		return await fetchAuctionOrderParamsFromDlob(params);
-	} catch (error) {
-		logger.error(error);
-		logger.debug('Falling back to L2 data');
-		try {
-			return await fetchAuctionOrderParamsFromL2(params);
-		} catch (l2Error) {
-			logger.error(l2Error);
-			if (!ENUM_UTILS.match(params.marketType, MarketType.PERP)) {
-				throw l2Error;
-			}
-			logger.debug('Falling back to on-chain vAMM data');
-			return await deriveAuctionParamsFromVamm(params);
-		}
-	}
-}
-
-const calcBaseFromQuote = (
-	velocityClient: VelocityClient,
-	marketIndex: number,
-	amount: BN
-) => {
-	const oraclePrice =
-		velocityClient.getOracleDataForPerpMarket(marketIndex).price;
-	return amount.mul(BASE_PRECISION).div(oraclePrice);
-};
-
 /**
- * Fetches auction order parameters from the auction params endpoint
+ * Quote a perp market order from the dlob-server. The quote is a worst price and the
+ * book walk's estimates. There is no auction to derive, and no local fallback: the
+ * published book already includes the vAMM.
  */
-export async function fetchAuctionOrderParamsFromDlob({
-	marketIndex,
-	marketType,
-	direction,
-	amount,
-	dlobServerHttpUrl,
-	assetType,
-	velocityClient,
-	reduceOnly,
-	optionalAuctionParamsInputs = {},
-	onAuctionParamsFetched,
-}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
-	const baseAmount =
-		assetType === 'base'
-			? amount
-			: calcBaseFromQuote(velocityClient, marketIndex, amount);
-
-	// Build URL parameters for server request
-	const urlParamsObject: Record<string, string> = {
-		// Required fields
-		assetType: 'base',
-		marketType: ENUM_UTILS.toStr(marketType),
-		marketIndex: marketIndex.toString(),
-		direction: ENUM_UTILS.toStr(direction),
-		amount: baseAmount.toString(),
-		reduceOnly: reduceOnly ? 'true' : 'false',
-	};
-
-	// Add defined optional parameters
-	Object.entries(optionalAuctionParamsInputs).forEach(([key, value]) => {
-		if (value !== undefined) {
-			urlParamsObject[key] = value.toString();
-		}
+export async function fetchMarketOrderParams(
+	request: MarketOrderQuoteRequest
+): Promise<MarketOrderQuote> {
+	const { inputs = {} } = request;
+	const query = encodeQueryParams({
+		marketIndex: request.marketIndex.toString(),
+		direction: isLong(request.direction) ? 'long' : 'short',
+		amount: request.amount.toString(),
+		assetType: request.assetType,
+		reduceOnly: request.reduceOnly ? 'true' : undefined,
+		userOrderId: request.userOrderId?.toString(),
+		slippageTolerance: inputs.slippageTolerance?.toString(),
+		priceReference: inputs.priceReference,
+		isOracleOrder: inputs.isOracleOrder ? 'true' : undefined,
+		maxLeverageSelected: inputs.maxLeverageSelected ? 'true' : undefined,
+		maxLeverageOrderSize: inputs.maxLeverageOrderSize?.toString(),
 	});
 
-	const urlParams = encodeQueryParams(urlParamsObject);
-
-	// Get order params from server
-	const requestUrl = `${dlobServerHttpUrl}/auctionParams?${urlParams.toString()}`;
-	const serverResponse = await fetchDlobWithTimeout(
-		requestUrl,
-		async (response): Promise<ServerAuctionParamsResponse> => {
+	const body = await fetchDlobWithTimeout(
+		`${request.dlobServerHttpUrl}/marketOrderParams?${query}`,
+		async (response) => {
 			if (!response.ok) {
 				throw new Error(
-					`Server responded with ${response.status}: ${response.statusText}`
+					`marketOrderParams responded ${response.status}: ${await response.text()}`
 				);
 			}
 
-			return await response.json();
+			return (await response.json()).data;
 		}
 	);
-	const serverAuctionParams = serverResponse?.data?.params;
-	invariant(serverAuctionParams, 'Server auction params are required');
 
-	const mappedParams: MappedAuctionParams =
-		mapAuctionParamsResponse(serverAuctionParams);
-
-	// Convert MappedAuctionParams to OptionalOrderParams
-	const orderParams: OptionalOrderParams = {
-		orderType: mappedParams.orderType,
-		marketType: mappedParams.marketType,
-		userOrderId: mappedParams.userOrderId,
-		direction: mappedParams.direction,
-		baseAssetAmount: mappedParams.baseAssetAmount,
-		marketIndex: mappedParams.marketIndex,
-		reduceOnly: mappedParams.reduceOnly,
-		postOnly: mappedParams.postOnly ?? DefaultOrderParams.postOnly,
-		triggerPrice: mappedParams.triggerPrice || null,
-		triggerCondition:
-			mappedParams.triggerCondition ?? DefaultOrderParams.triggerCondition,
-		oraclePriceOffset: mappedParams.oraclePriceOffset || null,
-		auctionDuration: mappedParams.auctionDuration || null,
-		maxTs: mappedParams.maxTs,
-		auctionStartPrice: mappedParams.auctionStartPrice || null,
-		auctionEndPrice: mappedParams.auctionEndPrice || null,
-		// no price, because market orders don't need a price
-	};
-
-	const meta: AuctionOrderParamsMeta = {
-		source: 'endpoint',
-		...mapAuctionParamsResponseMeta(serverResponse.data),
-	};
-
-	const result: FetchAuctionOrderParamsResult = { orderParams, meta };
-
-	onAuctionParamsFetched?.(
-		new URLSearchParams(urlParamsObject),
-		serverResponse,
-		result
-	);
-
-	return result;
+	return deserializeMarketOrderQuote(body);
 }
 
-const DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS = 100;
-
-/**
- * Fetches auction order parameters from the L2 data
- */
-export async function fetchAuctionOrderParamsFromL2({
-	dlobServerHttpUrl,
-	marketIndex,
-	marketType,
-	direction,
-	assetType,
-	amount,
-	reduceOnly,
-	optionalAuctionParamsInputs = {},
-	velocityClient,
-	dynamicSlippageConfig,
-	slotDuration,
-}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
-	const marketId = new MarketId(marketIndex, marketType);
-	const baseAmount =
-		assetType === 'base'
-			? amount
-			: calcBaseFromQuote(velocityClient, marketIndex, amount);
-
-	const l2DataResponse = await fetchBulkMarketsDlobL2Data(dlobServerHttpUrl, [
-		{
-			marketId,
-			depth: DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS,
-		},
-	]);
-	const oraclePriceData = l2DataResponse[0].oracleData;
-	const oraclePriceBn = oraclePriceData?.price;
-	const markPriceBn = l2DataResponse[0].markPrice;
-	const l2Data = convertToL2OrderBook(l2DataResponse);
-
-	return deriveFromL2Inputs({
-		l2Data,
-		oraclePrice: oraclePriceBn,
-		markPrice: markPriceBn,
-		marketId,
-		marketType,
-		marketIndex,
-		direction,
-		baseAmount,
-		reduceOnly,
-		optionalAuctionParamsInputs,
-		dynamicSlippageConfig,
-		slotDuration,
-		source: 'l2',
-	});
+function isLong(direction: PositionDirection): boolean {
+	return 'long' in direction;
 }
 
-/**
- * Derives auction order params from L2 data, oracle price, and mark price. Shared by
- * the network L2 tier (`fetchAuctionOrderParamsFromL2`) and the network-free vAMM
- * fallback tier so both code paths cannot drift from each other.
- */
-export function deriveFromL2Inputs({
-	l2Data,
-	oraclePrice,
-	markPrice,
-	marketId,
-	marketType,
-	marketIndex,
-	direction,
-	baseAmount,
-	reduceOnly,
-	optionalAuctionParamsInputs,
-	dynamicSlippageConfig,
-	slotDuration,
-	source,
-}: {
-	l2Data: L2OrderBook;
-	oraclePrice: BN;
-	markPrice: BN;
-	marketId: MarketId;
-	marketType: MarketType;
-	marketIndex: number;
-	direction: PositionDirection;
-	baseAmount: BN;
-	reduceOnly?: boolean;
-	optionalAuctionParamsInputs: OptionalAuctionParamsRequestInputs;
-	dynamicSlippageConfig?: DynamicSlippageConfig;
-	slotDuration: SlotDurationMs;
-	source: AuctionOrderParamsMeta['source'];
-}): FetchAuctionOrderParamsResult {
-	const priceImpactData = calculatePriceImpactFromL2(
-		marketId,
-		direction,
-		baseAmount,
-		l2Data,
-		oraclePrice
-	);
+const bnOrNull = (value: string | null | undefined) =>
+	value === null || value === undefined ? null : new BN(value);
 
-	const startPrices = getPriceObject({
-		oraclePrice,
-		bestOffer: priceImpactData.bestPrice,
-		entryPrice: priceImpactData.entryPrice,
-		worstPrice: priceImpactData.worstPrice,
-		markPrice,
-		direction,
-	});
-
-	const slippageToleranceInput = optionalAuctionParamsInputs.slippageTolerance;
-	const derivedSlippage =
-		slippageToleranceInput === 'dynamic'
-			? calculateDynamicSlippageFromL2({
-					l2Data,
-					marketId,
-					startPrice:
-						startPrices[
-							optionalAuctionParamsInputs.auctionStartPriceOffsetFrom as keyof typeof startPrices
-						],
-					worstPrice: priceImpactData.worstPrice,
-					oraclePrice,
-					dynamicSlippageConfig,
-				})
-			: typeof slippageToleranceInput === 'number'
-				? slippageToleranceInput
-				: 0.005;
-
-	const auctionOrderParams = deriveMarketOrderParams({
-		marketType,
-		marketIndex,
-		direction,
-		maxLeverageSelected:
-			optionalAuctionParamsInputs.maxLeverageSelected ?? false,
-		maxLeverageOrderSize:
-			optionalAuctionParamsInputs.maxLeverageOrderSize ?? new BN(0),
-		baseAmount,
-		reduceOnly: reduceOnly ?? false,
-		allowInfSlippage: false,
-		oraclePrice,
-		bestPrice: priceImpactData.bestPrice,
-		entryPrice: priceImpactData.entryPrice,
-		worstPrice: priceImpactData.worstPrice,
-		markPrice,
-		// Fall back to the default market auction duration when the caller omits it
-		// (the UI relies on the DLOB server to supply it). A null/0 duration on a
-		// signed-message order is rejected by the swift server as InvalidOrderAuction.
-		auctionDuration:
-			optionalAuctionParamsInputs.auctionDuration ??
-			getDefaultMarketAuctionDurationSlots(slotDuration),
-		auctionStartPriceOffset:
-			optionalAuctionParamsInputs.auctionStartPriceOffset ?? 0,
-		auctionEndPriceOffset:
-			optionalAuctionParamsInputs.auctionEndPriceOffset ?? 0,
-		auctionStartPriceOffsetFrom:
-			optionalAuctionParamsInputs.auctionStartPriceOffsetFrom ?? 'oracle',
-		auctionEndPriceOffsetFrom:
-			optionalAuctionParamsInputs.auctionEndPriceOffsetFrom ?? 'worst',
-		slippageTolerance: derivedSlippage,
-		isOracleOrder: optionalAuctionParamsInputs.isOracleOrder,
-		additionalEndPriceBuffer:
-			optionalAuctionParamsInputs.additionalEndPriceBuffer,
-		forceUpToSlippage: optionalAuctionParamsInputs.forceUpToSlippage,
-	});
-
-	if (!auctionOrderParams) {
-		throw new Error(`Failed to derive auction params from ${source}`);
-	}
-
-	const priceImpact: MappedPriceImpact = {
-		entryPrice: priceImpactData.entryPrice,
-		markPrice,
-		oraclePrice,
-		bestPrice: priceImpactData.bestPrice,
-		worstPrice: priceImpactData.worstPrice,
-		priceImpact: priceImpactData.priceImpact,
-		baseAvailable: priceImpactData.baseAvailable,
-		exceedsLiquidity: priceImpactData.exceedsLiquidity,
-	};
-
+/** Parse the endpoint's `data` object. Its `params` use `OptionalOrderParams` names. */
+export function deserializeMarketOrderQuote(data: any): MarketOrderQuote {
+	const params = data.params;
 	return {
-		orderParams: auctionOrderParams,
-		meta: { source, slippage: derivedSlippage, priceImpact },
+		orderParams: {
+			orderType:
+				params.orderType === 'oracle' ? OrderType.ORACLE : OrderType.MARKET,
+			marketType: MarketType.PERP,
+			marketIndex: params.marketIndex,
+			direction:
+				params.direction === 'long'
+					? PositionDirection.LONG
+					: PositionDirection.SHORT,
+			baseAssetAmount: new BN(params.baseAssetAmount),
+			price: new BN(params.price),
+			oraclePriceOffset: bnOrNull(params.oraclePriceOffset),
+			reduceOnly: params.reduceOnly,
+			userOrderId: params.userOrderId ?? undefined,
+			activationDelaySlots: params.activationDelaySlots,
+			maxTs: bnOrNull(params.maxTs),
+		},
+		entryPrice: new BN(data.entryPrice),
+		bestPrice: new BN(data.bestPrice),
+		worstPrice: new BN(data.worstPrice),
+		oraclePrice: new BN(data.oraclePrice),
+		markPrice: new BN(data.markPrice),
+		priceImpact: data.priceImpact,
+		slippageTolerance: data.slippageTolerance,
+		generatedAt: data.generatedAt,
 	};
-}
-
-const VAMM_L2_NUM_ORDERS = DEFAULT_L2_DEPTH_FOR_AUCTION_ORDER_PARAMS; // 100
-
-/**
- * Extra auction-end / oracle-offset buffer (in basis points of the oracle price)
- * applied ONLY on the network-free vAMM fallback. The vAMM book carries no resting
- * limit-order liquidity, so its derived worst/entry prices are coarser than the DLOB
- * server's; this widens the auction end so degraded-liquidity orders still cross.
- */
-const VAMM_FALLBACK_END_PRICE_BUFFER_BPS = 10; // 0.1%
-
-/**
- * Network-free last-resort tier: derives auction params from the in-memory perp AMM
- * + oracle when the DLOB server is unreachable. Used by FE-4472 fallback.
- */
-export async function deriveAuctionParamsFromVamm({
-	velocityClient,
-	marketIndex,
-	marketType,
-	direction,
-	assetType,
-	amount,
-	reduceOnly,
-	optionalAuctionParamsInputs = {},
-	dynamicSlippageConfig,
-	slotDuration,
-}: RegularOrderParams): Promise<FetchAuctionOrderParamsResult> {
-	invariant(
-		ENUM_UTILS.match(marketType, MarketType.PERP),
-		'vAMM auction params only support perp markets'
-	);
-
-	const marketId = new MarketId(marketIndex, marketType);
-	const baseAmount =
-		assetType === 'base'
-			? amount
-			: calcBaseFromQuote(velocityClient, marketIndex, amount);
-
-	const marketAccount = velocityClient.getPerpMarketAccount(marketIndex);
-	invariant(marketAccount, 'Perp market account not loaded on client');
-	const mmOracle: MMOraclePriceData =
-		velocityClient.getMMOracleDataForPerpMarket(marketIndex);
-	const oraclePrice =
-		velocityClient.getOracleDataForPerpMarket(marketIndex).price;
-
-	const vammGen = getVammL2Generator({
-		marketAccount,
-		mmOraclePriceData: mmOracle,
-		numOrders: VAMM_L2_NUM_ORDERS,
-		topOfBookQuoteAmounts:
-			marketIndex < 3
-				? MAJORS_TOP_OF_BOOK_QUOTE_AMOUNTS
-				: DEFAULT_TOP_OF_BOOK_QUOTE_AMOUNTS,
-		slotDurationState: velocityClient.getStateAccount(),
-	});
-	const l2Data: L2OrderBook = {
-		bids: createL2Levels(vammGen.getL2Bids(), VAMM_L2_NUM_ORDERS),
-		asks: createL2Levels(vammGen.getL2Asks(), VAMM_L2_NUM_ORDERS),
-	};
-	// markPrice may be undefined if the derived vAMM book is one-sided (no bid or no
-	// ask level); this is handled defensively by getPriceObject downstream.
-	const markPrice = calculateSpreadBidAskMark(l2Data, oraclePrice)?.markPrice;
-
-	logger.warn(
-		'DLOB server unreachable — deriving auction params from on-chain vAMM'
-	);
-
-	// Add a 0.1%-of-oracle buffer to the auction end / oracle price offset to
-	// compensate for the vAMM book's coarser (no resting-order) liquidity. Added on
-	// top of any caller-supplied buffer; direction is handled downstream (added for
-	// longs, subtracted for shorts) in getMarketAuctionParams.
-	const fallbackEndPriceBuffer = oraclePrice
-		.muln(VAMM_FALLBACK_END_PRICE_BUFFER_BPS)
-		.divn(10_000);
-	const bufferedInputs: OptionalAuctionParamsRequestInputs = {
-		...optionalAuctionParamsInputs,
-		additionalEndPriceBuffer: (
-			optionalAuctionParamsInputs.additionalEndPriceBuffer ?? new BN(0)
-		).add(fallbackEndPriceBuffer),
-	};
-
-	return deriveFromL2Inputs({
-		l2Data,
-		oraclePrice,
-		markPrice,
-		marketId,
-		marketType,
-		marketIndex,
-		direction,
-		baseAmount,
-		reduceOnly,
-		optionalAuctionParamsInputs: bufferedInputs,
-		dynamicSlippageConfig,
-		slotDuration,
-		source: 'vamm',
-	});
-}
-
-type FetchTopMakersParams = {
-	dlobServerHttpUrl: string;
-	marketIndex: number;
-	marketType: MarketType;
-	side: 'bid' | 'ask';
-	limit: number;
-};
-
-/**
- * Fetches the top makers information, for use as inputs in placeAndTake market orders.
- * The side of the request should be opposite of the side of the placeAndTake market order.
- */
-export async function fetchTopMakers(params: FetchTopMakersParams): Promise<
-	{
-		userAccountPubKey: PublicKey;
-		userAccount: UserAccount;
-	}[]
-> {
-	try {
-		const { dlobServerHttpUrl, marketIndex, marketType, side, limit } = params;
-
-		const urlParams = encodeQueryParams({
-			marketIndex: marketIndex.toString(),
-			marketType: ENUM_UTILS.toStr(marketType),
-			side,
-			limit: limit.toString(),
-			includeAccounts: 'true',
-		});
-
-		const requestUrl = `${dlobServerHttpUrl}/topMakers?${urlParams}`;
-		const response = await fetch(requestUrl);
-
-		if (!response.ok) {
-			throw new Error(
-				`Server responded with ${response.status}: ${response.statusText}`
-			);
-		}
-
-		const serverResponse: {
-			userAccountPubKey: string;
-			accountBase64: string;
-		}[] = await response.json();
-		const mappedParams: {
-			userAccountPubKey: PublicKey;
-			userAccount: UserAccount;
-		}[] = serverResponse.map((value) => ({
-			userAccountPubKey: new PublicKey(value.userAccountPubKey),
-			userAccount: decodeUser(Buffer.from(value.accountBase64, 'base64')),
-		}));
-
-		return mappedParams;
-	} catch (e) {
-		logger.error(e);
-		return [];
-	}
 }

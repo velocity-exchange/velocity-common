@@ -48,6 +48,23 @@ export type SwiftOrderEvent =
 	| SwiftOrderConfirmedEvent
 	| SwiftOrderSentEvent;
 
+/** What the confirmation server says about an order once it stops being pending. */
+export type SwiftConfirmation =
+	| { status: 'confirmed'; orderId: string }
+	| { status: 'failed'; reason: string }
+	| { status: 'expired' };
+
+const CONFIRMATION_POLL_INTERVAL_MS = 1_000;
+
+/** The time a last RPC check may take after the deadline before the hard bound fires. */
+const CONFIRMATION_GRACE_MS = 2_000;
+
+const ORDER_EXPIRED_MESSAGE =
+	'The order was not placed before its placement deadline';
+
+const sleep = (ms: number) =>
+	new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+
 export type SwiftOrderEventWithParams<T extends SwiftOrderEvent> = T & {
 	swiftOrderUuid: Uint8Array;
 	orderParamsMessage:
@@ -66,7 +83,8 @@ export class SwiftClient {
 		this.swiftClientConsumer = swiftClientConsumer;
 	}
 
-	private static get(url: string) {
+	/** A request still open after `timeoutMs` is aborted and reads as a network error. */
+	private static get(url: string, timeoutMs?: number) {
 		if (!this.baseUrl) {
 			throw new Error('SwiftClient not initialized');
 		}
@@ -77,8 +95,15 @@ export class SwiftClient {
 					...this.getSwiftHeaders(),
 				});
 
+				const controller = new AbortController();
+				const timeout =
+					timeoutMs === undefined
+						? undefined
+						: setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
+
 				fetch(`${this.baseUrl}${url}`, {
 					headers,
+					signal: controller.signal,
 				})
 					.then(async (response) => {
 						if (!response.ok) {
@@ -97,7 +122,8 @@ export class SwiftClient {
 					})
 					.catch((err) => {
 						res({ success: false, body: err, status: 0 });
-					});
+					})
+					.finally(() => clearTimeout(timeout));
 			}
 		);
 	}
@@ -199,7 +225,8 @@ export class SwiftClient {
 		client: VelocityClient,
 		signedMsgUserOrdersAccount: PublicKey,
 		signedMsgOrderUuid: Uint8Array,
-		confirmDuration: number
+		confirmDuration: number,
+		signal?: AbortSignal
 	): Promise<number | undefined> {
 		return new Promise((resolve, reject) => {
 			let settled = false;
@@ -266,6 +293,10 @@ export class SwiftClient {
 					finalizeReject(new Error('Order not found'));
 				}
 			}, confirmDuration);
+
+			signal?.addEventListener('abort', () =>
+				finalizeReject(new Error('Confirmation aborted'))
+			);
 
 			// Perform an initial check.
 			checkOrder('initial');
@@ -343,26 +374,21 @@ export class SwiftClient {
 		return order;
 	}
 
+	/**
+	 * Polls the confirmation server until it answers for the order or the deadline passes.
+	 * A 5xx or a network error is transient, so polling goes on. Only the deadline ends a
+	 * silent or failing server.
+	 */
 	static async confirmSwiftOrder(
 		hash: string,
-		confirmDuration: number
-	): Promise<
-		ClientResponse<
-			| {
-					orderId: string;
-					status: 'confirmed';
-			  }
-			| {
-					status: 'expired';
-			  }
-		>
-	> {
-		const expireTime = Date.now() + confirmDuration;
+		confirmDuration: number,
+		options?: { deadlineMs?: number; signal?: AbortSignal }
+	): ClientResponse<SwiftConfirmation> {
+		const deadlineMs = options?.deadlineMs ?? Date.now() + confirmDuration;
+		const url = `/confirmation/hash-status?hash=${encodeURIComponent(hash)}`;
 
-		while (Date.now() < expireTime) {
-			const confirmResponse = await this.get(
-				`/confirmation/hash-status?hash=${encodeURIComponent(hash)}`
-			);
+		while (Date.now() < deadlineMs && !options?.signal?.aborted) {
+			const confirmResponse = await this.get(url, deadlineMs - Date.now());
 
 			if (confirmResponse.status === 200) {
 				logger.debug('Confirmed hash: ', hash);
@@ -375,37 +401,107 @@ export class SwiftClient {
 						status: 'confirmed',
 					},
 				};
-			} else if (
-				confirmResponse.status >= 500 ||
-				confirmResponse.status < 200
-			) {
-				break;
 			}
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+
+			if (confirmResponse.status === 422) {
+				logger.error('Swift order placement failed: ', confirmResponse.body);
+				return {
+					success: false,
+					status: 422,
+					message: confirmResponse.body,
+					body: {
+						status: 'failed',
+						reason: confirmResponse.body,
+					},
+				};
+			}
+
+			await sleep(
+				Math.min(CONFIRMATION_POLL_INTERVAL_MS, deadlineMs - Date.now())
+			);
 		}
 
 		logger.error('Failed to confirm hash: ', hash);
 		return {
 			success: false,
 			status: 408,
-			message: `Failed to confirm hash: ${hash}`,
+			message: ORDER_EXPIRED_MESSAGE,
 			body: {
 				status: 'expired',
 			},
 		};
 	}
 
-	static async handleSwiftOrderSubscriber(
+	private static emitConfirmation(
+		subscriber: Subscriber<SwiftOrderEvent>,
+		hash: string,
+		confirmation: SwiftConfirmation
+	) {
+		if (confirmation.status === 'confirmed') {
+			subscriber.next({
+				type: 'confirmed',
+				orderId: confirmation.orderId,
+				hash,
+			});
+			subscriber.complete();
+			return;
+		}
+
+		subscriber.next(
+			confirmation.status === 'failed'
+				? { type: 'errored', hash, message: confirmation.reason, status: 422 }
+				: {
+						type: 'expired',
+						hash,
+						message: ORDER_EXPIRED_MESSAGE,
+						status: 408,
+					}
+		);
+		subscriber.error();
+	}
+
+	/**
+	 * Wraps a send and confirm flow so it always ends by `deadlineMs`, even when the
+	 * server never answers or the flow throws.
+	 */
+	private static boundedSwiftOrderObservable(
+		deadlineMs: number,
+		run: (subscriber: Subscriber<SwiftOrderEvent>) => Promise<void>
+	): Observable<SwiftOrderEvent> {
+		return new Observable<SwiftOrderEvent>((subscriber) => {
+			const hardBound = setTimeout(
+				() => {
+					if (subscriber.closed) return;
+					this.emitConfirmation(subscriber, '', { status: 'expired' });
+				},
+				deadlineMs - Date.now() + CONFIRMATION_GRACE_MS
+			);
+
+			run(subscriber).catch((err) => {
+				logger.error('swiftClient', 'swift order flow failed', err);
+				if (subscriber.closed) return;
+				subscriber.next({
+					type: 'errored',
+					hash: '',
+					message: err instanceof Error ? err.message : String(err),
+				});
+				subscriber.error();
+			});
+
+			return () => clearTimeout(hardBound);
+		});
+	}
+
+	private static async handleSwiftOrderSubscriber(
 		subscriber: Subscriber<SwiftOrderEvent>,
 		marketIndex: number,
 		marketType: MarketType,
 		message: string,
 		signature: Buffer,
 		takerPubkey: PublicKey,
-		confirmDuration: number,
+		deadlineMs: number,
 		signingAuthority?: PublicKey
 	) {
-		// First send the order
 		const sendResponse = await this.sendSwiftOrder(
 			marketIndex,
 			marketType,
@@ -414,6 +510,8 @@ export class SwiftClient {
 			takerPubkey,
 			signingAuthority
 		);
+
+		if (subscriber.closed) return;
 
 		if (!sendResponse.success) {
 			subscriber.next({
@@ -424,39 +522,26 @@ export class SwiftClient {
 			});
 			subscriber.error();
 			return;
-		} else {
-			subscriber.next({
-				type: 'sent',
-				hash: sendResponse.body!.hash,
-			});
 		}
 
 		const hash = sendResponse.body!.hash;
+		subscriber.next({ type: 'sent', hash });
 
-		// Then confirm it
-		const confirmResponse = await this.confirmSwiftOrder(hash, confirmDuration);
+		const confirmResponse = await this.confirmSwiftOrder(hash, 0, {
+			deadlineMs,
+		});
 
-		if (!confirmResponse.success) {
-			subscriber.next({
-				type: confirmResponse.body!.status as 'expired',
-				hash,
-				message: confirmResponse.message,
-				status: confirmResponse.status,
-			});
-			subscriber.error();
-		}
-		if (confirmResponse.body!.status === 'confirmed') {
-			subscriber.next({
-				type: 'confirmed',
-				orderId: (
-					confirmResponse.body as { orderId: string; status: 'confirmed' }
-				).orderId,
-				hash,
-			});
-			subscriber.complete();
-		}
+		if (subscriber.closed) return;
+
+		this.emitConfirmation(subscriber, hash, confirmResponse.body!);
 	}
-	static async handleSwiftOrderSubscriberWS(
+
+	/**
+	 * Confirms through the order's onchain entry and the confirmation server at once.
+	 * The chain is the authority for a placed order. Only the server can report a
+	 * placement that failed, so its answer ends the wait early.
+	 */
+	private static async handleSwiftOrderSubscriberWS(
 		subscriber: Subscriber<SwiftOrderEvent>,
 		connection: Connection,
 		client: VelocityClient,
@@ -467,10 +552,9 @@ export class SwiftClient {
 		takerPubkey: PublicKey,
 		signedMsgUserOrdersAccountPubkey: PublicKey,
 		signedMsgOrderUuid: Uint8Array,
-		confirmDuration: number,
+		deadlineMs: number,
 		signingAuthority?: PublicKey
 	) {
-		// First send the order
 		const sendResponse = await this.sendSwiftOrder(
 			marketIndex,
 			marketType,
@@ -481,6 +565,8 @@ export class SwiftClient {
 		);
 		logger.debug('swiftClient', 'sendResponse\n', sendResponse);
 
+		if (subscriber.closed) return;
+
 		if (!sendResponse.success) {
 			subscriber.next({
 				type: 'errored',
@@ -490,51 +576,57 @@ export class SwiftClient {
 			});
 			subscriber.error();
 			return;
-		} else {
-			subscriber.next({
-				type: 'sent',
-				hash: sendResponse.body!.hash,
-			});
 		}
 
 		const hash = sendResponse.body!.hash;
+		subscriber.next({ type: 'sent', hash });
 
-		// Then confirm it
-		const orderID = await this.confirmSwiftOrderWS(
-			connection,
-			client,
-			signedMsgUserOrdersAccountPubkey,
-			signedMsgOrderUuid,
-			confirmDuration
-		).catch((err) => {
-			logger.debug('swiftClient', 'confirmSwiftOrderWS error', err);
-			subscriber.next({
-				type: 'expired',
-				hash,
-				message: 'Order failed to confirm',
-				status: 408,
-			});
-			subscriber.error();
+		const controller = new AbortController();
+		const confirmation = await new Promise<SwiftConfirmation>((resolve) => {
+			this.confirmSwiftOrderWS(
+				connection,
+				client,
+				signedMsgUserOrdersAccountPubkey,
+				signedMsgOrderUuid,
+				Math.max(0, deadlineMs - Date.now()),
+				controller.signal
+			)
+				.then((orderId) =>
+					resolve(
+						orderId === undefined
+							? { status: 'expired' }
+							: { status: 'confirmed', orderId: orderId.toString() }
+					)
+				)
+				.catch((err) => {
+					logger.debug('swiftClient', 'confirmSwiftOrderWS error', err);
+					resolve({ status: 'expired' });
+				});
+
+			this.confirmSwiftOrder(hash, 0, {
+				deadlineMs,
+				signal: controller.signal,
+			})
+				.then((response) => {
+					if (response.body && response.body.status !== 'expired') {
+						resolve(response.body);
+					}
+				})
+				.catch((err) => {
+					logger.debug('swiftClient', 'confirmSwiftOrder error', err);
+				});
 		});
+		controller.abort();
 
-		if (!orderID) {
-			subscriber.next({
-				type: 'expired',
-				hash,
-				message: 'Order failed to confirm',
-				status: 408,
-			});
-			subscriber.error();
-		} else {
-			subscriber.next({
-				type: 'confirmed',
-				orderId: orderID.toString(),
-				hash,
-			});
-			subscriber.complete();
-		}
+		if (subscriber.closed) return;
+
+		this.emitConfirmation(subscriber, hash, confirmation);
 	}
 
+	/**
+	 * `deadlineMs` is the wall time after which the order can no longer be placed, plus a
+	 * margin to observe it. When it is absent, the wait is `confirmDuration` from now.
+	 */
 	public static sendAndConfirmSwiftOrder(
 		marketIndex: number,
 		marketType: MarketType,
@@ -542,9 +634,11 @@ export class SwiftClient {
 		signature: Buffer,
 		takerPubkey: PublicKey,
 		confirmDuration: number,
-		signingAuthority: PublicKey
+		signingAuthority: PublicKey,
+		deadlineMs?: number
 	): Observable<SwiftOrderEvent> {
-		return new Observable<SwiftOrderEvent>((subscriber) => {
+		const resolvedDeadlineMs = deadlineMs ?? Date.now() + confirmDuration;
+		return this.boundedSwiftOrderObservable(resolvedDeadlineMs, (subscriber) =>
 			this.handleSwiftOrderSubscriber(
 				subscriber,
 				marketIndex,
@@ -552,12 +646,13 @@ export class SwiftClient {
 				message,
 				signature,
 				takerPubkey,
-				confirmDuration,
+				resolvedDeadlineMs,
 				signingAuthority
-			);
-		});
+			)
+		);
 	}
 
+	/** `deadlineMs` works as in `sendAndConfirmSwiftOrder`. */
 	public static sendAndConfirmSwiftOrderWS(
 		connection: Connection,
 		client: VelocityClient,
@@ -569,9 +664,11 @@ export class SwiftClient {
 		signedMsgUserOrdersAccountPubkey: PublicKey,
 		signedMsgOrderUuid: Uint8Array,
 		confirmDuration: number,
-		signingAuthority: PublicKey
+		signingAuthority: PublicKey,
+		deadlineMs?: number
 	): Observable<SwiftOrderEvent> {
-		return new Observable<SwiftOrderEvent>((subscriber) => {
+		const resolvedDeadlineMs = deadlineMs ?? Date.now() + confirmDuration;
+		return this.boundedSwiftOrderObservable(resolvedDeadlineMs, (subscriber) =>
 			this.handleSwiftOrderSubscriberWS(
 				subscriber,
 				connection,
@@ -583,10 +680,10 @@ export class SwiftClient {
 				takerPubkey,
 				signedMsgUserOrdersAccountPubkey,
 				signedMsgOrderUuid,
-				confirmDuration,
+				resolvedDeadlineMs,
 				signingAuthority
-			);
-		});
+			)
+		);
 	}
 
 	public static async isSwiftServerHealthy(): Promise<boolean> {

@@ -318,8 +318,7 @@ async function signAndSendSwiftOrderMessage(
 				return new Uint8Array(signature);
 			},
 		},
-		hexEncodedSwiftOrderMessage:
-			swiftMessage.hexEncodedSwiftOrderMessage.uInt8Array,
+		signingBytes: swiftMessage.signingBytes,
 		signingDeadlineSlot: swiftMessage.signingDeadlineSlot,
 		expirationTimeMs: swiftMessage.expirationTimeMs,
 	});
@@ -337,7 +336,8 @@ async function signAndSendSwiftOrderMessage(
 		signedMsgOrderUuid: swiftMessage.signedMsgOrderUuid,
 		takerAuthority: wallet.publicKey,
 		signingAuthority: wallet.publicKey,
-		slotsTillAuctionEnd: swiftMessage.slotsTillAuctionEnd,
+		slotsTillPlacementDeadline: swiftMessage.slotsTillPlacementDeadline,
+		placementDeadlineMs: swiftMessage.placementDeadlineMs,
 		slotDuration: await resolveSlotDuration(),
 	});
 
@@ -778,7 +778,6 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 	const triggerPrice = args.triggerPrice as string;
 	const reduceOnly = (args.reduceOnly as string) === 'true';
 	const postOnly = (args.postOnly as string) || 'none';
-	const oraclePriceOffset = args.oraclePriceOffset as string;
 
 	if (!userAccount || isNaN(marketIndex) || !direction || !orderType) {
 		throw new Error(
@@ -799,10 +798,6 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 		if (!triggerPrice) {
 			throw new Error(`Order type '${orderType}' requires --triggerPrice`);
 		}
-	} else if (orderType === 'oracleLimit') {
-		if (!oraclePriceOffset) {
-			throw new Error(`Order type '${orderType}' requires --oraclePriceOffset`);
-		}
 	}
 
 	const userAccountPubkey = new PublicKey(userAccount);
@@ -814,9 +809,6 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 	const triggerPriceBN = triggerPrice
 		? parseAmount(triggerPrice, PRICE_PRECISION)
 		: undefined;
-	const oraclePriceOffsetBN = oraclePriceOffset
-		? parseAmount(oraclePriceOffset, PRICE_PRECISION)
-		: undefined;
 
 	const orderConfig: NonMarketOrderParamsConfig['orderConfig'] =
 		orderType === 'limit'
@@ -824,15 +816,10 @@ async function openPerpNonMarketOrderCommand(args: CliArgs): Promise<void> {
 					orderType,
 					limitPrice: limitPriceBN!,
 				}
-			: orderType === 'takeProfit' || orderType === 'stopLoss'
-				? {
-						orderType,
-						triggerPrice: triggerPriceBN!,
-					}
-				: {
-						orderType,
-						oraclePriceOffset: oraclePriceOffsetBN!,
-					};
+			: {
+					orderType,
+					triggerPrice: triggerPriceBN!,
+				};
 
 	console.log('--- 📋 Open Perp Non-Market Order ---');
 	console.log(`👤 User Account: ${userAccount}`);

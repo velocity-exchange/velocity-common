@@ -1,10 +1,9 @@
 import {
 	BN,
+	ModifyOrderV1Params,
 	VelocityClient,
 	OrderTriggerCondition,
-	OrderType,
 	PositionDirection,
-	PostOnlyParams,
 	SlotDurationMs,
 	User,
 } from '@velocity-exchange/sdk';
@@ -14,13 +13,7 @@ import {
 	TransactionInstruction,
 	VersionedTransaction,
 } from '@solana/web3.js';
-import { ENUM_UTILS } from '../../../../utils';
 import invariant from 'tiny-invariant';
-import { getLimitAuctionOrderParams } from './openPerpOrder/auction';
-import {
-	LimitAuctionConfig,
-	LimitOrderParamsOrderConfig,
-} from './openPerpOrder/types';
 import { WithTxnParams } from '../../types';
 
 /**
@@ -39,12 +32,6 @@ interface EditOrderParams {
 	newTriggerPrice?: BN;
 	/** New trigger condition for conditional orders */
 	newTriggerCondition?: OrderTriggerCondition;
-	/** Duration of the auction in slots */
-	auctionDuration?: number;
-	/** Starting price for the auction */
-	auctionStartPrice?: BN;
-	/** Ending price for the auction */
-	auctionEndPrice?: BN;
 	/** Whether the order should only reduce position size */
 	reduceOnly?: boolean;
 	/** Whether the order should only be posted (maker only) */
@@ -67,76 +54,29 @@ export interface CreateEditOrderIxParams {
 	/** Live slot duration, resolved by the caller from `State` */
 	slotDuration: SlotDurationMs;
 	mainSignerOverride?: PublicKey;
-	limitAuctionOrderConfig?: LimitOrderParamsOrderConfig & {
-		limitAuction: LimitAuctionConfig;
-	};
 }
 
 /**
- * Creates a transaction instruction to edit an existing order
+ * Edits a slot order, which is an armed trigger. A book order has no slot, so it goes through
+ * `createModifyClobOrderIx`. The modify replaces the order under a new order id, so the second
+ * instruction re-syncs the trigger's relay watch. Without it the edited trigger never fires.
  * @param velocityClient - The VelocityClient instance
  * @param userPublicKey - The public key of the user who owns the order
  * @param orderId - The ID of the order to edit
  * @param editOrderParams - Parameters containing the new order values
- * @param limitAuctionOrderConfig - Configuration for the limit auction order. If not provided, limit auction will not be enabled when relevant.
- * @returns Promise that resolves to a TransactionInstruction
+ * @returns Promise that resolves to the modify and trigger sync instructions
  */
-export const createEditOrderIx = async (
+export const createEditOrderIxs = async (
 	params: CreateEditOrderIxParams
-): Promise<TransactionInstruction> => {
-	const {
-		velocityClient,
-		user,
-		orderId,
-		editOrderParams,
-		mainSignerOverride,
-		limitAuctionOrderConfig,
-		slotDuration,
-	} = params;
-	const currentOrder = user.getOrder(orderId);
+): Promise<TransactionInstruction[]> => {
+	const { velocityClient, user, orderId, editOrderParams, mainSignerOverride } =
+		params;
+	invariant(user.getOrder(orderId), 'Current order not found');
 
-	invariant(currentOrder, 'Current order not found');
-
-	const isLimitOrder = ENUM_UTILS.match(
-		currentOrder.orderType,
-		OrderType.LIMIT
-	);
-
-	let finalEditOrderParams = editOrderParams;
-
-	// handle limit auction if config is provided
-	if (
-		isLimitOrder &&
-		limitAuctionOrderConfig &&
-		ENUM_UTILS.match(currentOrder.postOnly, PostOnlyParams.NONE)
-	) {
-		const limitAuctionOrderParams = await getLimitAuctionOrderParams({
-			velocityClient,
-			user,
-			marketIndex: currentOrder.marketIndex,
-			marketType: currentOrder.marketType,
-			direction: currentOrder.direction,
-			baseAssetAmount: currentOrder.baseAssetAmount,
-			userOrderId: currentOrder.userOrderId,
-			reduceOnly: currentOrder.reduceOnly,
-			postOnly: currentOrder.postOnly,
-			orderConfig: limitAuctionOrderConfig,
-			positionMaxLeverage: editOrderParams.positionMaxLeverage ?? 0,
-			slotDuration,
-		});
-
-		finalEditOrderParams = {
-			...editOrderParams,
-			auctionDuration: limitAuctionOrderParams.auctionDuration ?? undefined,
-			auctionStartPrice: limitAuctionOrderParams.auctionStartPrice,
-			auctionEndPrice: limitAuctionOrderParams.auctionEndPrice,
-		};
-	}
-
-	return velocityClient.getModifyOrderIx(
+	return velocityClient.getModifyOrderIxs(
 		{
 			orderId,
-			...finalEditOrderParams,
+			...editOrderParams,
 		},
 		undefined,
 		{
@@ -162,7 +102,34 @@ export const createEditOrderTxn = async ({
 	...params
 }: CreateEditOrderTxnParams): Promise<Transaction | VersionedTransaction> => {
 	return params.velocityClient.buildTransaction(
-		await createEditOrderIx(params),
+		await createEditOrderIxs(params),
 		txParams
+	);
+};
+
+interface CreateModifyClobOrderIxParams {
+	velocityClient: VelocityClient;
+	user: User;
+	modify: ModifyOrderV1Params;
+	/** The feed's `takerOrigin` flag. A modified taker remainder rests as a maker order. */
+	takerOrigin: boolean;
+	mainSignerOverride?: PublicKey;
+}
+
+/**
+ * Reprices or resizes a resting book order. The order keeps its id and loses its queue position.
+ * A `rejectIfCrossed` modify that the book refuses leaves no order at all.
+ */
+export const createModifyClobOrderIx = async (
+	params: CreateModifyClobOrderIxParams
+): Promise<TransactionInstruction> => {
+	const { velocityClient, user, modify, takerOrigin, mainSignerOverride } =
+		params;
+
+	return velocityClient.getModifyOrderV1Ix(
+		modify,
+		user.getUserAccountOrThrow().subAccountId,
+		takerOrigin,
+		{ authority: mainSignerOverride }
 	);
 };

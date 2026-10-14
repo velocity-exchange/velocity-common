@@ -11,7 +11,7 @@ import {
  * `programs/velocity/src/state/user.rs`). Passed to
  * `getMinimumBalanceForRentExemption` (RPC adds the 128-byte overhead).
  */
-export const USER_ACCOUNT_SIZE = 4496;
+export const USER_ACCOUNT_SIZE = 4560;
 
 /**
  * Data length for a SignedMsgUserOrders account with `numOrders` slots.

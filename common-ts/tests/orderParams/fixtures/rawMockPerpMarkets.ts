@@ -133,6 +133,8 @@ function mockPerpMarketCommon(): Omit<
 > {
 	return {
 		status: MarketStatus.INITIALIZED,
+		clobMarket: PublicKey.default,
+		quoterSlab: PublicKey.default,
 		lastFillPrice: new BN(0),
 		name: [],
 		contractType: ContractType.PERPETUAL,

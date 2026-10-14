@@ -101,13 +101,20 @@ export const deserializeL2Response = (
 		marketType: serializedOrderbook.marketType,
 		marketIndex: serializedOrderbook.marketIndex,
 		marketName: serializedOrderbook.marketName,
-		markPrice: new BN(serializedOrderbook.markPrice),
-		bestBidPrice: new BN(serializedOrderbook.bestBidPrice),
-		bestAskPrice: new BN(serializedOrderbook.bestAskPrice),
-		spreadPct: new BN(serializedOrderbook.spreadPct),
-		spreadQuote: new BN(serializedOrderbook.spreadQuote),
+		markPrice: bnOrZero(serializedOrderbook.markPrice),
+		bestBidPrice: bnOrZero(serializedOrderbook.bestBidPrice),
+		bestAskPrice: bnOrZero(serializedOrderbook.bestAskPrice),
+		spreadPct: bnOrZero(serializedOrderbook.spreadPct),
+		spreadQuote: bnOrZero(serializedOrderbook.spreadQuote),
 	};
 };
+
+/**
+ * A book with an empty side has no best price or spread, and a publisher can send the field
+ * as null. bn.js reads `undefined` as zero but runs out of memory on a null.
+ */
+const bnOrZero = (value: string | number | null | undefined): BN =>
+	new BN(value ?? 0);
 
 export const convertToL2OrderBook = (
 	l2Data: L2WithOracleAndMarketData[]
@@ -262,15 +269,10 @@ export const getLiquidityPcts = (
 		? (totalCumulativeSize / totalSize) * 100
 		: 0; // This is the portion of the total size of the orderbook that the cumulative size of the liquidity should be occupying.
 
-	const cumulativeRestingSize =
-		totalCumulativeSize - (cumulativeSize?.indicative ?? 0);
-	const cumulativeIndicativeSize = cumulativeSize?.indicative ?? 0;
-
-	const restingLiquidityPct =
-		(cumulativeRestingSize / totalCumulativeSize) * cumulativeSizePct; // This is the portion of the width of the orderbook that the resting liquidity should be occupying
-
-	const indicativeLiquidityPct =
-		(cumulativeIndicativeSize / totalCumulativeSize) * cumulativeSizePct; // This is the portion of the width of the orderbook that the indicative liquidity should be occupying
+	// Every source draws as resting. PropAMM quotes are firm and fill on chain,
+	// unlike the indicative quotes the gradient band was for.
+	const restingLiquidityPct = cumulativeSizePct;
+	const indicativeLiquidityPct = 0;
 
 	return {
 		restingLiquidityPct,
@@ -402,17 +404,10 @@ export const getCategorisedLiquidityForLevel = (
 	level: L2Level,
 	basePrecision: BN
 ): CategorisedLiquidity => {
-	const dlobSize = sizeToNum(level?.sources?.dlob ?? ZERO, basePrecision);
-	const vammSize = sizeToNum(level?.sources?.vamm ?? ZERO, basePrecision);
-	const indicativeSize = sizeToNum(
-		level?.sources?.indicative ?? ZERO,
-		basePrecision
-	);
-
 	const categorisedLiquidity: CategorisedLiquidity = {
-		dlob: dlobSize,
-		vamm: vammSize,
-		indicative: indicativeSize,
+		clob: sizeToNum(level?.sources?.clob ?? ZERO, basePrecision),
+		vamm: sizeToNum(level?.sources?.vamm ?? ZERO, basePrecision),
+		propamm: sizeToNum(level?.sources?.propamm ?? ZERO, basePrecision),
 	};
 
 	return categorisedLiquidity;

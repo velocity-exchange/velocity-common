@@ -7,10 +7,7 @@ import {
 import { WithTxnParams } from '../../../base/types';
 import { OpenPerpMarketOrderBaseParams } from '../../../base/actions/trade/openPerpOrder/openPerpMarketOrder';
 import { OpenPerpNonMarketOrderBaseParams } from '../../../base/actions/trade/openPerpOrder/openPerpNonMarketOrder';
-import {
-	IsolatedPositionDepositsOverride,
-	PlaceAndTakeParams,
-} from '../../../base/actions/trade/openPerpOrder/types';
+import { IsolatedPositionDepositsOverride } from '../../../base/actions/trade/openPerpOrder/types';
 import { PublicKey } from '@solana/web3.js';
 
 export type CentralServerSwiftOrderOptions = {
@@ -26,7 +23,7 @@ type CsdBaseMarketOrderParams = Omit<
 export type CentralServerGetOpenPerpMarketOrderTxnParams<
 	T extends boolean = boolean,
 > = T extends true
-	? Omit<CsdBaseMarketOrderParams, 'placeAndTake'> & {
+	? CsdBaseMarketOrderParams & {
 			useSwift: true;
 			swiftOptions?: CentralServerSwiftOrderOptions;
 			isolatedPositionDepositsOverride?: Omit<
@@ -96,7 +93,6 @@ export interface CentralServerGetCloseAndWithdrawIsolatedPerpPositionTxnParams {
 	/** If true and withdrawCollateralAfterClose, prepends settle PnL ix. */
 	settlePnlBeforeClose?: boolean;
 	assetType?: 'base' | 'quote';
-	placeAndTake?: PlaceAndTakeParams;
 	txParams?: TxParams;
 	/** Optional signer override for transaction signing; defaults to user authority. */
 	mainSignerOverride?: PublicKey;
@@ -127,7 +123,6 @@ export interface CentralServerGetCloseAndWithdrawIsolatedPerpPositionToWalletTxn
 	 */
 	estimatedWithdrawAmount?: BN;
 	assetType?: 'base' | 'quote';
-	placeAndTake?: PlaceAndTakeParams;
 	txParams?: TxParams;
 	/** Optional signer override and withdrawal destination; when provided, used for signing and as the wallet that receives the withdrawal; defaults to user authority. */
 	mainSignerOverride?: PublicKey;

@@ -5,7 +5,6 @@ import {
 	MarketType,
 	PostOnlyParams,
 	OptionalOrderParams,
-	PositionDirection,
 	OrderType,
 	SlotDurationMs,
 } from '@velocity-exchange/sdk';
@@ -26,24 +25,20 @@ import {
 	resolveBaseAssetAmount,
 } from '../../../../../utils/orderParams';
 import { ENUM_UTILS } from '../../../../../../utils';
-import { createPlaceAndTakePerpMarketOrderIx } from '../openPerpMarketOrder';
 import {
 	TxnOrSwiftResult,
-	LimitAuctionConfig,
-	LimitOrderParamsOrderConfig,
 	SwiftLimitOrderParamsOrderConfig,
 	NonMarketOrderParamsConfig,
 	IsolatedPositionDepositsOverride,
 	BuilderParams,
 } from '../types';
 import { WithTxnParams } from '../../../../types';
-import { getPositionMaxLeverageIxIfNeeded } from '../positionMaxLeverage';
-import { getLimitAuctionOrderParams } from '../auction';
+import { resolveIsolatedPositionDepositsWithOverride } from '../isolatedPositionDeposit';
+import { createPositionSetupIxs } from '../positionSetup';
 import {
-	getIsolatedPositionDepositIxIfNeeded,
-	resolveIsolatedPositionDepositsWithOverride,
-} from '../isolatedPositionDeposit';
-import { logger } from '../../../../../../utils/logger';
+	bracketTriggerOrderParams,
+	createTriggerOrderIxs,
+} from '../triggerOrders';
 
 export interface OpenPerpNonMarketOrderBaseParams extends Omit<
 	NonMarketOrderParamsConfig,
@@ -106,11 +101,11 @@ export type OpenPerpNonMarketOrderParams<
 			swiftOptions?: never;
 		};
 
-// TODO: add isolated margin?
 /**
- * Creates a transaction instruction to open multiple non-market orders.
+ * Instructions for several non-market orders at once. Each limit rests on the book as a
+ * maker order. The triggers arm together, under one margin check and one sync.
  */
-export const createMultipleOpenPerpNonMarketOrderIx = async (params: {
+export const createMultipleOpenPerpNonMarketOrderIxs = async (params: {
 	velocityClient: VelocityClient;
 	user: User;
 	orderParamsConfigs: NonMarketOrderParamsConfig[];
@@ -122,35 +117,57 @@ export const createMultipleOpenPerpNonMarketOrderIx = async (params: {
 	 * Optional builder code parameters for revenue sharing, applied to every order in the batch.
 	 */
 	builderParams?: BuilderParams;
-}): Promise<TransactionInstruction> => {
-	const {
-		velocityClient,
-		orderParamsConfigs,
-		mainSignerOverride,
-		builderParams,
-	} = params;
-
-	const orderParams = orderParamsConfigs.map((config) => ({
+}): Promise<TransactionInstruction[]> => {
+	const { velocityClient, user, mainSignerOverride, builderParams } = params;
+	const orders = params.orderParamsConfigs.map((config) => ({
 		...buildNonMarketOrderParams(config),
 		...builderParams,
 	}));
+	const limits = orders.filter((order) => !isTriggerOrder(order));
+	const triggers = orders.filter(isTriggerOrder);
 
-	const placeOrderIx = await velocityClient.getPlaceOrdersIx(
-		orderParams,
-		undefined,
-		{
-			authority: mainSignerOverride,
-		}
-	);
-	return placeOrderIx;
+	const [makeIxs, triggerIxs] = await Promise.all([
+		Promise.all(
+			limits.map((order) =>
+				createMakeIx(velocityClient, user, order, mainSignerOverride)
+			)
+		),
+		createTriggerOrderIxs({
+			velocityClient,
+			user,
+			orderParams: triggers,
+			mainSignerOverride,
+		}),
+	]);
+
+	return [...makeIxs, ...triggerIxs];
 };
 
+function isTriggerOrder(order: OptionalOrderParams): boolean {
+	return (
+		ENUM_UTILS.match(order.orderType, OrderType.TRIGGER_MARKET) ||
+		ENUM_UTILS.match(order.orderType, OrderType.TRIGGER_LIMIT)
+	);
+}
+
+function createMakeIx(
+	velocityClient: VelocityClient,
+	user: User,
+	order: OptionalOrderParams,
+	mainSignerOverride?: PublicKey
+): Promise<TransactionInstruction> {
+	return velocityClient.getPlaceAndMakePerpOrderIx(
+		order,
+		undefined,
+		user.getUserAccountOrThrow().subAccountId,
+		{ authority: mainSignerOverride }
+	);
+}
+
 /**
- * Creates a transaction instruction to open a non-market order.
- * Allows for bracket orders to be opened in the same transaction.
- *
- * If `limitAuction` is enabled, a placeAndTake order is created to simulate a market auction order,
- * with the end price being the limit price.
+ * The instructions of a non-market order and its bracket triggers. A limit rests as a maker
+ * order, unless the caller marks it marketable and it is not post-only. It then takes, with
+ * the limit as its worst price, and its remainder rests on the book.
  */
 export const createOpenPerpNonMarketOrderIxs = async (
 	params: OpenPerpNonMarketOrderBaseParams
@@ -164,312 +181,114 @@ export const createOpenPerpNonMarketOrderIxs = async (
 		postOnly = PostOnlyParams.NONE,
 		orderConfig,
 		userOrderId = 0,
-		positionMaxLeverage,
-		marginMode,
 		mainSignerOverride,
-		isolatedPositionDepositsOverride,
 		builderParams,
-		slotDuration,
 	} = params;
-	// Support both new (amount + assetType) and legacy (baseAssetAmount) approaches
-	const finalBaseAssetAmount = resolveBaseAssetAmount({
-		amount: 'amount' in params ? params.amount : undefined,
-		assetType: 'assetType' in params ? params.assetType : undefined,
-		baseAssetAmount:
-			'baseAssetAmount' in params ? params.baseAssetAmount : undefined,
+	const baseAssetAmount = resolveNonMarketBaseAssetAmount(params);
+
+	const order = {
+		...buildNonMarketOrderParams({
+			marketIndex,
+			marketType: MarketType.PERP,
+			direction,
+			baseAssetAmount,
+			orderConfig,
+			reduceOnly,
+			postOnly,
+			userOrderId,
+		}),
+		...builderParams,
+	};
+	const brackets = bracketTriggerOrderParams({
+		marketIndex,
+		entryDirection: direction,
+		entryBaseAssetAmount: baseAssetAmount,
+		bracketOrders:
+			'bracketOrders' in orderConfig ? orderConfig.bracketOrders : undefined,
+	});
+	const isTrigger = isTriggerOrder(order);
+	const takes =
+		orderConfig.orderType === 'limit' &&
+		orderConfig.marketable === true &&
+		ENUM_UTILS.match(postOnly, PostOnlyParams.NONE);
+
+	const [setupIxs, mainIxs, triggerIxs] = await Promise.all([
+		createPositionSetupIxs({ ...params, amount: baseAssetAmount }, true),
+		isTrigger
+			? Promise.resolve([])
+			: takes
+				? velocityClient
+						.getPlaceAndTakePerpOrderIx(
+							order,
+							undefined,
+							undefined,
+							undefined,
+							user.getUserAccountOrThrow().subAccountId,
+							{ authority: mainSignerOverride },
+							orderConfig.takerEscrow
+						)
+						.then((ix) => [ix])
+				: createMakeIx(velocityClient, user, order, mainSignerOverride).then(
+						(ix) => [ix]
+					),
+		createTriggerOrderIxs({
+			velocityClient,
+			user,
+			orderParams: isTrigger ? [order, ...brackets] : brackets,
+			mainSignerOverride,
+		}),
+	]);
+
+	return [...setupIxs, ...mainIxs, ...triggerIxs];
+};
+
+/** Supports both the amount and asset type pair and the legacy base asset amount. */
+function resolveNonMarketBaseAssetAmount(
+	params: OpenPerpNonMarketOrderBaseParams
+): BN {
+	const baseAssetAmount = resolveBaseAssetAmount({
+		amount: params.amount,
+		assetType: params.assetType,
+		baseAssetAmount: params.baseAssetAmount,
 		limitPrice:
 			'limitPrice' in params.orderConfig
 				? params.orderConfig.limitPrice
 				: undefined,
 	});
-
-	if (!finalBaseAssetAmount || finalBaseAssetAmount.isZero()) {
+	if (!baseAssetAmount || baseAssetAmount.isZero()) {
 		throw new Error('Final base asset amount must be greater than zero');
 	}
 
-	const resolvedDeposits = resolveIsolatedPositionDepositsWithOverride(
-		isolatedPositionDepositsOverride,
-		{
-			velocityClient,
-			user,
-			marketIndex,
-			baseAssetAmount: finalBaseAssetAmount,
-			direction,
-			positionMaxLeverage,
-			marginMode,
-			replenishUnderwaterPositions: true,
-		}
-	);
+	return baseAssetAmount;
+}
 
-	const mainIsolatedPositionDeposit = resolvedDeposits?.mainDeposit;
-	const resolvedAdditionalDeposits =
-		resolvedDeposits?.additionalIsolatedPositionDeposits;
-
-	const allOrders: OptionalOrderParams[] = [];
-	const allIxs: TransactionInstruction[] = [];
-
-	// Fetch all deposit/leverage ixs in parallel
-	const [leverageIx, additionalDepositIxs, isolatedPositionDepositIx] =
-		await Promise.all([
-			getPositionMaxLeverageIxIfNeeded(
-				velocityClient,
-				user,
-				marketIndex,
-				positionMaxLeverage,
-				mainSignerOverride
-			),
-			resolvedAdditionalDeposits?.length
-				? Promise.all(
-						resolvedAdditionalDeposits.map((deposit) =>
-							getIsolatedPositionDepositIxIfNeeded(
-								velocityClient,
-								user,
-								deposit.marketIndex,
-								deposit.amount,
-								mainSignerOverride
-							)
-						)
-					)
-				: Promise.resolve([] as (TransactionInstruction | undefined)[]),
-			getIsolatedPositionDepositIxIfNeeded(
-				velocityClient,
-				user,
-				marketIndex,
-				mainIsolatedPositionDeposit,
-				mainSignerOverride
-			),
-		]);
-
-	if (leverageIx) {
-		allIxs.push(leverageIx);
-	}
-	for (const ix of additionalDepositIxs) {
-		if (ix) {
-			allIxs.push(ix);
-		}
-	}
-	if (isolatedPositionDepositIx) {
-		allIxs.push(isolatedPositionDepositIx);
-	}
-
-	// handle limit auction
-	if (
-		orderConfig.orderType === 'limit' &&
-		orderConfig.limitAuction?.enable &&
-		ENUM_UTILS.match(postOnly, PostOnlyParams.NONE)
-	) {
-		const limitAuctionOrderParams = await getLimitAuctionOrderParams({
-			...params,
-			marketType: MarketType.PERP,
-			baseAssetAmount: finalBaseAssetAmount,
-			orderConfig: orderConfig as LimitOrderParamsOrderConfig & {
-				limitAuction: LimitAuctionConfig;
-			},
-		});
-
-		let createdPlaceAndTakeIx = false;
-
-		// if it is a limit auction order, we create a placeAndTake order to simulate a market order.
-		// this is useful when a limit order is crossing, and we want to achieve the best fill price through a placeAndTake.
-		// falls back to limit order with auction params if the placeAndTake order creation fails
-		if (
-			limitAuctionOrderParams.auctionDuration &&
-			limitAuctionOrderParams.auctionDuration > 0 &&
-			orderConfig.limitAuction?.usePlaceAndTake?.enable
-		) {
-			try {
-				const placeAndTakeIx = await createPlaceAndTakePerpMarketOrderIx({
-					assetType: 'base',
-					amount: finalBaseAssetAmount,
-					orderType: OrderType.LIMIT,
-					price: orderConfig.limitPrice,
-					direction,
-					dlobServerHttpUrl: orderConfig.limitAuction.dlobServerHttpUrl,
-					marketIndex,
-					velocityClient,
-					user,
-					userOrderId,
-					reduceOnly,
-					positionMaxLeverage,
-					optionalAuctionParamsInputs:
-						orderConfig.limitAuction.optionalLimitAuctionParams,
-					auctionDurationPercentage:
-						orderConfig.limitAuction.usePlaceAndTake.auctionDurationPercentage,
-					takerEscrow: orderConfig.limitAuction.usePlaceAndTake.takerEscrow,
-					builderParams,
-					slotDuration,
-				});
-				allIxs.push(placeAndTakeIx);
-				createdPlaceAndTakeIx = true;
-			} catch (e) {
-				logger.error(
-					'Failed to create placeAndTake order for limit auction order',
-					e
-				);
-				createdPlaceAndTakeIx = false;
-			}
-		}
-
-		// fallback to normal limit order with auction params
-		if (!createdPlaceAndTakeIx) {
-			allOrders.push({
-				...limitAuctionOrderParams,
-				...builderParams,
-			});
-		}
-	} else {
-		const orderParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction,
-			baseAssetAmount: finalBaseAssetAmount,
-			orderConfig,
-			reduceOnly,
-			postOnly,
-			userOrderId,
-		});
-
-		allOrders.push({
-			...orderParams,
-			...builderParams,
-		});
-	}
-
-	const bracketOrdersDirection = ENUM_UTILS.match(
-		direction,
-		PositionDirection.LONG
-	)
-		? PositionDirection.SHORT
-		: PositionDirection.LONG;
-
-	if ('bracketOrders' in orderConfig && orderConfig.bracketOrders?.takeProfit) {
-		const takeProfitParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction: bracketOrdersDirection,
-			baseAssetAmount:
-				orderConfig.bracketOrders.takeProfit.baseAssetAmount ??
-				finalBaseAssetAmount,
-			orderConfig: {
-				orderType: 'takeProfit',
-				triggerPrice: orderConfig.bracketOrders.takeProfit.triggerPrice,
-				limitPrice: orderConfig.bracketOrders.takeProfit.limitPrice,
-			},
-			reduceOnly: orderConfig.bracketOrders.takeProfit.reduceOnly ?? true,
-		});
-		allOrders.push(takeProfitParams);
-	}
-
-	if ('bracketOrders' in orderConfig && orderConfig.bracketOrders?.stopLoss) {
-		const stopLossParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction: bracketOrdersDirection,
-			baseAssetAmount:
-				orderConfig.bracketOrders.stopLoss.baseAssetAmount ??
-				finalBaseAssetAmount,
-			orderConfig: {
-				orderType: 'stopLoss',
-				triggerPrice: orderConfig.bracketOrders.stopLoss.triggerPrice,
-				limitPrice: orderConfig.bracketOrders.stopLoss.limitPrice,
-			},
-			reduceOnly: orderConfig.bracketOrders.stopLoss.reduceOnly ?? true,
-		});
-		allOrders.push(stopLossParams);
-	}
-
-	if (allOrders.length > 0) {
-		const placeOrderIx = await velocityClient.getPlaceOrdersIx(
-			allOrders,
-			undefined,
-			{
-				authority: mainSignerOverride,
-			}
-		);
-		allIxs.push(placeOrderIx);
-	}
-
-	return allIxs;
-};
-
-/**
- * Shared prep logic for swift limit orders: validates limit price, resolves base asset amount,
- * computes order params (with or without limit auction), and resolves the user account.
- */
+/** Shared prep logic for swift limit orders. */
 async function prepSwiftLimitOrderData(
 	params: OpenPerpNonMarketOrderBaseParams & {
 		orderConfig: SwiftLimitOrderParamsOrderConfig;
 	}
 ) {
 	const { user, marketIndex, orderConfig } = params;
-
-	let orderParams: OptionalOrderParams;
-
-	if (orderConfig.orderType === 'limit') {
-		const limitPrice = orderConfig.limitPrice;
-
-		if (limitPrice.isZero()) {
-			throw new Error('LIMIT orders require limitPrice');
-		}
-
-		const finalBaseAssetAmount = resolveBaseAssetAmount({
-			amount: 'amount' in params ? params.amount : undefined,
-			assetType: 'assetType' in params ? params.assetType : undefined,
-			baseAssetAmount:
-				'baseAssetAmount' in params ? params.baseAssetAmount : undefined,
-			limitPrice,
-		});
-
-		orderParams = orderConfig.limitAuction?.enable
-			? await getLimitAuctionOrderParams({
-					...params,
-					marketType: MarketType.PERP,
-					baseAssetAmount: finalBaseAssetAmount,
-					orderConfig: orderConfig as LimitOrderParamsOrderConfig & {
-						limitAuction: LimitAuctionConfig;
-					},
-				})
-			: buildNonMarketOrderParams({
-					marketIndex,
-					marketType: MarketType.PERP,
-					direction: params.direction,
-					baseAssetAmount: finalBaseAssetAmount,
-					orderConfig,
-					reduceOnly: params.reduceOnly,
-					postOnly: params.postOnly,
-					userOrderId: params.userOrderId,
-				});
-	} else if (orderConfig.orderType === 'oracleLimit') {
-		if (orderConfig.oraclePriceOffset.isZero()) {
-			throw new Error('ORACLE_LIMIT orders require oraclePriceOffset');
-		}
-
-		const finalBaseAssetAmount = resolveBaseAssetAmount({
-			amount: 'amount' in params ? params.amount : undefined,
-			assetType: 'assetType' in params ? params.assetType : undefined,
-			baseAssetAmount:
-				'baseAssetAmount' in params ? params.baseAssetAmount : undefined,
-		});
-
-		orderParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction: params.direction,
-			baseAssetAmount: finalBaseAssetAmount,
-			orderConfig,
-			reduceOnly: params.reduceOnly,
-			postOnly: params.postOnly,
-			userOrderId: params.userOrderId,
-		});
-	} else {
-		throw new Error(`Unsupported orderType for Swift limit order`);
+	if (orderConfig.limitPrice.isZero()) {
+		throw new Error('LIMIT orders require limitPrice');
 	}
 
-	const userAccount = user.getUserAccountOrThrow();
-	const bracketOrders =
-		orderConfig.orderType === 'limit' ? orderConfig.bracketOrders : undefined;
+	const orderParams = buildNonMarketOrderParams({
+		marketIndex,
+		marketType: MarketType.PERP,
+		direction: params.direction,
+		baseAssetAmount: resolveNonMarketBaseAssetAmount(params),
+		orderConfig,
+		reduceOnly: params.reduceOnly,
+		postOnly: params.postOnly,
+		userOrderId: params.userOrderId,
+	});
 
-	return { userAccount, orderParams, bracketOrders };
+	return {
+		userAccount: user.getUserAccountOrThrow(),
+		orderParams,
+		bracketOrders: orderConfig.bracketOrders,
+	};
 }
 
 export const createSwiftLimitOrder = async (
@@ -598,13 +417,8 @@ export const createOpenPerpNonMarketOrder = async <T extends boolean>(
 
 	// If useSwift is true, return the Swift result directly
 	if (useSwift) {
-		if (
-			orderConfig.orderType !== 'limit' &&
-			orderConfig.orderType !== 'oracleLimit'
-		) {
-			throw new Error(
-				'Only limit and oracle limit orders are supported with Swift'
-			);
+		if (orderConfig.orderType !== 'limit') {
+			throw new Error('Only limit orders are supported with Swift');
 		}
 
 		if (!swiftOptions) {

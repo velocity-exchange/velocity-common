@@ -376,6 +376,10 @@ export class SerializableOrder implements Order {
 	@autoserializeUsing(BNSerializeAndDeserializeFns) maxTs: BN;
 	@autoserializeAs(Number) bitFlags!: number;
 	@autoserializeAs(Number) postedSlotTail!: number;
+	@autoserializeAs(Number) unusedAuctionDuration!: number;
+	@autoserializeUsing(BNSerializeAndDeserializeFns) clobNodeIndex: BN;
+	@autoserializeUsing(BNSerializeAndDeserializeFns) clobOrderId: BN;
+	padding!: number[];
 }
 
 @inheritSerialization(SerializableOrder)
@@ -2176,6 +2180,11 @@ export function transformDataApiOrderRecordToUISerializableOrderRecord(
 			immediateOrCancel: deserializedV2Record.immediateOrCancel,
 			existingPositionDirection: deserializedV2Record.existingPositionDirection,
 			auctionDuration: deserializedV2Record.auctionDuration,
+			unusedAuctionDuration: 0,
+			// Only a live trigger-limit shadow slot carries a book ref, and a history record is never one.
+			clobNodeIndex: ZERO,
+			clobOrderId: ZERO,
+			padding: [],
 			slot: new BN(deserializedV2Record.slot),
 			marketType: deserializedV2Record.marketType,
 			maxTs: new BN(deserializedV2Record.maxTs),
@@ -2211,8 +2220,6 @@ export function transformDataApiOrderRecordToSerializableOrderRecord(
 			quoteAssetAmountFilled: deserializedV2Record.quoteAssetAmountFilled.val,
 			triggerPrice: deserializedV2Record.triggerPrice.val,
 			oraclePriceOffset: deserializedV2Record.oraclePriceOffset.val,
-			auctionStartPrice: deserializedV2Record.auctionStartPrice.val,
-			auctionEndPrice: deserializedV2Record.auctionEndPrice.val,
 			orderType: deserializedV2Record.orderType,
 			orderId: deserializedV2Record.orderId,
 			userOrderId: deserializedV2Record.userOrderId,
@@ -2224,7 +2231,11 @@ export function transformDataApiOrderRecordToSerializableOrderRecord(
 			postOnly: deserializedV2Record.postOnly,
 			immediateOrCancel: deserializedV2Record.immediateOrCancel,
 			existingPositionDirection: deserializedV2Record.existingPositionDirection,
-			auctionDuration: deserializedV2Record.auctionDuration,
+			unusedAuctionDuration: 0,
+			// Only a live trigger-limit shadow slot carries a book ref, and a history record is never one.
+			clobNodeIndex: ZERO,
+			clobOrderId: ZERO,
+			padding: [],
 			slot: new BN(deserializedV2Record.slot),
 			marketType: deserializedV2Record.marketType,
 			maxTs: new BN(deserializedV2Record.maxTs),

@@ -3,13 +3,6 @@ import {
 	User,
 	BN,
 	PositionDirection,
-	OptionalOrderParams,
-	MarketType,
-	getUserStatsAccountPublicKey,
-	OrderType,
-	RevenueShareEscrowAccount,
-	fetchRevenueShareEscrowAccount,
-	escrowHasReferrer,
 	SlotDurationMs,
 } from '@velocity-exchange/sdk';
 import {
@@ -18,34 +11,31 @@ import {
 	TransactionInstruction,
 	VersionedTransaction,
 } from '@solana/web3.js';
-import { ENUM_UTILS } from '../../../../../../utils';
 import {
 	prepSignAndSendSwiftOrder,
 	prepSwiftOrderMessage,
 	SwiftOrderOptions,
 	SwiftOrderMessage,
 } from '../openSwiftOrder';
-import { buildNonMarketOrderParams } from '../../../../../utils/orderParams';
 import {
-	fetchAuctionOrderParams,
-	fetchTopMakers,
-	OptionalAuctionParamsRequestInputs,
+	fetchMarketOrderParams,
+	MarketOrderQuote,
+	MarketOrderQuoteInputs,
 } from '../dlobServer';
 import { WithTxnParams } from '../../../../types';
 import {
 	TxnOrSwiftResult,
 	IsolatedPositionDepositsOverride,
-	PlaceAndTakeParams,
 	OptionalTriggerOrderParams,
 	BuilderParams,
+	TakerEscrowOverride,
 } from '../types';
-import { NoTopMakersError } from '../../../../../Velocity/constants/errors';
-import { getPositionMaxLeverageIxIfNeeded } from '../positionMaxLeverage';
-import { AuctionParamsFetchedCallback } from '../../../../../utils/auctionParamsResponseMapper';
+import { createPositionSetupIxs } from '../positionSetup';
+import { resolveIsolatedPositionDepositsWithOverride } from '../isolatedPositionDeposit';
 import {
-	getIsolatedPositionDepositIxIfNeeded,
-	resolveIsolatedPositionDepositsWithOverride,
-} from '../isolatedPositionDeposit';
+	bracketTriggerOrderParams,
+	createTriggerOrderIxs,
+} from '../triggerOrders';
 
 export interface OpenPerpMarketOrderBaseParams {
 	velocityClient: VelocityClient;
@@ -60,8 +50,8 @@ export interface OpenPerpMarketOrderBaseParams {
 	reduceOnly?: boolean;
 	// mainly used for UI order identification
 	userOrderId?: number;
-	placeAndTake?: PlaceAndTakeParams;
-	optionalAuctionParamsInputs?: OptionalAuctionParamsRequestInputs;
+	quoteInputs?: MarketOrderQuoteInputs;
+	takerEscrow?: TakerEscrowOverride;
 	bracketOrders?: {
 		takeProfit?: OptionalTriggerOrderParams;
 		stopLoss?: OptionalTriggerOrderParams;
@@ -109,14 +99,11 @@ export interface OpenPerpMarketOrderBaseParams {
 	 */
 	builderParams?: BuilderParams;
 	callbacks?: {
-		onAuctionParamsFetched?: AuctionParamsFetchedCallback;
+		onQuoteFetched?: (quote: MarketOrderQuote) => void;
 	};
 }
 
-export interface OpenPerpMarketOrderBaseParamsWithSwift extends Omit<
-	OpenPerpMarketOrderBaseParams,
-	'placeAndTake'
-> {
+export interface OpenPerpMarketOrderBaseParamsWithSwift extends OpenPerpMarketOrderBaseParams {
 	swiftOptions: SwiftOrderOptions;
 }
 
@@ -130,60 +117,43 @@ export type OpenPerpMarketOrderParams<
 	? OpenPerpMarketOrderBaseParams & {
 			useSwift: T;
 			swiftOptions: S;
-			placeAndTake?: never;
 		}
 	: OpenPerpMarketOrderBaseParams & {
 			useSwift: T;
-			placeAndTake?: PlaceAndTakeParams;
 			swiftOptions?: never;
 		};
-/**
- * Shared prep logic for swift market orders: validates input, fetches auction params,
- * computes bit flags, and resolves the user account.
- */
-async function prepSwiftMarketOrderData(params: OpenPerpMarketOrderBaseParams) {
-	const {
-		velocityClient,
-		user,
-		assetType,
-		marketIndex,
-		direction,
-		amount,
-		reduceOnly,
-		dlobServerHttpUrl,
-		slotDuration,
-		optionalAuctionParamsInputs,
-		userOrderId = 0,
-		callbacks,
-	} = params;
 
-	if (amount.isZero()) {
+/** Quote the order, and stamp the caller's `userOrderId` on it. */
+async function quoteMarketOrder(
+	params: OpenPerpMarketOrderBaseParams
+): Promise<MarketOrderQuote> {
+	if (!params.amount || params.amount.isZero()) {
 		throw new Error('Amount must be greater than zero');
 	}
 
-	const { orderParams: fetchedOrderParams } = await fetchAuctionOrderParams({
-		velocityClient,
-		user,
-		assetType,
-		marketIndex,
-		marketType: MarketType.PERP,
-		direction,
-		amount,
-		dlobServerHttpUrl,
-		slotDuration,
-		optionalAuctionParamsInputs,
-		reduceOnly,
-		onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,
+	const quote = await fetchMarketOrderParams({
+		dlobServerHttpUrl: params.dlobServerHttpUrl,
+		marketIndex: params.marketIndex,
+		direction: params.direction,
+		amount: params.amount,
+		assetType: params.assetType,
+		reduceOnly: params.reduceOnly,
+		userOrderId: params.userOrderId,
+		inputs: params.quoteInputs,
 	});
+	params.callbacks?.onQuoteFetched?.(quote);
 
+	return quote;
+}
+
+async function prepSwiftMarketOrderData(params: OpenPerpMarketOrderBaseParams) {
+	const quote = await quoteMarketOrder(params);
 	const orderParams = {
-		...fetchedOrderParams,
-		userOrderId,
+		...quote.orderParams,
+		userOrderId: params.userOrderId ?? 0,
 	};
 
-	const userAccount = user.getUserAccountOrThrow();
-
-	return { userAccount, orderParams };
+	return { userAccount: params.user.getUserAccountOrThrow(), orderParams };
 }
 
 /**
@@ -243,7 +213,7 @@ export async function createSwiftMarketOrder(
 
 export type CreateSwiftMarketOrderMessageParams = Omit<
 	OpenPerpMarketOrderBaseParams,
-	'placeAndTake' | 'mainSignerOverride'
+	'mainSignerOverride'
 > & {
 	isDelegate?: boolean;
 	userSigningSlotBuffer?: number;
@@ -251,7 +221,7 @@ export type CreateSwiftMarketOrderMessageParams = Omit<
 
 /**
  * Prepares a Swift market order message without signing or sending it.
- * Fetches auction params from the DLOB server and creates the prepared message.
+ * Quotes the order from the DLOB server and creates the prepared message.
  *
  * @returns The prepared SwiftOrderMessage ready for client-side signing and sending
  */
@@ -309,343 +279,66 @@ export async function createSwiftMarketOrderMessage(
 }
 
 /**
- * Creates a placeAndTake transaction instruction.
- * Fallbacks to a regular market order if no top makers are found.
+ * The take of a market order. The quote names its worst price, and what does not fill
+ * rests on the book there as a taker-origin order.
  */
-export const createPlaceAndTakePerpMarketOrderIx = async ({
-	assetType,
-	direction,
-	dlobServerHttpUrl,
-	marketIndex,
-	velocityClient,
-	user,
-	userOrderId,
-	amount,
-	orderType,
-	price,
-	reduceOnly,
-	auctionDurationPercentage,
-	optionalAuctionParamsInputs,
-	mainSignerOverride,
-	callbacks,
-	takerEscrow,
-	builderParams,
-	slotDuration,
-}: Omit<
-	OpenPerpMarketOrderBaseParams,
-	'marginMode' | 'isolatedPositionDepositsOverride'
-> & {
-	orderType?: OrderType;
-	price?: BN;
-	direction: PositionDirection;
-	dlobServerHttpUrl: string;
-	marketIndex: number;
-	velocityClient: VelocityClient;
-	user: User;
-	auctionDurationPercentage?: number;
-	takerEscrow?: RevenueShareEscrowAccount;
-}) => {
-	const counterPartySide = ENUM_UTILS.match(direction, PositionDirection.LONG)
-		? 'ask'
-		: 'bid';
+export const createPlaceAndTakePerpMarketOrderIx = async (
+	params: OpenPerpMarketOrderBaseParams
+): Promise<TransactionInstruction> => {
+	const quote = await quoteMarketOrder(params);
+	const { velocityClient, user, builderParams, mainSignerOverride } = params;
 
-	const [fetchedResult, topMakersResult, resolvedTakerEscrow] =
-		await Promise.all([
-			fetchAuctionOrderParams({
-				velocityClient,
-				user,
-				assetType,
-				marketIndex,
-				marketType: MarketType.PERP,
-				direction,
-				amount,
-				reduceOnly,
-				dlobServerHttpUrl,
-				slotDuration,
-				optionalAuctionParamsInputs,
-				onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,
-			}),
-			fetchTopMakers({
-				dlobServerHttpUrl,
-				marketIndex,
-				marketType: MarketType.PERP,
-				side: counterPartySide,
-				limit: 4,
-			}),
-			// place_and_take fills the placing user's own order in-instruction, so the
-			// taker's RevenueShareEscrow must be attached or the program rejects the fill
-			// with UnableToLoadRevenueShareAccount. Enforcement triggers when the order
-			// carries a builder code or the escrow has a referrer. Honor a caller-supplied
-			// escrow, otherwise fetch it and only attach it when one of those holds.
-			(async (): Promise<RevenueShareEscrowAccount | undefined> => {
-				if (takerEscrow) {
-					return takerEscrow;
-				}
-				const escrow = await fetchRevenueShareEscrowAccount(
-					velocityClient.connection,
-					velocityClient.program,
-					user.getUserAccountOrThrow().authority
-				);
-				return escrow && (escrowHasReferrer(escrow) || !!builderParams)
-					? escrow
-					: undefined;
-			})(),
-		]);
-
-	const fetchedOrderParams = fetchedResult.orderParams;
-
-	fetchedOrderParams.userOrderId = userOrderId;
-
-	if (orderType) {
-		fetchedOrderParams.orderType = orderType;
-	}
-
-	if (price) {
-		fetchedOrderParams.price = price;
-		fetchedOrderParams.auctionEndPrice = price;
-	}
-
-	if (!topMakersResult || topMakersResult.length === 0) {
-		throw new NoTopMakersError('No top makers found', fetchedOrderParams);
-	}
-
-	const topMakersInfo = topMakersResult.map((maker) => ({
-		maker: maker.userAccountPubKey,
-		makerUserAccount: maker.userAccount,
-		makerStats: getUserStatsAccountPublicKey(
-			velocityClient.program.programId,
-			maker.userAccount.authority
-		),
-	}));
-
-	const placeAndTakeIx = await velocityClient.getPlaceAndTakePerpOrderIx(
-		{ ...fetchedOrderParams, ...builderParams },
-		topMakersInfo,
+	return velocityClient.getPlaceAndTakePerpOrderIx(
+		{ ...quote.orderParams, userOrderId: params.userOrderId, ...builderParams },
 		undefined,
-		auctionDurationPercentage,
+		undefined,
+		undefined,
 		user.getUserAccountOrThrow().subAccountId,
-		{
-			authority: mainSignerOverride,
-		},
-		resolvedTakerEscrow
+		{ authority: mainSignerOverride },
+		params.takerEscrow
 	);
-
-	return placeAndTakeIx;
 };
 
 /**
- * Creates transaction instructions for opening a perp market order.
- * If swiftOptions is provided, it will create a Swift (signed message) order instead.
+ * The instructions of a perp market order: any leverage and isolated-margin setup, the take,
+ * and the bracket triggers.
  *
- * @param velocityClient - The Velocity client instance for interacting with the protocol
- * @param user - The user account that will place the order
- * @param assetType - Whether the amount is in base or quote units
- * @param marketIndex - The perp market index to trade
- * @param direction - The direction of the trade (long/short)
- * @param amount - The amount to trade
- * @param dlobServerHttpUrl - Server URL for the auction params endpoint
- * @param optionalAuctionParamsInputs - Optional parameters for auction params endpoint and order configuration
- * @param positionMaxLeverage - Optional per-market leverage (e.g., 5 for 5x). If provided and different from current,
- *                               adds an instruction to update the position's maxMarginRatio before placing the order.
  * @param userOrderId - the order ID in terms of incremental fills (usually 0). do NOT use the nextOrderId from the user account. values over 255 will cause the order to fail onchain.
- * @returns Promise resolving to an array of transaction instructions for regular orders
  */
-export const createOpenPerpMarketOrderIxs = async ({
-	velocityClient,
-	user,
-	assetType,
-	marketIndex,
-	direction,
-	amount,
-	reduceOnly,
-	bracketOrders,
-	dlobServerHttpUrl,
-	placeAndTake,
-	userOrderId,
-	optionalAuctionParamsInputs = {},
-	positionMaxLeverage,
-	mainSignerOverride,
-	marginMode,
-	isolatedPositionDepositsOverride,
-	callbacks,
-	builderParams,
-	slotDuration,
-}: OpenPerpMarketOrderBaseParams): Promise<TransactionInstruction[]> => {
+export const createOpenPerpMarketOrderIxs = async (
+	params: OpenPerpMarketOrderBaseParams
+): Promise<TransactionInstruction[]> => {
+	const {
+		velocityClient,
+		user,
+		marketIndex,
+		direction,
+		amount,
+		bracketOrders,
+		mainSignerOverride,
+	} = params;
+
 	if (!amount || amount.isZero()) {
 		throw new Error('Amount must be greater than zero');
 	}
 
-	const resolvedDeposits = resolveIsolatedPositionDepositsWithOverride(
-		isolatedPositionDepositsOverride,
-		{
-			velocityClient,
-			user,
+	const [setupIxs, takeIx] = await Promise.all([
+		createPositionSetupIxs(params, true),
+		createPlaceAndTakePerpMarketOrderIx(params),
+	]);
+	const triggerIxs = await createTriggerOrderIxs({
+		velocityClient,
+		user,
+		orderParams: bracketTriggerOrderParams({
 			marketIndex,
-			baseAssetAmount: amount,
-			direction,
-			positionMaxLeverage,
-			marginMode,
-			replenishUnderwaterPositions: true,
-		}
-	);
+			entryDirection: direction,
+			entryBaseAssetAmount: amount,
+			bracketOrders,
+		}),
+		mainSignerOverride,
+	});
 
-	const mainIsolatedDeposit = resolvedDeposits?.mainDeposit;
-	const resolvedAdditionalDeposits =
-		resolvedDeposits?.additionalIsolatedPositionDeposits;
-
-	const allOrders: OptionalOrderParams[] = [];
-	const allIxs: TransactionInstruction[] = [];
-
-	// Fetch all deposit/leverage ixs in parallel
-	const [leverageIx, additionalDepositIxs, isolatedPositionDepositIx] =
-		await Promise.all([
-			getPositionMaxLeverageIxIfNeeded(
-				velocityClient,
-				user,
-				marketIndex,
-				positionMaxLeverage,
-				mainSignerOverride
-			),
-			resolvedAdditionalDeposits?.length
-				? Promise.all(
-						resolvedAdditionalDeposits.map((deposit) =>
-							getIsolatedPositionDepositIxIfNeeded(
-								velocityClient,
-								user,
-								deposit.marketIndex,
-								deposit.amount,
-								mainSignerOverride
-							)
-						)
-					)
-				: Promise.resolve([] as (TransactionInstruction | undefined)[]),
-			getIsolatedPositionDepositIxIfNeeded(
-				velocityClient,
-				user,
-				marketIndex,
-				mainIsolatedDeposit,
-				mainSignerOverride
-			),
-		]);
-
-	if (leverageIx) {
-		allIxs.push(leverageIx);
-	}
-	for (const ix of additionalDepositIxs) {
-		if (ix) {
-			allIxs.push(ix);
-		}
-	}
-	if (isolatedPositionDepositIx) {
-		allIxs.push(isolatedPositionDepositIx);
-	}
-
-	if (placeAndTake?.enable) {
-		try {
-			const placeAndTakeIx = await createPlaceAndTakePerpMarketOrderIx({
-				assetType,
-				amount,
-				direction,
-				dlobServerHttpUrl,
-				marketIndex,
-				velocityClient,
-				user,
-				userOrderId,
-				reduceOnly,
-				auctionDurationPercentage: placeAndTake.auctionDurationPercentage,
-				takerEscrow: placeAndTake.takerEscrow,
-				optionalAuctionParamsInputs,
-				mainSignerOverride,
-				positionMaxLeverage,
-				builderParams,
-				slotDuration,
-			});
-			allIxs.push(placeAndTakeIx);
-		} catch (e) {
-			if (e instanceof NoTopMakersError) {
-				// fallback to regular order
-				allOrders.push(e.orderParams);
-			} else {
-				throw e;
-			}
-		}
-	} else {
-		const { orderParams: fetchedOrderParams } = await fetchAuctionOrderParams({
-			velocityClient,
-			user,
-			assetType,
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction,
-			amount,
-			dlobServerHttpUrl,
-			slotDuration,
-			optionalAuctionParamsInputs,
-			reduceOnly,
-			onAuctionParamsFetched: callbacks?.onAuctionParamsFetched,
-		});
-
-		const orderParams = {
-			...fetchedOrderParams,
-			userOrderId,
-			...builderParams,
-		};
-
-		allOrders.push(orderParams);
-	}
-
-	const bracketOrdersDirection = ENUM_UTILS.match(
-		direction,
-		PositionDirection.LONG
-	)
-		? PositionDirection.SHORT
-		: PositionDirection.LONG;
-
-	if (bracketOrders?.takeProfit) {
-		const takeProfitParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction: bracketOrdersDirection,
-			baseAssetAmount: bracketOrders.takeProfit.baseAssetAmount ?? amount,
-			orderConfig: {
-				orderType: 'takeProfit',
-				triggerPrice: bracketOrders.takeProfit.triggerPrice,
-				limitPrice: bracketOrders.takeProfit.limitPrice,
-			},
-			reduceOnly: bracketOrders.takeProfit.reduceOnly ?? true,
-		});
-		allOrders.push(takeProfitParams);
-	}
-
-	if (bracketOrders?.stopLoss) {
-		const stopLossParams = buildNonMarketOrderParams({
-			marketIndex,
-			marketType: MarketType.PERP,
-			direction: bracketOrdersDirection,
-			baseAssetAmount: bracketOrders.stopLoss.baseAssetAmount ?? amount,
-			orderConfig: {
-				orderType: 'stopLoss',
-				triggerPrice: bracketOrders.stopLoss.triggerPrice,
-				limitPrice: bracketOrders.stopLoss.limitPrice,
-			},
-			reduceOnly: bracketOrders.stopLoss.reduceOnly ?? true,
-		});
-		allOrders.push(stopLossParams);
-	}
-
-	// Regular order flow - create transaction instruction
-	if (allOrders.length > 0) {
-		const placeOrderIx = await velocityClient.getPlaceOrdersIx(
-			allOrders,
-			undefined,
-			{
-				authority: mainSignerOverride,
-			}
-		);
-		allIxs.push(placeOrderIx);
-	}
-
-	return allIxs;
+	return [...setupIxs, takeIx, ...triggerIxs];
 };
 
 /**
@@ -656,8 +349,8 @@ export const createOpenPerpMarketOrderIxs = async ({
  * @param marketIndex - The perp market index to trade
  * @param direction - The direction of the trade (long/short)
  * @param amount - The amount to trade
- * @param optionalAuctionParamsInputs - Optional parameters for auction params endpoint and order configuration
- * @param dlobServerHttpUrl - Server URL for the auction params endpoint
+ * @param quoteInputs - Slippage and price reference for the /marketOrderParams quote
+ * @param dlobServerHttpUrl - Server URL for the /marketOrderParams quote
  * @param positionMaxLeverage - Optional per-market leverage (e.g., 5 for 5x). If provided and different from current,
  *                              includes an instruction to update the position's maxMarginRatio.
  *
@@ -692,8 +385,8 @@ export const createOpenPerpMarketOrderTxn = async (
  * @param marketIndex - The perp market index to trade
  * @param direction - The direction of the trade (long/short)
  * @param amount - The amount to trade
- * @param optionalAuctionParamsInputs - Optional parameters for auction params endpoint and order configuration
- * @param dlobServerHttpUrl - Server URL for the auction params endpoint
+ * @param quoteInputs - Slippage and price reference for the /marketOrderParams quote
+ * @param dlobServerHttpUrl - Server URL for the /marketOrderParams quote
  * @param useSwift - Whether to use Swift (signed message) orders instead of regular transactions
  * @param swiftOptions - Options for Swift (signed message) orders. Required if useSwift is true
  * @param userOrderId - The user order id for UI identification

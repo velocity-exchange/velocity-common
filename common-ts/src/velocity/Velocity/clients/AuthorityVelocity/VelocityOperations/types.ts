@@ -6,7 +6,7 @@ import {
 	SlotDurationMs,
 	SwapQuote,
 } from '@velocity-exchange/sdk';
-import { OptionalAuctionParamsRequestInputs } from '../../../../base/actions/trade/openPerpOrder/dlobServer';
+import { MarketOrderQuoteInputs } from '../../../../base/actions/trade/openPerpOrder/dlobServer';
 import { SwiftOrderOptions } from '../../../../base/actions/trade/openPerpOrder/openSwiftOrder';
 import { IsolatedPositionDepositsOverride } from '../../../../base/actions/trade/openPerpOrder/types';
 import { ReferralParams } from '../../../../base/actions/user/create';
@@ -97,7 +97,7 @@ export type PerpOrderParams = {
 		| {
 				orderType: 'market';
 				disableSwift?: boolean;
-				optionalAuctionParamsInputs?: OptionalAuctionParamsRequestInputs;
+				quoteInputs?: MarketOrderQuoteInputs;
 				postOnly?: never;
 				bracketOrders?: {
 					takeProfitPrice?: BigNum;
@@ -119,10 +119,6 @@ export type PerpOrderParams = {
 				orderType: 'takeProfit' | 'stopLoss';
 				triggerPrice: BigNum;
 				limitPrice?: BigNum;
-		  }
-		| {
-				orderType: 'oracleLimit';
-				oraclePriceOffset: BigNum;
 		  };
 };
 

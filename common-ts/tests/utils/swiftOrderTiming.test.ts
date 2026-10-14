@@ -15,15 +15,14 @@ import {
 	DELEGATE_SIGNING_MESSAGE_BUFFER_MS,
 	getUserSigningSlotBuffer,
 	MAXIMUM_SIGNING_MESSAGE_BUFFER_MS,
-	MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS,
+	MINIMUM_SWIFT_SIGNING_BUDGET_MS,
 	prepSwiftOrderMessage,
-	USER_SIGNING_MESSAGE_BUFFER_MS,
+	SIGNED_MSG_FILL_WINDOW_MS,
 } from '../../src/velocity/base/actions/trade/openPerpOrder/openSwiftOrder';
 import {
 	getSwiftConfirmationTimeoutMs,
 	SWIFT_CONFIRMATION_ROUND_TRIP_MS,
 } from '../../src/utils/signedMsgs';
-import { getDefaultMarketAuctionDurationSlots } from '../../src/velocity/base/constants/auction';
 
 const GATES = [400, 350, 300, 250, 200] as SlotDurationMs[];
 
@@ -31,19 +30,22 @@ const CURRENT_SLOT = 1_000_000;
 
 const clientStub = () =>
 	({
+		env: 'devnet',
+		program: { programId: PublicKey.default },
 		connection: {
 			getSlot: async () => CURRENT_SLOT,
 		},
+		getCustomQuoterRoute: async () => [],
 		encodeSignedMsgOrderParamsMessage: () => Buffer.from([1, 2, 3]),
 	}) as unknown as VelocityClient;
 
-const marketOrder = (auctionDuration: number): OptionalOrderParams =>
+const marketOrder = (): OptionalOrderParams =>
 	getMarketOrderParams({
 		marketIndex: 0,
 		marketType: MarketType.PERP,
 		direction: PositionDirection.LONG,
 		baseAssetAmount: BASE_PRECISION,
-		auctionDuration,
+		price: PRICE_PRECISION,
 	});
 
 const restingLimitOrder = (): OptionalOrderParams =>
@@ -55,34 +57,18 @@ const restingLimitOrder = (): OptionalOrderParams =>
 		price: PRICE_PRECISION,
 	});
 
-const limitAuctionOrder = (auctionDuration: number): OptionalOrderParams =>
-	getLimitOrderParams({
-		marketIndex: 0,
-		marketType: MarketType.PERP,
-		direction: PositionDirection.LONG,
-		baseAssetAmount: BASE_PRECISION,
-		price: PRICE_PRECISION,
-		auctionDuration,
-		auctionStartPrice: PRICE_PRECISION,
-		auctionEndPrice: PRICE_PRECISION.muln(101).divn(100),
-	});
-
 /**
- * The slot past which the program stops placing the order, as an offset from the
- * prep slot: `order_slot + auction_duration`, where `order_slot` is the auction
- * start. Derived from the program's rule and the published buffer constants, not
- * from the timing helper's own intermediates, so the assertion is independent.
+ * The program's placement rule, from `signed_msg_max_slot`: a resting limit places until
+ * its message slot, and any other order until the fill window past it. Both are offsets
+ * from the prep slot, derived from the published constants rather than the helper.
  */
-const onChainMaxSlotOffset = (
-	auctionDuration: number,
+const placementDeadlineOffset = (
+	main: OptionalOrderParams,
 	slotDuration: SlotDurationMs
-) => {
-	const budgetMs = auctionDuration
-		? USER_SIGNING_MESSAGE_BUFFER_MS
-		: MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS;
-
-	return Math.ceil(budgetMs / slotDuration) + auctionDuration;
-};
+) =>
+	'limit' in (main.orderType as object)
+		? Math.ceil(MINIMUM_SWIFT_SIGNING_BUDGET_MS / slotDuration)
+		: Math.ceil(SIGNED_MSG_FILL_WINDOW_MS / slotDuration);
 
 const timing = (main: OptionalOrderParams, slotDuration: SlotDurationMs) =>
 	prepSwiftOrderMessage({
@@ -95,111 +81,74 @@ const timing = (main: OptionalOrderParams, slotDuration: SlotDurationMs) =>
 		orderParams: { main },
 	});
 
-describe('swift order timing', () => {
-	it('reproduces the legacy windows at the 400ms baseline', async () => {
-		const auction = await timing(marketOrder(20), 400 as SlotDurationMs);
-		// 7 signing-buffer slots + 20 auction slots, less the 5-slot guard buffer.
-		expect(auction.slotsTillAuctionEnd).to.equal(27);
-		expect(auction.signingDeadlineSlot).to.equal(CURRENT_SLOT + 22);
-		expect(auction.expirationTimeMs).to.equal(8_800);
+describe('swift signing bytes', () => {
+	it('prefixes the hex message with the program domain the program verifies against', async () => {
+		const message = await timing(marketOrder(), 400 as SlotDurationMs);
+		const prefix = `velocity-signed-msg:${PublicKey.default.toBase58()}:`;
 
-		const nonAuction = await timing(restingLimitOrder(), 400 as SlotDurationMs);
-		expect(nonAuction.slotsTillAuctionEnd).to.equal(35);
-		expect(nonAuction.signingDeadlineSlot).to.equal(CURRENT_SLOT + 30);
-		expect(nonAuction.expirationTimeMs).to.equal(12_000);
+		expect(Buffer.from(message.signingBytes).toString()).to.equal(
+			prefix +
+				Buffer.from(message.hexEncodedSwiftOrderMessage.uInt8Array).toString()
+		);
+	});
+});
+
+describe('swift order timing', () => {
+	it('stamps a market order at the current slot, which the program requires', async () => {
+		for (const slotDuration of GATES) {
+			const { slotForSignedMsg } = await timing(marketOrder(), slotDuration);
+			expect(slotForSignedMsg.toNumber()).to.equal(CURRENT_SLOT);
+		}
+	});
+
+	it('stamps a resting limit ahead by its signing budget, inside the 30s lead', async () => {
+		for (const slotDuration of GATES) {
+			const { slotForSignedMsg } = await timing(
+				restingLimitOrder(),
+				slotDuration
+			);
+			const leadMs =
+				(slotForSignedMsg.toNumber() - CURRENT_SLOT) * slotDuration;
+
+			expect(leadMs).to.be.at.least(MINIMUM_SWIFT_SIGNING_BUDGET_MS);
+			expect(leadMs).to.be.below(30_000);
+		}
 	});
 
 	it('keeps the signing deadline inside the placement window at every gate', async () => {
 		for (const slotDuration of GATES) {
-			const cases: [OptionalOrderParams, number][] = [
-				[
-					marketOrder(getDefaultMarketAuctionDurationSlots(slotDuration)),
-					getDefaultMarketAuctionDurationSlots(slotDuration),
-				],
-				[marketOrder(1), 1],
-				[restingLimitOrder(), 0],
-				// A near-touch limit order: the confirmation floor runs well past
-				// the auction, so a deadline clamped against that floor instead of
-				// the chain's bound would let the user sign an order the program
-				// will silently decline to place.
-				[limitAuctionOrder(1), 1],
-				[limitAuctionOrder(5), 5],
-				[limitAuctionOrder(20), 20],
-			];
+			for (const main of [marketOrder(), restingLimitOrder()]) {
+				const { signingDeadlineSlot, slotsTillPlacementDeadline } =
+					await timing(main, slotDuration);
 
-			for (const [main, auctionDuration] of cases) {
-				const { signingDeadlineSlot } = await timing(main, slotDuration);
-
-				expect(
-					signingDeadlineSlot,
-					`auctionDuration ${auctionDuration} at ${slotDuration}ms`
-				).to.be.below(
-					CURRENT_SLOT + onChainMaxSlotOffset(auctionDuration, slotDuration)
+				expect(slotsTillPlacementDeadline).to.equal(
+					placementDeadlineOffset(main, slotDuration)
+				);
+				expect(signingDeadlineSlot).to.be.below(
+					CURRENT_SLOT + placementDeadlineOffset(main, slotDuration)
 				);
 			}
 		}
 	});
 
-	it('keeps the deadline inside the window when a caller passes its own tiny buffer', async () => {
-		// The minimum floor is 5 slots, so without a cap it outruns any window
-		// shorter than that and the guard lets through an order that can no
-		// longer fill. Only reachable when a caller supplies the buffer itself.
+	it('puts the placement deadline in wall time the placement window after prep', async () => {
 		for (const slotDuration of GATES) {
-			const { slotsTillAuctionEnd, signingDeadlineSlot } =
-				await prepSwiftOrderMessage({
-					velocityClient: clientStub(),
-					subAccountId: 0,
-					userAccountPubKey: PublicKey.default,
-					marketIndex: 0,
-					userSigningSlotBuffer: 1,
-					slotDuration,
-					orderParams: { main: marketOrder(1) },
-				});
+			for (const main of [marketOrder(), restingLimitOrder()]) {
+				const beforeMs = Date.now();
+				const { placementDeadlineMs } = await timing(main, slotDuration);
+				const windowMs =
+					placementDeadlineOffset(main, slotDuration) * slotDuration;
 
-			expect(slotsTillAuctionEnd).to.equal(2);
-			expect(signingDeadlineSlot).to.be.below(
-				CURRENT_SLOT + slotsTillAuctionEnd
-			);
-		}
-	});
-
-	it('holds the signing buffer wall-clock constant at every gate', async () => {
-		for (const slotDuration of GATES) {
-			const auctionSlots = getDefaultMarketAuctionDurationSlots(slotDuration);
-			const { slotsTillAuctionEnd } = await timing(
-				marketOrder(auctionSlots),
-				slotDuration
-			);
-
-			const bufferMs = (slotsTillAuctionEnd - auctionSlots) * slotDuration;
-			expect(bufferMs).to.be.at.least(USER_SIGNING_MESSAGE_BUFFER_MS);
-			expect(bufferMs).to.be.below(
-				USER_SIGNING_MESSAGE_BUFFER_MS + slotDuration
-			);
-		}
-	});
-
-	it('holds the non-auction approval budget wall-clock constant at every gate', async () => {
-		for (const slotDuration of GATES) {
-			const { slotsTillAuctionEnd } = await timing(
-				restingLimitOrder(),
-				slotDuration
-			);
-
-			const budgetMs = slotsTillAuctionEnd * slotDuration;
-			expect(budgetMs).to.be.at.least(
-				MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS
-			);
-			expect(budgetMs).to.be.below(
-				MINIMUM_SWIFT_NON_AUCTION_ORDER_SIGNING_BUDGET_MS + slotDuration
-			);
+				expect(placementDeadlineMs).to.be.at.least(beforeMs + windowMs);
+				expect(placementDeadlineMs).to.be.at.most(Date.now() + windowMs);
+			}
 		}
 	});
 
 	it('expresses the signing window in ms at the live duration', async () => {
 		for (const slotDuration of GATES) {
 			const { signingDeadlineSlot, expirationTimeMs } = await timing(
-				marketOrder(getDefaultMarketAuctionDurationSlots(slotDuration)),
+				marketOrder(),
 				slotDuration
 			);
 			expect(expirationTimeMs).to.equal(
@@ -218,12 +167,12 @@ describe('getSwiftConfirmationTimeoutMs', () => {
 
 	it('holds its wall-clock length at every gate', () => {
 		GATES.forEach((slotDuration) => {
-			const auctionSlots = Math.ceil(20_000 / slotDuration);
+			const windowSlots = Math.ceil(20_000 / slotDuration);
 			expect(
-				getSwiftConfirmationTimeoutMs(auctionSlots, undefined, slotDuration)
+				getSwiftConfirmationTimeoutMs(windowSlots, undefined, slotDuration)
 			).to.be.at.least(20_000 + SWIFT_CONFIRMATION_ROUND_TRIP_MS);
 			expect(
-				getSwiftConfirmationTimeoutMs(auctionSlots, undefined, slotDuration)
+				getSwiftConfirmationTimeoutMs(windowSlots, undefined, slotDuration)
 			).to.be.below(20_000 + SWIFT_CONFIRMATION_ROUND_TRIP_MS + slotDuration);
 		});
 	});
@@ -331,9 +280,9 @@ describe('user signing slot buffer', () => {
 		});
 	});
 
-	// The delegate budget is far below the 14s non-auction floor, which
-	// prepSwiftOrder applies after the caller's buffer.
-	it('still floors a resting limit at the non-auction budget', async () => {
+	// The delegate budget is far below the 14s floor, which prepSwiftOrder applies after the
+	// caller's buffer.
+	it('still floors a resting limit at the minimum signing budget', async () => {
 		const restingLimit = await prepSwiftOrderMessage({
 			velocityClient: clientStub(),
 			subAccountId: 0,
@@ -347,7 +296,7 @@ describe('user signing slot buffer', () => {
 			orderParams: { main: restingLimitOrder() },
 		});
 
-		expect(restingLimit.slotsTillAuctionEnd).to.equal(35);
+		expect(restingLimit.slotsTillPlacementDeadline).to.equal(35);
 		expect(restingLimit.expirationTimeMs).to.equal(12_000);
 	});
 });
